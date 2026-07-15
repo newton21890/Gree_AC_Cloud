@@ -1,0 +1,12 @@
+{
+  "domain": "gree_ac_cloud",
+  "name": "Gree AC Cloud",
+  "codeowners": ["@mariano"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/mariano/gree_ac_cloud",
+  "iot_class": "cloud_polling",
+  "integration_type": "hub",
+  "version": "0.1.0",
+  "requirements": ["pycryptodome>=3.10", "paho-mqtt>=2.0.0"]
+}

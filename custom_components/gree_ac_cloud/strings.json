@@ -1,0 +1,48 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Gree AC Cloud",
+        "description": "Enter your Gree cloud account credentials.\n\nIf you don't have an account, create one in the Gree+ app.",
+        "data": {
+          "server": "Server Region",
+          "username": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the cloud server. Check credentials and network.",
+      "invalid_auth": "Invalid email or password. Check your Gree+ app credentials.",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This account is already configured"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "in_tem": { "name": "Indoor Temperature" },
+      "out_tem": { "name": "Outdoor Temperature" },
+      "in_humi": { "name": "Indoor Humidity" },
+      "tem_sen": { "name": "Sensor Temperature" },
+      "set_deci_tem": { "name": "Target Temperature (Decimal)" }
+    },
+    "switch": {
+      "health": { "name": "Health/Ionizer" },
+      "quiet": { "name": "Quiet Mode" },
+      "tur": { "name": "Turbo Mode" },
+      "st_ht": { "name": "Strong Heat" },
+      "blo": { "name": "Blow" },
+      "sv_st": { "name": "Energy Saving" },
+      "tem_rec": { "name": "Temperature Recovery" },
+      "slp_mod": { "name": "Sleep Mode" },
+      "air": { "name": "Air Direction" },
+      "lig": { "name": "Light" }
+    },
+    "binary_sensor": {
+      "err": { "name": "Error Status" },
+      "filter": { "name": "Filter Status" }
+    }
+  }
+}

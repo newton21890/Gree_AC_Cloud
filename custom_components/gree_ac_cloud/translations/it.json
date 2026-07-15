@@ -1,0 +1,48 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Gree AC Cloud",
+        "description": "Inserisci le credenziali del tuo account cloud Gree.\n\nSe non hai un account, creane uno nell'app Gree+.",
+        "data": {
+          "server": "Regione server",
+          "username": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossibile connettersi al server cloud. Controlla credenziali e rete.",
+      "invalid_auth": "Email o password non valide. Controlla le credenziali dell'app Gree+.",
+      "unknown": "Errore imprevisto"
+    },
+    "abort": {
+      "already_configured": "Questo account è già configurato"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "in_tem": { "name": "Temperatura interna" },
+      "out_tem": { "name": "Temperatura esterna" },
+      "in_humi": { "name": "Umidità interna" },
+      "tem_sen": { "name": "Temperatura sensore" },
+      "set_deci_tem": { "name": "Temperatura target (decimale)" }
+    },
+    "switch": {
+      "health": { "name": "Ionizzatore" },
+      "quiet": { "name": "Modalità silenziosa" },
+      "tur": { "name": "Modalità turbo" },
+      "st_ht": { "name": "Riscaldamento intenso" },
+      "blo": { "name": "Ventilazione" },
+      "sv_st": { "name": "Risparmio energetico" },
+      "tem_rec": { "name": "Recupero temperatura" },
+      "slp_mod": { "name": "Modalità notte" },
+      "air": { "name": "Direzione aria" },
+      "lig": { "name": "Luce" }
+    },
+    "binary_sensor": {
+      "err": { "name": "Stato errore" },
+      "filter": { "name": "Stato filtro" }
+    }
+  }
+}
