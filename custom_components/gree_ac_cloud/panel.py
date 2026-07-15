@@ -6,6 +6,7 @@ for monitoring and controlling Gree cloud VRF devices.
 
 from __future__ import annotations
 
+import json
 import logging
 from collections import deque
 from datetime import datetime
