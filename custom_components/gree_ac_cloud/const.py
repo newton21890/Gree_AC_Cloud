@@ -24,7 +24,7 @@ GREE_CLOUD_SERVERS = {
 }
 
 GREE_MQTT_HOSTS = {
-    "Europe": "mqtt-eu.gree.com",
+    "Europe": "18.185.150.155",  # mqtt-eu.gree.com
     "North America": "mqtt-us.gree.com",
     "China Mainland": "mqtt-cn.gree.com",
     "Australia": "mqtt-au.gree.com",
@@ -97,3 +97,4 @@ DEVICE_BINARY_SENSORS = {
 
 STORAGE_VERSION = 1
 STORAGE_KEY_MODELS = f"{DOMAIN}.models"
+STORAGE_KEY_SETTINGS = f"{DOMAIN}.settings"

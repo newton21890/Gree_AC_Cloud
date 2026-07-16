@@ -76,6 +76,8 @@ async def async_register_panel(hass: HomeAssistant):
     hass.http.register_view(GreePanelLogView)
     hass.http.register_view(GreePanelModelsView)
     hass.http.register_view(GreePanelNamesView)
+    hass.http.register_view(GreePanelSettingsView)
+    hass.http.register_view(GreePanelRefreshView)
 
     if "frontend" in hass.config.components:
         try:
@@ -264,6 +266,56 @@ class GreePanelNamesView(HomeAssistantView):
         return self.json({"ok": True, "mac": mac, "name": name})
 
 
+class GreePanelSettingsView(HomeAssistantView):
+    """Get/set panel settings."""
+
+    url = "/api/gree_ac_cloud/panel/settings"
+    name = "api:gree_ac_cloud:panel_settings"
+    requires_auth = False
+
+    async def get(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        settings = hass.data.get(DOMAIN, {}).get("settings", {"update_interval": 15})
+        return self.json(settings)
+
+    async def post(self, request: web.Request) -> web.Response:
+        from datetime import timedelta
+
+        hass = request.app["hass"]
+        try:
+            body = await request.json()
+        except Exception:
+            return self.json({"error": "invalid JSON"}, status=400)
+
+        interval = body.get("update_interval")
+        if interval and isinstance(interval, (int, float)):
+            interval = max(5, min(300, int(interval)))
+            hass.data.setdefault(DOMAIN, {}).setdefault("settings", {})
+            hass.data[DOMAIN]["settings"]["update_interval"] = interval
+            for coord in hass.data.get(DOMAIN, {}).get("coordinators", []):
+                coord.update_interval = timedelta(seconds=interval)
+            _LOGGER.info("Poll interval changed to %ds", interval)
+
+        store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.settings")
+        await store.async_save(hass.data.get(DOMAIN, {}).get("settings", {}))
+        return self.json({"ok": True, "update_interval": interval})
+
+
+class GreePanelRefreshView(HomeAssistantView):
+    """Triggers immediate data refresh."""
+
+    url = "/api/gree_ac_cloud/panel/refresh"
+    name = "api:gree_ac_cloud:panel_refresh"
+    requires_auth = False
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        coordinators = hass.data.get(DOMAIN, {}).get("coordinators", [])
+        for coord in coordinators:
+            await coord.async_request_refresh()
+        return self.json({"ok": True, "refreshed": len(coordinators)})
+
+
 # ── Panel HTML ────────────────────────────────────────
 
 PANEL_HTML = r"""<!DOCTYPE html>
@@ -341,6 +393,12 @@ body {
   scrollbar-width: none;
 }
 .tab-nav::-webkit-scrollbar { display: none; }
+.header-controls { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.interval-label { font-size: 10px; color: var(--text2); display: flex; align-items: center; gap: 4px; }
+.interval-label select { font-size: 10px; padding: 2px 4px; border-radius: 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text); }
+.refresh-btn { font-size: 16px; padding: 2px 10px; border-radius: 6px; background: rgba(3,169,244,0.15); border: 1px solid rgba(3,169,244,0.3); color: var(--primary); cursor: pointer; }
+.refresh-btn:hover { background: rgba(3,169,244,0.25); }
+body.desktop .header-controls { margin: 6px 0 4px; }
 .tab-btn {
   flex-shrink: 0;
   padding: 7px 12px;
@@ -675,6 +733,19 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
     <span class="icon-ac"><svg viewBox="0 0 24 24"><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg></span>
     <h1>Gree AC Cloud</h1>
     <span class="status-badge" id="statusBadge">loading...</span>
+  </div>
+  <div class="header-controls">
+    <label class="interval-label">
+      Poll:
+      <select id="intervalSelect" onchange="setPollInterval(this.value)" title="Intervallo di polling">
+        <option value="5">5s</option>
+        <option value="10">10s</option>
+        <option value="15" selected>15s</option>
+        <option value="30">30s</option>
+        <option value="60">60s</option>
+      </select>
+    </label>
+    <button class="refresh-btn" onclick="refreshNow()" title="Aggiorna ora">↻</button>
   </div>
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="devices" onclick="switchTab('devices')">Devices</button>
@@ -1056,6 +1127,8 @@ const HA_BASE = window.location.origin;
 const PANEL_DATA_URL = HA_BASE + '/api/gree_ac_cloud/panel/data';
 const PANEL_CMD_URL = HA_BASE + '/api/gree_ac_cloud/panel/command';
 const PANEL_NAMES_URL = HA_BASE + '/api/gree_ac_cloud/panel/names';
+const PANEL_SETTINGS_URL = HA_BASE + '/api/gree_ac_cloud/panel/settings';
+const PANEL_REFRESH_URL = HA_BASE + '/api/gree_ac_cloud/panel/refresh';
 
 const __README_CONTENT__ = __README_JSON__;
 const __CHANGELOG_CONTENT__ = __CHANGELOG_JSON__;
@@ -1132,6 +1205,26 @@ async function renameDevice(mac) {
     __DEVICE_NAMES__[mac] = name;
   } catch (e) {
     console.warn('renameDevice failed:', e);
+  }
+  loadData();
+}
+
+async function setPollInterval(val) {
+  try {
+    await fetch(PANEL_SETTINGS_URL, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({update_interval: parseInt(val)})
+    });
+  } catch (e) {
+    console.warn('setPollInterval failed:', e);
+  }
+}
+
+async function refreshNow() {
+  try {
+    await fetch(PANEL_REFRESH_URL, { method: 'POST' });
+  } catch (e) {
+    console.warn('refreshNow failed:', e);
   }
   loadData();
 }
@@ -1532,6 +1625,14 @@ window.addEventListener('resize', updateViewportClass);
 loadModels();
 loadData();
 setInterval(loadData, 10000);
+
+(async function initSettings() {
+  try {
+    const s = await (await fetch(PANEL_SETTINGS_URL)).json();
+    const sel = document.getElementById('intervalSelect');
+    if (sel && s.update_interval) sel.value = String(s.update_interval);
+  } catch (e) {}
+})();
 </script>
 </body>
 </html>"""

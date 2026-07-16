@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -27,7 +28,9 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         GREE_MQTT_HOSTS,
         GREE_MQTT_PORTS,
         STORAGE_KEY_MODELS,
+        STORAGE_KEY_SETTINGS,
         STORAGE_VERSION,
+        UPDATE_INTERVAL,
     )
     STORAGE_KEY_NAMES = f"{DOMAIN}.names"
     from .coordinator import async_discover_and_connect, GreeDeviceCoordinator
@@ -93,14 +96,22 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         hass.data[DOMAIN]["device_names"].update(saved_names)
         _LOGGER.info("Restored %d device names", len(saved_names))
 
+    settings_store = Store(hass, STORAGE_VERSION, STORAGE_KEY_SETTINGS)
+    saved_settings = await settings_store.async_load()
+    poll_interval = (saved_settings or {}).get("update_interval", UPDATE_INTERVAL)
+    hass.data[DOMAIN]["settings"] = saved_settings or {"update_interval": UPDATE_INTERVAL}
+
     coordinators = [
         GreeDeviceCoordinator(hass, entry, mqtt, dev)
         for dev in devices
     ]
 
     for coord in coordinators:
+        coord.update_interval = timedelta(seconds=poll_interval)
         await coord.async_init()
         await coord.async_config_entry_first_refresh()
+
+    hass.data[DOMAIN]["coordinators"] = coordinators
 
     def _forward(mac, data):
         if "Pow" not in data:
@@ -126,6 +137,8 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         await store.async_save(hass.data[DOMAIN].get("models", {}))
         ns = Store(hass, STORAGE_VERSION, STORAGE_KEY_NAMES)
         await ns.async_save(hass.data[DOMAIN].get("device_names", {}))
+        ss = Store(hass, STORAGE_VERSION, STORAGE_KEY_SETTINGS)
+        await ss.async_save(hass.data[DOMAIN].get("settings", {}))
         for coord in coordinators:
             await coord.async_save_energy()
 

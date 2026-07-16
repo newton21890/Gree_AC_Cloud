@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import socket
+
 import threading
 import time
 from typing import Any, Callable
@@ -61,8 +62,9 @@ class GreeMQTTClient:
             d.mac: threading.Event() for d in devices
         }
         self._running = False
-        self._keepalive_thread: threading.Thread | None = None
         self._user_params: dict[str, set[str]] = {d.mac: set() for d in devices}
+        self._req_counter = 0
+        self._req_lock = threading.Lock()
 
     # ── lifecycle ──────────────────────────────────────
 
@@ -86,19 +88,13 @@ class GreeMQTTClient:
         try:
             self._client.reconnect_delay_set(min_delay=1, max_delay=30)
             _LOGGER.info("Connecting to %s:%s", self.host, self.port)
-            self._client.connect(self.host, self.port, keepalive=60)
+            self._client.connect(self.host, self.port, keepalive=10)
             self._client.loop_start()
         except Exception as exc:
             _LOGGER.error("MQTT connect failed: %s", exc)
             return False
 
-        ok = self._ready.wait(timeout)
-        if ok:
-            self._keepalive_thread = threading.Thread(
-                target=self._keepalive_loop, daemon=True
-            )
-            self._keepalive_thread.start()
-        return ok
+        return self._ready.wait(timeout)
 
     def stop(self):
         self._running = False
@@ -148,13 +144,16 @@ class GreeMQTTClient:
             _LOGGER.warning("Could not set TCP keepalive", exc_info=True)
 
     def _on_message(self, _c, _u, msg):
+        _LOGGER.debug("MQTT RECV topic=%s payload=%.120s", msg.topic, msg.payload)
         try:
             payload = json.loads(msg.payload)
         except json.JSONDecodeError:
+            _LOGGER.debug("MQTT RECV non-JSON on %s", msg.topic)
             return
 
         pack = payload.get("pack")
         if not pack:
+            _LOGGER.debug("MQTT RECV no pack on %s keys=%s", msg.topic, list(payload.keys()))
             return
 
         # Topic format: response/{parent_mac}/...
@@ -221,20 +220,6 @@ class GreeMQTTClient:
                 )
                 self._client.publish(f"request/{dev.parent_mac}", msg)
 
-    def _keepalive_loop(self):
-        """Background thread: publishes a minimal ping every 25s to keep TCP alive."""
-        topic = f"ping/ha_ac_cloud/{self.uid}"
-        while self._running:
-            time.sleep(25)
-            if not self._client or not self._client.is_connected():
-                continue
-            try:
-                payload = json.dumps({"t": "ping", "ts": time.time()}, separators=(",", ":"))
-                info = self._client.publish(topic, payload, qos=0)
-                if info.rc != 0:
-                    _LOGGER.debug("Keepalive publish rc=%s", info.rc)
-            except Exception:
-                pass
 
     # ── public API ─────────────────────────────────────
 
@@ -247,15 +232,15 @@ class GreeMQTTClient:
         if not dev or not self._client or not self._client.is_connected():
             return False
 
-        # Re-subscribe before each poll in case broker dropped subscriptions
-        self._client.subscribe(f"response/{dev.parent_mac}/#")
-        self._client.subscribe(f"status/{dev.parent_mac}/#")
+        with self._req_lock:
+            self._req_counter += 1
+            req_i = self._req_counter
 
         pack = dev.build_status_request(cols or POLL_COLS)
         msg = json.dumps(
             {
                 "t": "pack",
-                "i": 0,
+                "i": req_i,
                 "uid": self.uid,
                 "cid": "ha_ac_cloud",
                 "tcid": mac,
@@ -266,8 +251,8 @@ class GreeMQTTClient:
         result = self._client.publish(f"request/{dev.parent_mac}", msg)
         ok = result.rc == 0 if hasattr(result, 'rc') else False
         _LOGGER.debug(
-            "Poll %s published (rc=%s) to request/%s",
-            mac, result.rc if hasattr(result, 'rc') else '?', dev.parent_mac,
+            "Poll %s published (i=%d rc=%s) to request/%s",
+            mac, req_i, result.rc if hasattr(result, 'rc') else '?', dev.parent_mac,
         )
         return ok
 
@@ -300,6 +285,10 @@ class GreeMQTTClient:
             separators=(",", ":"),
         )
         self._client.publish(f"request/{dev.parent_mac}", msg)
+        _LOGGER.info(
+            "send_command: %s options=%s values=%s",
+            mac, options, values,
+        )
         # Track user intent for extra params (re-enable after power cycle)
         up = self._user_params.setdefault(mac, set())
         for opt, val in zip(options, values):

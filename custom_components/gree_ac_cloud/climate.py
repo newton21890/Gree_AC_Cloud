@@ -115,7 +115,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
             mqtt.send_command, self._device.mac, ["Pow"], [0]
         )
         self._device.properties["Pow"] = 0
-        self._sync_data()
+        await self._sync_data()
 
     # ── fan ───────────────────────────────────────────
 
@@ -131,7 +131,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
             mqtt.send_command, self._device.mac, ["WdSpd"], [speed]
         )
         self._device.properties["WdSpd"] = speed
-        self._sync_data()
+        await self._sync_data()
 
     # ── swing ─────────────────────────────────────────
 

@@ -152,9 +152,7 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("%s: poll publish failed", self.device.name)
             return self._build_data()
 
-        got = await asyncio.get_event_loop().run_in_executor(
-            None, resp_event.wait, 5
-        )
+        got = await asyncio.to_thread(resp_event.wait, 5)
 
         _LOGGER.debug(
             "%s: poll %s (properties Pow=%s)",
