@@ -30,6 +30,8 @@ POLL_COLS = [
 
 _LOGGER = logging.getLogger(__name__)
 
+EXTRA_KEYS = ["Health", "Quiet", "Tur", "StHt", "Blo", "SvSt", "SlpMod", "Lig", "Air", "SwingLfRig", "SwUpDn"]
+
 
 class GreeMQTTClient:
     """Manages MQTT connection to Gree cloud broker.
@@ -60,6 +62,7 @@ class GreeMQTTClient:
         }
         self._running = False
         self._keepalive_thread: threading.Thread | None = None
+        self._user_params: dict[str, set[str]] = {d.mac: set() for d in devices}
 
     # ── lifecycle ──────────────────────────────────────
 
@@ -188,17 +191,35 @@ class GreeMQTTClient:
 
         dev.properties.update(_data)
 
-        EXTRA_KEYS = ["Health", "Quiet", "Tur", "StHt", "Blo", "SvSt", "SlpMod", "Lig", "Air", "SwingLfRig", "SwUpDn"]
+        needs_reenable: list[str] = []
         if power_on:
             for key in EXTRA_KEYS:
                 if key not in _data:
                     dev.properties[key] = 0
+            # Re-enable params the user had set ON before power cycle
+            for key in list(self._user_params.get(mac, set())):
+                if not dev.properties.get(key):
+                    dev.properties[key] = 1
+                    needs_reenable.append(key)
 
         self._response_events[mac].set()
         if self._on_data:
             self._on_data(mac, dict(dev.properties))
         _LOGGER.debug("MQTT: %s ⇐ %s (topic=%s)",
                       mac, dict(sorted(_data.items())), msg.topic)
+
+        # Re-publish commands for re-enabled params
+        if needs_reenable:
+            _LOGGER.info("Re-enabling %s on %s after power-on", needs_reenable, mac)
+            dev = self.devices.get(mac)
+            if dev:
+                pack = dev.build_command_pack(needs_reenable, [1] * len(needs_reenable))
+                msg = json.dumps(
+                    {"t": "pack", "i": 0, "uid": self.uid, "cid": "ha_ac_cloud",
+                     "tcid": mac, "pack": pack},
+                    separators=(",", ":"),
+                )
+                self._client.publish(f"request/{dev.parent_mac}", msg)
 
     def _keepalive_loop(self):
         """Background thread: publishes a minimal ping every 25s to keep TCP alive."""
@@ -279,6 +300,14 @@ class GreeMQTTClient:
             separators=(",", ":"),
         )
         self._client.publish(f"request/{dev.parent_mac}", msg)
+        # Track user intent for extra params (re-enable after power cycle)
+        up = self._user_params.setdefault(mac, set())
+        for opt, val in zip(options, values):
+            if opt in EXTRA_KEYS:
+                if val == 1:
+                    up.add(opt)
+                else:
+                    up.discard(opt)
         return True
 
     def wait_for_response(self, mac: str, timeout: float = 5) -> bool:
