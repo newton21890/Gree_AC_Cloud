@@ -380,30 +380,39 @@ body {
   pointer-events: none;
 }
 
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  gap: 4px;
+/* ── card header ──────────────────────────── */
+.card-header { margin-bottom: 8px; }
+.header-row1 {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 2px;
 }
-.card-header .name-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
+.header-row1 .name-group {
+  display: flex; align-items: center; gap: 6px;
+  flex: 1; min-width: 0;
 }
-.card-header .name-group .icon-ac { font-size: 18px; color: var(--primary); flex-shrink: 0; }
-.card-header h2 { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; cursor: pointer; }
-.card-header h2:hover { text-decoration: underline dotted var(--text2); }
-.card-header .mac-label { font-size: 9px; color: var(--text2); flex-shrink: 0; }
-.card-header .conn-badge {
+.header-row1 .name-group .icon-ac { font-size: 18px; color: var(--primary); flex-shrink: 0; }
+.header-row1 h2 {
+  font-size: 14px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1; cursor: pointer;
+}
+.header-row1 h2:hover { text-decoration: underline dotted var(--text2); }
+.header-row1 .conn-badge {
   font-size: 9px; padding: 2px 8px; border-radius: 10px;
   background: rgba(76,175,80,0.12); color: var(--green); font-weight: 600;
   white-space: nowrap; flex-shrink: 0;
 }
-.card-header .conn-badge.off { background: rgba(239,83,80,0.12); color: var(--red); }
+.header-row1 .conn-badge.off { background: rgba(239,83,80,0.12); color: var(--red); }
+.header-row2 {
+  display: flex; align-items: center; gap: 8px;
+  padding-left: 24px;
+}
+.header-row2 .mac-label { font-size: 9px; color: var(--text2); }
+body.desktop .card-header { display: flex; align-items: center; gap: 4px; }
+body.desktop .header-row1 { flex: 1; min-width: 0; margin-bottom: 0; }
+body.desktop .header-row1 .name-group { flex-wrap: wrap; }
+body.desktop .header-row1 h2 { flex: initial; max-width: 100%; }
+body.desktop .header-row2 { padding-left: 0; }
 
 .model-select {
   font-size: 9px; padding: 3px 6px; border-radius: 6px;
@@ -640,7 +649,7 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
   .tab-btn { padding: 8px 16px; font-size: 12px; }
   .card { padding: 20px; }
   .card-header { margin-bottom: 14px; }
-  .card-header h2 { font-size: 15px; }
+  .header-row1 h2 { font-size: 15px; }
   .sensors { gap: 8px; margin-bottom: 16px; }
   .sensor .value { font-size: 22px; }
   .control-row { gap: 8px; }
@@ -1215,16 +1224,20 @@ function renderDevice(d) {
   return `
 <div class="card${pow ? ' on' : ''}" data-mac="${d.mac}" style="position:relative">
   <div class="card-header">
-    <div class="name-group">
-      <span class="icon-ac"><svg viewBox="0 0 24 24"><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg></span>
-      <h2 class="device-name" ondblclick="renameDevice('${d.mac}')" title="Doppio click per rinominare">${deviceName}</h2>
+    <div class="header-row1">
+      <div class="name-group">
+        <span class="icon-ac"><svg viewBox="0 0 24 24"><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg></span>
+        <h2 class="device-name" ondblclick="renameDevice('${d.mac}')" title="Doppio click per rinominare">${deviceName}</h2>
+      </div>
+      <span class="conn-badge${!connected ? ' off' : ''}">${connected ? '● online' : '○ offline'}</span>
+    </div>
+    <div class="header-row2">
       <span class="mac-label">${d.mac}</span>
       <select class="model-select" onchange="setModel('${d.mac}', this.value)" title="Seleziona modello per stima consumi">
         <option value="">— modello —</option>
         ${Object.entries(MODELS).map(([k,v]) => `<option value="${k}" ${modelKey === k ? 'selected' : ''}>${v.name}</option>`).join('')}
       </select>
     </div>
-    <span class="conn-badge${!connected ? ' off' : ''}">${connected ? '● online' : '○ offline'}</span>
   </div>
 
   <div class="sensors">
