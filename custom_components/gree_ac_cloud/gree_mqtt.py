@@ -182,10 +182,21 @@ class GreeMQTTClient:
                 _LOGGER.debug("MQTT: %s decrypt failed (topic=%s)", mac, msg.topic)
                 return
 
+        old_pow = dev.properties.get("Pow")
+        new_pow = _data.get("Pow")
+        power_on = (old_pow == 0 and new_pow == 1)
+
         dev.properties.update(_data)
+
+        EXTRA_KEYS = ["Health", "Quiet", "Tur", "StHt", "Blo", "SvSt", "SlpMod", "Lig", "Air", "SwingLfRig", "SwUpDn"]
+        if power_on:
+            for key in EXTRA_KEYS:
+                if key not in _data:
+                    dev.properties[key] = 0
+
         self._response_events[mac].set()
         if self._on_data:
-            self._on_data(mac, _data)
+            self._on_data(mac, dict(dev.properties))
         _LOGGER.debug("MQTT: %s ⇐ %s (topic=%s)",
                       mac, dict(sorted(_data.items())), msg.topic)
 
