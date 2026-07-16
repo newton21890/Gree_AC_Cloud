@@ -278,7 +278,7 @@ if __name__ == "__main__":
     with open(creds) as f:
         cfg = json.load(f)
 
-    host = "3.71.159.59"
+    host = "eugrih.gree.com"
     uid, token, devices = discover_devices(
         host, cfg["username"], cfg["password"]
     )

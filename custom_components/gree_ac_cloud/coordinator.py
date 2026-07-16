@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import time
 from datetime import timedelta
@@ -10,7 +9,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import DOMAIN, ENERGY_MODELS, STORAGE_VERSION, UPDATE_INTERVAL
 from .gree_api import GreeDevice, discover_devices
-from .gree_mqtt import POLL_COLS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -141,36 +139,29 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
             _LOGGER.warning("%s: MQTT disconnected, skipping poll", self.device.name)
             return self._build_data()
 
-        resp_event = self._mqtt._response_events[self.device.mac]
-        resp_event.clear()
-
-        ok = await self.hass.async_add_executor_job(
-            self._mqtt.poll_device, self.device.mac, POLL_COLS
+        data = await self.hass.async_add_executor_job(
+            self._mqtt.refresh_device, self.device.mac, 5
         )
 
-        if not ok:
-            _LOGGER.debug("%s: poll publish failed", self.device.name)
-            return self._build_data()
-
-        got = await asyncio.to_thread(resp_event.wait, 5)
-
-        _LOGGER.debug(
-            "%s: poll %s (properties Pow=%s)",
-            self.device.name,
-            "got response" if got else "TIMEOUT",
-            self.device.properties.get("Pow"),
-        )
-
-        if self.device.properties:
+        if data is not None:
             self._error_count = 0
-            data = self._build_data()
+            result = self._build_data()
             self._energy_save_counter += 1
             if self._energy_save_counter >= 5:
                 self._energy_save_counter = 0
                 await self.async_save_energy()
-            return data
+            _LOGGER.debug(
+                "%s: refresh OK (Pow=%s)",
+                self.device.name, data.get("Pow"),
+            )
+            return result
 
         self._error_count += 1
+        _LOGGER.debug(
+            "%s: refresh TIMEOUT (attempt %d, Pow=%s)",
+            self.device.name, self._error_count,
+            self.device.properties.get("Pow"),
+        )
         if self._error_count >= 3:
             _LOGGER.warning(
                 "%s: no response after %d attempts",
