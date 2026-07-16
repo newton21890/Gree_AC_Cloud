@@ -63,6 +63,7 @@ class GreeMQTTClient:
         }
         self._data_seq: dict[str, int] = {d.mac: 0 for d in devices}
         self._running = False
+        self._keepalive_thread: threading.Thread | None = None
         self._user_params: dict[str, set[str]] = {d.mac: set() for d in devices}
 
     # ── lifecycle ──────────────────────────────────────
@@ -88,13 +89,19 @@ class GreeMQTTClient:
         try:
             self._client.reconnect_delay_set(min_delay=1, max_delay=30)
             _LOGGER.info("Connecting to %s:%s", self.host, self.port)
-            self._client.connect(self.host, self.port, keepalive=10)
+            self._client.connect(self.host, self.port, keepalive=60)
             self._client.loop_start()
         except Exception as exc:
             _LOGGER.error("MQTT connect failed: %s", exc)
             return False
 
-        return self._ready.wait(timeout)
+        ok = self._ready.wait(timeout)
+        if ok:
+            self._keepalive_thread = threading.Thread(
+                target=self._keepalive_loop, daemon=True
+            )
+            self._keepalive_thread.start()
+        return ok
 
     def stop(self):
         self._running = False
@@ -208,6 +215,19 @@ class GreeMQTTClient:
                     {"t": "pack", "i": 0, "uid": self.uid, "cid": "ha_ac_cloud",
                      "tcid": mac, "pack": pack},
                 )
+
+    def _keepalive_loop(self):
+        while self._running:
+            time.sleep(25)
+            if not self._client or not self._client.is_connected():
+                continue
+            try:
+                self._publish_json(
+                    f"kA/{self.uid}",
+                    {"t": "ka", "ts": time.time()},
+                )
+            except Exception:
+                pass
 
     # ── public API ─────────────────────────────────────
 
