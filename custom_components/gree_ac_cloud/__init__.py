@@ -106,25 +106,22 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         for dev in devices
     ]
 
+    def _forward(mac, data):
+        if "Pow" not in data:
+            return
+        for coord in coordinators:
+            if coord.device.mac == mac:
+                coord.async_set_updated_data(coord._build_data())
+                break
+
+    data_forwarder["cb"] = _forward
+
     for coord in coordinators:
         coord.update_interval = timedelta(seconds=poll_interval)
         await coord.async_init()
         await coord.async_config_entry_first_refresh()
 
     hass.data[DOMAIN]["coordinators"] = coordinators
-
-    def _forward(mac, data):
-        if "Pow" not in data:
-            return
-        for coord in coordinators:
-            if coord.device.mac == mac:
-                asyncio.run_coroutine_threadsafe(
-                    coord.async_set_updated_data(coord._build_data()),
-                    hass.loop,
-                )
-                break
-
-    data_forwarder["cb"] = _forward
 
     entry.runtime_data = {
         "mqtt": mqtt,
@@ -160,6 +157,6 @@ async def async_unload_entry(hass: HomeAssistant, entry):
     if unload_ok:
         mqtt = entry.runtime_data.get("mqtt")
         if mqtt:
-            await hass.async_add_executor_job(mqtt.stop)
+            await mqtt.stop()
         await async_unregister_panel(hass)
     return unload_ok

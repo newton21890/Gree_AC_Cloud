@@ -46,7 +46,7 @@ async def async_discover_and_connect(
         on_data=on_data_callback,
     )
 
-    ok = await hass.async_add_executor_job(mqtt.start, 15)
+    ok = await mqtt.start()
     if not ok:
         raise ConnectionError("Failed to connect to MQTT broker")
 
@@ -139,33 +139,13 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
             _LOGGER.warning("%s: MQTT disconnected, skipping poll", self.device.name)
             return self._build_data()
 
-        data = await self.hass.async_add_executor_job(
-            self._mqtt.refresh_device, self.device.mac, 5
-        )
-
-        if data is not None:
-            self._error_count = 0
-            result = self._build_data()
-            self._energy_save_counter += 1
-            if self._energy_save_counter >= 5:
-                self._energy_save_counter = 0
-                await self.async_save_energy()
-            _LOGGER.debug(
-                "%s: refresh OK (Pow=%s)",
-                self.device.name, data.get("Pow"),
-            )
-            return result
-
-        self._error_count += 1
+        await self._mqtt.refresh_device(self.device.mac)
+        result = self._build_data()
+        self._energy_save_counter += 1
+        if self._energy_save_counter >= 5:
+            self._energy_save_counter = 0
+            await self.async_save_energy()
         _LOGGER.debug(
-            "%s: refresh TIMEOUT (attempt %d, Pow=%s)",
-            self.device.name, self._error_count,
-            self.device.properties.get("Pow"),
+            "%s: refresh (Pow=%s)", self.device.name, result.get("Pow"),
         )
-        if self._error_count >= 3:
-            _LOGGER.warning(
-                "%s: no response after %d attempts",
-                self.device.name,
-                self._error_count,
-            )
-        return self._build_data()
+        return result

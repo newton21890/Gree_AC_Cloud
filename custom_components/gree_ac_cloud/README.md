@@ -12,11 +12,12 @@ HA (gree_ac_cloud) ─→ Gree MQTT (mqtt-eu.gree.com:1984) ←→ Devices
 The integration:
 1. Authenticates to the Gree Cloud API with your email/password
 2. Discovers registered VRF devices and their encryption keys
-3. Connects to the Gree MQTT broker to poll device state and send commands
+3. Connects to the Gree MQTT broker (async via aiomqtt) to poll device state and receive real-time status pushes
 4. Exposes climate, sensor, switch, and binary_sensor entities in HA
 
 ## Setup
 
+- **Requires `aiomqtt`**: `pip install aiomqtt` in your HA Python environment
 - Go to **Settings → Devices & Services → Add Integration → Gree AC Cloud**
 - Select your region and enter your Gree+ account credentials
 - Two devices appear: the parent controllers (12-char MAC)
@@ -28,7 +29,8 @@ The integration:
 - Switches: Health, Quiet, Turbo, Strong Heat, Blow, Energy Saving, Sleep, Light
 - Binary sensors: Error status, Filter reminder
 - Energy consumption estimation (based on model, mode, fan speed, load)
-- Panel UI with live controls, log viewer, Wiki reference, and energy monitoring
+- Panel UI with live controls, log viewer, Wiki reference, energy monitoring, and device info tab
+- Async MQTT (aiomqtt) — reliable auto-reconnect, no threads, real-time status pushes
 
 ## Hosted Regions
 
