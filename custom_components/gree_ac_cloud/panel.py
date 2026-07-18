@@ -16,7 +16,14 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN, STORAGE_KEY_MODELS, STORAGE_VERSION
+from .const import (
+    DOMAIN,
+    GREE_CLOUD_SERVERS,
+    GREE_MQTT_HOSTS,
+    GREE_MQTT_PORTS,
+    STORAGE_KEY_MODELS,
+    STORAGE_VERSION,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,6 +85,7 @@ async def async_register_panel(hass: HomeAssistant):
     hass.http.register_view(GreePanelNamesView)
     hass.http.register_view(GreePanelSettingsView)
     hass.http.register_view(GreePanelRefreshView)
+    hass.http.register_view(GreePanelDevicesInfoView)
 
     if "frontend" in hass.config.components:
         try:
@@ -177,9 +185,7 @@ class GreePanelCommandView(HomeAssistantView):
             if mqtt:
                 for coord in coordinators:
                     if coord.device.mac == mac:
-                        ok = await hass.async_add_executor_job(
-                            mqtt.send_command, mac, options, values
-                        )
+                        ok = await mqtt.send_command(mac, options, values)
                         if ok:
                             for opt, val in zip(options, values):
                                 coord.device.properties[opt] = val
@@ -314,6 +320,93 @@ class GreePanelRefreshView(HomeAssistantView):
         for coord in coordinators:
             await coord.async_request_refresh()
         return self.json({"ok": True, "refreshed": len(coordinators)})
+
+
+class GreePanelDevicesInfoView(HomeAssistantView):
+    """Returns raw device info (keys, MACs, etc.) from the cloud API."""
+
+    url = "/api/gree_ac_cloud/panel/devices-info"
+    name = "api:gree_ac_cloud:panel_devices_info"
+    requires_auth = False
+
+    async def get(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        result = []
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            runtime = getattr(entry, "runtime_data", None)
+            if not runtime:
+                continue
+            uid = runtime.get("uid", "?")
+            mqtt = runtime.get("mqtt")
+            server = entry.data.get("server", "Europe")
+            mqtt_host = GREE_MQTT_HOSTS.get(server, "?")
+            mqtt_port = GREE_MQTT_PORTS.get(server, 1984)
+            cloud_host = GREE_CLOUD_SERVERS.get(server, "?")
+
+            devices_info = []
+            coordinators = runtime.get("coordinators", [])
+            for coord in coordinators:
+                dev = coord.device
+                devices_info.append({
+                    "mac": dev.mac,
+                    "name": dev.name,
+                    "key": dev.key,
+                    "parent_mac": dev.parent_mac,
+                    "hid": dev.hid,
+                    "mqtt_topic_request": f"request/{dev.parent_mac}",
+                    "mqtt_topic_status": f"status/{dev.parent_mac}/#",
+                    "mqtt_topic_response": f"response/{dev.parent_mac}/#",
+                    "properties_count": len(dev.properties) if dev.properties else 0,
+                    "connected": mqtt.connected if hasattr(mqtt, "connected") else False,
+                })
+
+            result.append({
+                "uid": uid,
+                "server_region": server,
+                "cloud_host": cloud_host,
+                "mqtt_host": mqtt_host,
+                "mqtt_port": mqtt_port,
+                "devices": devices_info,
+            })
+
+        return self.json(result)
+
+    async def post(self, request: web.Request) -> web.Response:
+        """Re-discover devices from cloud API and return fresh info."""
+        from .gree_api import discover_devices
+
+        hass = request.app["hass"]
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            server = entry.data.get("server", "Europe")
+            username = entry.data.get("username", "")
+            password = entry.data.get("password", "")
+            cloud_host = GREE_CLOUD_SERVERS.get(server, "eugrih.gree.com")
+
+            try:
+                uid, token, devices = await hass.async_add_executor_job(
+                    discover_devices, cloud_host, username, password
+                )
+                result = {
+                    "uid": uid,
+                    "token": f"{token[:8]}...{token[-4:]}",
+                    "server_region": server,
+                    "cloud_host": cloud_host,
+                    "devices": [
+                        {
+                            "mac": d.mac,
+                            "name": d.name,
+                            "key": d.key,
+                            "parent_mac": d.parent_mac,
+                            "hid": d.hid,
+                        }
+                        for d in devices
+                    ],
+                }
+                return self.json(result)
+            except Exception as exc:
+                return self.json({"error": str(exc)}, status=500)
+
+        return self.json({"error": "No integration found"}, status=404)
 
 
 # ── Panel HTML ────────────────────────────────────────
@@ -753,6 +846,7 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
     <button class="tab-btn" data-tab="logs" onclick="switchTab('logs')">Logs</button>
     <button class="tab-btn" data-tab="readme" onclick="switchTab('readme')">README</button>
     <button class="tab-btn" data-tab="changelog" onclick="switchTab('changelog')">Changelog</button>
+    <button class="tab-btn" data-tab="info" onclick="switchTab('info')">🔧 Info</button>
   </nav>
 </div>
 
@@ -1115,6 +1209,9 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
       <p style="color:var(--text-secondary);font-size:13px;">Loading...</p>
     </div>
   </div>
+  <div id="tab-info" style="display:none;">
+    <div id="infoContent"></div>
+  </div>
 </div>
 
 <div class="server-info" id="serverInfo"></div>
@@ -1129,6 +1226,7 @@ const PANEL_CMD_URL = HA_BASE + '/api/gree_ac_cloud/panel/command';
 const PANEL_NAMES_URL = HA_BASE + '/api/gree_ac_cloud/panel/names';
 const PANEL_SETTINGS_URL = HA_BASE + '/api/gree_ac_cloud/panel/settings';
 const PANEL_REFRESH_URL = HA_BASE + '/api/gree_ac_cloud/panel/refresh';
+const PANEL_DEVICES_INFO_URL = HA_BASE + '/api/gree_ac_cloud/panel/devices-info';
 
 const __README_CONTENT__ = __README_JSON__;
 const __CHANGELOG_CONTENT__ = __CHANGELOG_JSON__;
@@ -1595,7 +1693,7 @@ function onLogAutoRefreshChange() {
 
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  const tabs = ['devices','wiki','logs','readme','changelog'];
+  const tabs = ['devices','wiki','logs','readme','changelog','info'];
   tabs.forEach(t => {
     const el = document.getElementById('tab-' + t);
     if (el) el.style.display = t === tab ? 'block' : 'none';
@@ -1613,6 +1711,95 @@ function switchTab(tab) {
   }
   if (tab === 'readme') loadReadme();
   if (tab === 'changelog') loadChangelog();
+  if (tab === 'info') loadInfo();
+}
+
+// ── Info tab (device keys, nerd details) ──
+
+async function loadInfo() {
+  const el = document.getElementById('infoContent');
+  el.innerHTML = '<p style="color:var(--text-secondary);">Loading device info...</p>';
+  try {
+    const data = await (await fetch(PANEL_DEVICES_INFO_URL)).json();
+    if (!data.length) {
+      el.innerHTML = '<p style="color:var(--text-secondary);">No devices found. Configure the integration first.</p>';
+      return;
+    }
+    let html = '';
+    for (const install of data) {
+      html += '<div class="wiki" style="margin-bottom:20px;">';
+      html += `<h3 style="margin-bottom:8px;">🔒 MQTT Connection</h3>`;
+      html += `<table class="wt"><tr><th>Parameter</th><th>Value</th></tr>`;
+      html += `<tr><td>UID</td><td><code>${install.uid}</code></td></tr>`;
+      html += `<tr><td>Server Region</td><td>${install.server_region}</td></tr>`;
+      html += `<tr><td>Cloud API</td><td><code>${install.cloud_host}</code></td></tr>`;
+      html += `<tr><td>MQTT Broker</td><td><code>${install.mqtt_host}:${install.mqtt_port}</code></td></tr>`;
+      html += `</table><br>`;
+
+      html += `<h3 style="margin-bottom:8px;">📡 Devices (${install.devices.length})</h3>`;
+      html += `<table class="wt"><tr><th>Name</th><th>MAC</th><th>Parent MAC</th><th>Key</th><th>Firmware</th><th>Props</th><th>Connected</th></tr>`;
+      for (const d of install.devices) {
+        const connCls = d.connected ? 'green' : 'red';
+        const connTxt = d.connected ? '✓' : '✗';
+        html += `<tr>
+          <td>${escHtml(d.name)}</td>
+          <td><code>${d.mac}</code></td>
+          <td><code>${d.parent_mac}</code></td>
+          <td><code style="font-size:9px;word-break:break-all;">${d.key}</code></td>
+          <td style="font-size:10px;">${escHtml(d.hid || '-')}</td>
+          <td>${d.properties_count}</td>
+          <td style="color:var(--${connCls});font-weight:700;">${connTxt}</td>
+        </tr>`;
+      }
+      html += `</table><br>`;
+
+      html += `<h3 style="margin-bottom:8px;">🧭 MQTT Topics</h3>`;
+      html += `<table class="wt"><tr><th>Device</th><th>Publish (request)</th><th>Subscribe (status)</th><th>Subscribe (response)</th></tr>`;
+      for (const d of install.devices) {
+        html += `<tr>
+          <td>${escHtml(d.name)}</td>
+          <td><code>${d.mqtt_topic_request}</code></td>
+          <td><code>${d.mqtt_topic_status}</code></td>
+          <td><code>${d.mqtt_topic_response}</code></td>
+        </tr>`;
+      }
+      html += `</table>`;
+      html += '</div>';
+    }
+    html += '<div style="margin-top:12px;">';
+    html += '<button class="btn" onclick="reDiscoverDevices()" title="Re-fetch device info from Gree Cloud API">🔄 Re-discover from Cloud</button>';
+    html += '<span id="rediscoverStatus" style="margin-left:8px;font-size:11px;color:var(--text2);"></span>';
+    html += '</div>';
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = '<p style="color:var(--red);">Error loading device info: ' + escHtml(e.message) + '</p>';
+  }
+}
+
+async function reDiscoverDevices() {
+  const btn = document.querySelector('button[onclick="reDiscoverDevices()"]');
+  const status = document.getElementById('rediscoverStatus');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Re-discovering...';
+  try {
+    const resp = await (await fetch(PANEL_DEVICES_INFO_URL, {method:'POST'})).json();
+    if (resp.error) {
+      if (status) status.textContent = '❌ ' + resp.error;
+      return;
+    }
+    if (status) status.textContent = `✅ Found ${resp.devices.length} devices. Last keys: ${resp.devices.map(d=>d.key.slice(0,4)+'...').join(', ')}`;
+    // Re-load the info tab
+    loadInfo();
+  } catch (e) {
+    if (status) status.textContent = '❌ ' + e.message;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ── viewport detection (works in iframe context) ──

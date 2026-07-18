@@ -1,25 +1,17 @@
 # Changelog
 
-## 0.2.0 (2026-07-15)
-
-### Fixed
-
-- **async_set_updated_data not awaited** — The `_forward` callback used `call_soon_threadsafe` to invoke the coroutine, which silently dropped the return value without scheduling it. Same issue in `_sync_data` (climate.py) and the panel command handler. The coordinator was never updated after MQTT responses, so entities always showed default (off) state.
-- **Stale cloud IP** — Replaced hardcoded `GREE_CLOUD_IPS` (`3.71.159.59`) with `GREE_CLOUD_SERVERS` hostnames for reliable DNS resolution.
-
-### Added
-
-- **Energy persistence** — Model mappings and accumulated energy are saved to HA Store (`gree_ac_cloud.models`, `gree_ac_cloud.energy.{mac}`), survive restarts.
-- **Energy counter freeze on power-off** — Energy no longer resets to 0 when AC turns off, satisfying `TOTAL_INCREASING` contract.
-- **Integration icon** — Custom brand icon using Gree blue + white text.
-- **Connection retry** — `async_setup_entry` retries 3 times with 5s sleep before raising `ConfigEntryNotReady`.
-- **Live log tab** — Log tab in the panel auto-refreshes every 2s, with Copy-all button and auto-scroll.
-- **Readme + Changelog tabs** — In-panel documentation tabs.
+## 0.2.0 (2026-07-18)
 
 ### Changed
 
-- **MAC format handling** — Normalize MACs to lowercase without colons for consistent MQTT topic matching.
-- Code cleanup: removed unused `GREE_CLOUD_IPS`, `DISPATCH_DEVICE_DISCOVERED`, stale SVG icon, invalid `icons.json`.
+- **MQTT driver rewritten with aiomqtt** — Replaced paho-mqtt (threaded) with aiomqtt (async). Eliminates paho v2 auto-reconnect bugs in threaded HA environments. Connection is now fully async and integrates natively with the HA event loop.
+- **Fire-and-forget polling** — `poll_device_sync()` removed. Poll requests are fire-and-forget; responses arrive via the async listener. No more blocking sleep-loops, `_data_seq`, or response queues.
+- **Async MQTT callbacks** — `_on_data` is now called from the event loop directly. Removed all `asyncio.run_coroutine_threadsafe` and `async_add_executor_job` wrappers for MQTT operations.
+- **Panel Info tab** — New "🔧 Info" tab showing device keys, MACs, MQTT topics, firmware versions, and a "Re-discover from Cloud" button to re-fetch device info from the Gree API.
+
+### Fixed
+
+- **Wrong device key in docs** — Corrected CLAUDE.md: device `580d0d334f3d` uses key `6PWCusP394IfZ8DI` (not `Mi9d7k040l70dP5i`).
 
 ## 0.1.0 (2026-07-10)
 

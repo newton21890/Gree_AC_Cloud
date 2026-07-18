@@ -28,16 +28,12 @@ class GreeSwitch(GreeDeviceEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         mqtt = self.coordinator._mqtt
-        await self.hass.async_add_executor_job(
-            mqtt.send_command, self.coordinator.device.mac, [self._key], [1]
-        )
+        await mqtt.send_command(self.coordinator.device.mac, [self._key], [1])
         self.coordinator.device.properties[self._key] = 1
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
         mqtt = self.coordinator._mqtt
-        await self.hass.async_add_executor_job(
-            mqtt.send_command, self.coordinator.device.mac, [self._key], [0]
-        )
+        await mqtt.send_command(self.coordinator.device.mac, [self._key], [0])
         self.coordinator.device.properties[self._key] = 0
         self.async_write_ha_state()
