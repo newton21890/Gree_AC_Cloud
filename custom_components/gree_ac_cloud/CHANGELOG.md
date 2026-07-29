@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.2 (2026-07-29)
+
+### Added
+
+- **hacs.json** — Added HACS configuration file for automatic update notifications via HACS.
+
+### Fixed
+
+- **manifest.json documentation URL** — Fixed to point to correct GitHub repo `newton21890/Gree_AC_Cloud`.
+
 ## 0.2.1 (2026-07-29)
 
 ### Added
