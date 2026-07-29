@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.7 (2026-07-29)
+
+### Fixed
+
+- **send_command updates staleness timer** — `send_command()` now updates `_last_seen` on successful publish, preventing the coordinator staleness check from immediately reverting `Pow=0` after a turn-on command or extra parameter toggle.
+- **Staleness only resets Pow if previously ON** — The coordinator now only sets `Pow=0` on stale data when the device was previously ON (`Pow=1`). If already OFF, stale data is left untouched.
+- **Cipher reset on key update** — `GreeDevice._cipher` is reset when the device key is updated via re-authentication, ensuring new keys are used immediately.
+
+### Added
+
+- **Re-authenticate & Update Keys** — New button in the 🔧 Info tab that re-fetches device keys from the Gree Cloud API, updates running devices, and shows old → new key changes in a table.
+
 ## 0.2.6 (2026-07-29)
 
 ### Fixed
