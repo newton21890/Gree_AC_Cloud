@@ -967,23 +967,66 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
       <p style="color:var(--text-secondary);font-size:12px;">Topics: <code>request/{parent_mac}</code> → <code>response/{parent_mac}/#</code></p>
 
       <h3>Entities HA</h3>
-      <table class="wt"><tr><th>Platform</th><th>Key</th><th>Description</th></tr>
-      <tr><td>climate</td><td>—</td><td>Acceso/spento, modo (Auto/Cool/Heat/Fan/Dry), ventola, swing, temperatura</td></tr>
-      <tr><td>sensor</td><td>InTem</td><td>Temperatura ambiente interna</td></tr>
-      <tr><td>sensor</td><td>OutTem</td><td>Temperatura esterna</td></tr>
-      <tr><td>sensor</td><td>SetDeciTem</td><td>Setpoint temperatura (decimi di °C)</td></tr>
-      <tr><td>sensor</td><td>InHumi</td><td>Umidità interna (potrebbe non essere disponibile)</td></tr>
-      <tr><td>switch</td><td>Health</td><td>Health mode</td></tr>
-      <tr><td>switch</td><td>Quiet</td><td>Quiet (silenzioso)</td></tr>
-      <tr><td>switch</td><td>Tur</td><td>Turbo (massima potenza)</td></tr>
-      <tr><td>switch</td><td>StHt</td><td>Strong heat (riscaldamento intenso)</td></tr>
-      <tr><td>switch</td><td>Blo</td><td>Blow (ventilazione dopo spegnimento)</td></tr>
-      <tr><td>switch</td><td>SvSt</td><td>Energy saving (risparmio energetico)</td></tr>
-      <tr><td>switch</td><td>SlpMod</td><td>Sleep (notte: regola temperatura gradualmente)</td></tr>
-      <tr><td>switch</td><td>Lig</td><td>Light (retroilluminazione display)</td></tr>
-      <tr><td>binary_sensor</td><td>Err</td><td>Errore attivo</td></tr>
-      <tr><td>binary_sensor</td><td>Filter</td><td>Promemoria pulizia filtro</td></tr>
+      <p style="color:var(--text-secondary);font-size:12px;">Ogni entità HA corrisponde a una funzione del controller XE7A-24/HC. La colonna <strong>ICONA Display</strong> mostra quale simbolo appare sul display fisico quando la funzione è attiva (riferimento Tabella 3.1 del manuale).</p>
+      <table class="wt"><tr><th>Platform</th><th>Key</th><th>HA Icona</th><th>ICONA Display</th><th>Descrizione</th></tr>
+      <tr><td>climate</td><td>—</td><td><span class="hmi">❄</span></td><td>N.27/31/32 ☀❄/ N.30 Ventola / N.29 Goccia</td><td>Acceso/spento, modo (Auto/Cool/Heat/Fan/Dry), ventola 6 vel, swing, setpoint temperatura</td></tr>
+      <tr><td>sensor</td><td>InTem</td><td><span class="hmi">🌡</span></td><td>N.33 — valore temperatura display</td><td>Temperatura ambiente interna (da cloud; se InTemEn=0 sul controller, il valore è fisso 68=20°C)</td></tr>
+      <tr><td>sensor</td><td>OutTem</td><td><span class="hmi">🌡</span></td><td>N.33 — valore temperatura display</td><td>Temperatura esterna (componente elettronico, non temperatura ambiente esterna reale)</td></tr>
+      <tr><td>sensor</td><td>TemSen</td><td><span class="hmi">🌡</span></td><td>—</td><td>Temperatura sensore locale del controller (I-FEEL). Non disponibile via cloud API → mostra <code>None</code></td></tr>
+      <tr><td>sensor</td><td>InHumi</td><td><span class="hmi">💧</span></td><td>—</td><td>Umidità interna percentuale (0–100%). C17 sul menu service. Non sempre disponibile</td></tr>
+      <tr><td>sensor</td><td>SetDeciTem</td><td><span class="hmi">🌡</span></td><td>N.33 — setpoint display</td><td>Setpoint temperatura in decimi di °C (es. 245 = 24.5°C). Solo lettura</td></tr>
+      <tr><td>switch</td><td>Health</td><td><span class="hmi">🌿</span></td><td>N.14 🌿 Health function</td><td>Ionizzatore/Health — genera ioni per purificare l'aria. Icona foglia sul display. Confermato funzionante sui tuoi device</td></tr>
+      <tr><td>switch</td><td>Quiet</td><td><span class="hmi">🔇</span></td><td>N.21 🔇 Quiet status</td><td>Modalità silenziosa — riduce rumore ventola al minimo. Include Quiet e Auto Quiet. Sempre 0 nella scansione (non supportato dal tuo modello VRF)</td></tr>
+      <tr><td>switch</td><td>Tur</td><td><span class="hmi">⚡</span></td><td>— Simbolo Turbo ⚡</td><td>Turbo — massima potenza per raggiungere velocemente la temperatura impostata. Non presente nella tabella LCD base (simbolo specifico). Sempre 0 nella scansione</td></tr>
+      <tr><td>switch</td><td>StHt</td><td><span class="hmi">🔥</span></td><td>N.27 ☀ Heating mode</td><td>Strong Heat — riscaldamento intenso con temperatura mandata più alta. Usa lo stesso simbolo della modalità Riscaldamento ☀. Sempre 0 nella scansione</td></tr>
+      <tr><td>switch</td><td>Blo</td><td><span class="hmi">🌬</span></td><td>N.16 🌬 X-fan function</td><td>Blow/X-Fan — la ventola continua a girare dopo lo spegnimento del compressore per asciugare la batteria interna ed evitare muffe. Sempre 0 nella scansione</td></tr>
+      <tr><td>switch</td><td>SvSt</td><td><span class="hmi">💾</span></td><td>N.18 💾 Save status</td><td>Energy Saving — limita la potenza massima per risparmiare energia. Icona Save sul display. Confermato funzionante su device 2 (zona notte)</td></tr>
+      <tr><td>switch</td><td>TemRec</td><td><span class="hmi">🔄</span></td><td>—</td><td>Temperature Recovery — alla riaccensione, recupera la temperatura precedente invece di ripartire da 24°C. Funzione cloud, nessuna icona LCD dedicata</td></tr>
+      <tr><td>switch</td><td>SlpMod</td><td><span class="hmi">🌙</span></td><td>N.22 ☾ Sleep status</td><td>Sleep — regola gradualmente la temperatura durante la notte per comfort e risparmio. 3 modalità notte disponibili sul manuale. Sempre 0 nella scansione</td></tr>
+      <tr><td>switch</td><td>Air</td><td><span class="hmi">🌀</span></td><td>N.19 🌬 Air status</td><td>Air — funzione opzionale (non implementata sul tuo modello VRF, Air viene da "Air Direction"?). Sempre 0 nella scansione</td></tr>
+      <tr><td>switch</td><td>Lig</td><td><span class="hmi">💡</span></td><td>—</td><td>Light — retroilluminazione display on/off. Nessuna icona LCD (controlla il retroilluminazione, non un simbolo)</td></tr>
+      <tr><td>binary_sensor</td><td>Err</td><td><span class="hmi">⚠</span></td><td>— Mostra codice errore sul display</td><td>Errore attivo — quando ON, sul display appare un codice errore (E1, F3, L0, ecc.). Vedi tabella codici errore sotto</td></tr>
+      <tr><td>binary_sensor</td><td>Filter</td><td><span class="hmi">🗓</span></td><td>N.15 🗓 Remind to clean filter</td><td>Promemoria pulizia filtro — si attiva dopo le ore accumulate impostate su C08 (4–416 giorni). P46 per resettare dopo la pulizia</td></tr>
       </table>
+
+      <h3>ICONE Display (Tabella 3.1 Manuale)</h3>
+      <p style="color:var(--text-secondary);font-size:12px;">Simboli che appaiono sul display LCD del controller XE7A-24/HC. Riferimento: Tabella 3.1 "LCD display instruction" del manuale ufficiale, pagine 9–12.</p>
+      <table class="wt"><tr><th>N.</th><th>Icona</th><th>Nome / Descrizione</th><th>Entità HA correlata</th></tr>
+      <tr><td>1</td><td>🚪</td><td>Gate-control function</td><td>—</td></tr>
+      <tr><td>2</td><td>🔒</td><td>Child Lock status (tasto FUNCTION 5s blocca)</td><td>—</td></tr>
+      <tr><td>3</td><td>🔗</td><td>Slave wired controller (indirizzo 02)</td><td>—</td></tr>
+      <tr><td>4</td><td>🏢</td><td>One wired controller controls multiple indoor units</td><td>—</td></tr>
+      <tr><td>5</td><td>❄</td><td>Outdoor unit defrosting status</td><td>— (sbrinamento automatico)</td></tr>
+      <tr><td>6</td><td>🛡</td><td>Shielding status</td><td>—</td></tr>
+      <tr><td>7</td><td>⭐</td><td>Current wired controller connects master indoor unit</td><td>—</td></tr>
+      <tr><td>8</td><td>🌬</td><td>Fresh air control function of AHU-KIT</td><td>— (solo unità aria fresca)</td></tr>
+      <tr><td>9</td><td>🗳</td><td>System mode priority is voting mode</td><td>—</td></tr>
+      <tr><td>10</td><td>📶</td><td>WiFi status (o connesso a G-Cloud)</td><td>—</td></tr>
+      <tr><td>11</td><td>⏱</td><td>Timer zone: display system clock and timer status</td><td>—</td></tr>
+      <tr><td>12</td><td>🌀</td><td>Current set fan speed</td><td><code>WdSpd</code> (climate entity)</td></tr>
+      <tr><td>13</td><td>🚶</td><td>Absence function</td><td>—</td></tr>
+      <tr><td>14</td><td>🌿</td><td>Health function, Indoor unit optional function</td><td><code>Health</code> switch</td></tr>
+      <tr><td>15</td><td>🗓</td><td>Remind to clean the filter</td><td><code>Filter</code> binary_sensor</td></tr>
+      <tr><td>16</td><td>🌬</td><td>X-fan function</td><td><code>Blo</code> switch</td></tr>
+      <tr><td>17</td><td>✨</td><td>Auto clean status</td><td>— (<code>CleanEn</code> nel protocollo)</td></tr>
+      <tr><td>18</td><td>💾</td><td>Save status of indoor unit</td><td><code>SvSt</code> switch</td></tr>
+      <tr><td>19</td><td>🌬</td><td>Air status, Indoor unit optional function</td><td><code>Air</code> switch</td></tr>
+      <tr><td>20</td><td>✅</td><td>I-DEMAND function, Indoor unit optional function</td><td>— (<code>IDemand</code> nel protocollo)</td></tr>
+      <tr><td>21</td><td>🔇</td><td>Quiet status (including Quiet and Auto Quiet)</td><td><code>Quiet</code> switch</td></tr>
+      <tr><td>22</td><td>🌙</td><td>Sleep status</td><td><code>SlpMod</code> switch</td></tr>
+      <tr><td>23</td><td>↔</td><td>Left and right swing function</td><td><code>SwingLfRig</code> (climate)</td></tr>
+      <tr><td>24</td><td>↕</td><td>Up and down swing function</td><td><code>SwUpDn</code> (climate)</td></tr>
+      <tr><td>25</td><td>🔥</td><td>3D Heating mode</td><td>—</td></tr>
+      <tr><td>26</td><td>🏠</td><td>Space Heating mode</td><td>—</td></tr>
+      <tr><td>27</td><td>☀</td><td>Heating mode</td><td><code>heat</code> (Mod=2, climate)</td></tr>
+      <tr><td>28</td><td>🔥</td><td>Floor Heating mode</td><td>—</td></tr>
+      <tr><td>29</td><td>💧</td><td>Dry mode</td><td><code>dry</code> (Mod=4, climate)</td></tr>
+      <tr><td>30</td><td>🌀</td><td>Fan mode</td><td><code>fan_only</code> (Mod=3, climate)</td></tr>
+      <tr><td>31</td><td>🔄</td><td>Auto mode</td><td><code>auto</code> (Mod=0, climate)</td></tr>
+      <tr><td>32</td><td>❄</td><td>Cooling mode</td><td><code>cool</code> (Mod=1, climate)</td></tr>
+      <tr><td>33</td><td>🌡</td><td>Temperature value display (o FAP per unità aria fresca)</td><td><code>InTem</code>, <code>OutTem</code>, <code>SetTem</code></td></tr>
+      </table>
+      <p style="color:var(--text2);font-size:11px;margin-top:4px;">Le icone nella colonna sono approssimazioni. Il display LCD effettivo usa una matrice di punti (segment LCD). I numeri (N.) sono riferimenti diretti alla Tabella 3.1 del manuale ufficiale Gree XE7A-24/HC (pagine 9–12).</p>
 
       <h3>Codici Errore VRF</h3>
       <p style="color:var(--text-secondary);font-size:12px;">Quando il binary_sensor <strong>Err</strong> è ON, il device ha un problema. I codici appaiono sul display del controller wired.</p>

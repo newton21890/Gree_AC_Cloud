@@ -44,7 +44,7 @@ POLL_COLS = [
     "Pow", "Mod", "SetTem", "WdSpd", "Air", "Blo", "Health",
     "SwhSlp", "Lig", "SwUpDn", "SwingLfRig", "Quiet", "Tur",
     "StHt", "TemUn", "HeatCoolType", "TemRec", "SvSt", "SlpMod",
-    "InTem", "OutTem", "InHumi", "SetDeciTem",
+    "InTem", "OutTem", "TemSen", "InHumi", "SetDeciTem",
     "Err", "Filter", "WaterSen",
 ]
 
@@ -63,6 +63,7 @@ HVAC_MAP_REV = {v: k for k, v in HVAC_MAP.items()}
 DEVICE_SENSORS = {
     "InTem": {"name": "Indoor Temperature", "icon": "mdi:thermometer"},
     "OutTem": {"name": "Outdoor Temperature", "icon": "mdi:thermometer"},
+    "TemSen": {"name": "Indoor Sensor Temperature", "icon": "mdi:thermometer"},
     "InHumi": {"name": "Indoor Humidity", "icon": "mdi:water-percent"},
     "SetDeciTem": {"name": "Target Temperature (Decimal)", "icon": "mdi:thermometer"},
 }

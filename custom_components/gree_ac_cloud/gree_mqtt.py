@@ -16,7 +16,7 @@ POLL_COLS = [
     "Pow", "Mod", "SetTem", "WdSpd", "Air", "Blo", "Health",
     "SwhSlp", "Lig", "SwUpDn", "SwingLfRig", "Quiet", "Tur",
     "StHt", "TemUn", "HeatCoolType", "TemRec", "SvSt", "SlpMod",
-    "InTem", "OutTem", "InHumi", "SetDeciTem",
+    "InTem", "OutTem", "TemSen", "InHumi", "SetDeciTem",
     "Err", "Filter", "WaterSen",
 ]
 
@@ -285,7 +285,9 @@ def _test():
 
     def on_data(mac, data):
         results[mac] = data
-        print(f"\n  ← Data for {mac}: Pow={data.get('Pow')} T={data.get('InTem')}°C")
+        in_tem = data.get('InTem')
+        tem_sen = data.get('TemSen')
+        print(f"\n  ← Data for {mac}: Pow={data.get('Pow')} InTem={in_tem} TemSen={tem_sen} OutTem={data.get('OutTem')}")
 
     client = GreeMQTTClient(
         host="18.185.150.155",
