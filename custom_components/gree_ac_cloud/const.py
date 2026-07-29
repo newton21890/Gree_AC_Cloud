@@ -5,6 +5,7 @@ CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 
 UPDATE_INTERVAL = 15
+STALE_AFTER_SECONDS = UPDATE_INTERVAL * 4  # 60s — mark device unavailable after this many seconds without fresh MQTT data
 
 TARGET_TEMPERATURE_STEP = 1
 MIN_TEMP_C = 16

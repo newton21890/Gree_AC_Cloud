@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from typing import Any, Callable
 
 from .gree_api import GreeDevice
@@ -47,6 +48,7 @@ class GreeMQTTClient:
         self._listener_task: asyncio.Task | None = None
         self._running = False
         self._user_params: dict[str, set[str]] = {d.mac: set() for d in devices}
+        self._last_seen: dict[str, float] = {}
 
     # ── lifecycle ──────────────────────────────────────
 
@@ -172,6 +174,7 @@ class GreeMQTTClient:
         power_on = (old_pow == 0 and new_pow == 1)
 
         dev.properties.update(_data)
+        self._last_seen[mac] = time.monotonic()
 
         needs_reenable: list[str] = []
         if power_on:
@@ -228,6 +231,11 @@ class GreeMQTTClient:
             qos=1,
         )
         return dict(dev.properties) if dev.properties else None
+
+    def seconds_since_last_seen(self, mac: str) -> float | None:
+        """Seconds since last real MQTT response, or None if never seen."""
+        seen = self._last_seen.get(mac)
+        return (time.monotonic() - seen) if seen is not None else None
 
     async def send_command(
         self, mac: str, options: list[str], values: list[Any]
