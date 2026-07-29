@@ -143,11 +143,17 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         elapsed = self._mqtt.seconds_since_last_seen(self.device.mac)
         if elapsed is None or elapsed > STALE_AFTER_SECONDS:
             age = f"{elapsed:.0f}s" if elapsed is not None else "never"
-            _LOGGER.warning(
-                "%s: no fresh data (last seen: %s) — assuming device is OFF",
-                self.device.name, age,
-            )
-            self.device.properties["Pow"] = 0
+            if self.device.properties.get("Pow"):
+                _LOGGER.warning(
+                    "%s: no fresh data (last seen: %s) — resetting Pow=0",
+                    self.device.name, age,
+                )
+                self.device.properties["Pow"] = 0
+            else:
+                _LOGGER.debug(
+                    "%s: no fresh data (last seen: %s) — device already OFF",
+                    self.device.name, age,
+                )
         else:
             _LOGGER.debug(
                 "%s: refresh (Pow=%s, last_seen=%.1fs ago)",

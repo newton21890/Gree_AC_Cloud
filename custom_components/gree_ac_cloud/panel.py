@@ -389,7 +389,7 @@ class GreePanelDevicesInfoView(HomeAssistantView):
         return self.json(result)
 
     async def post(self, request: web.Request) -> web.Response:
-        """Re-discover devices from cloud API and return fresh info."""
+        """Re-discover devices from cloud API and update keys on running integration."""
         from .gree_api import discover_devices
 
         hass = request.app["hass"]
@@ -403,11 +403,31 @@ class GreePanelDevicesInfoView(HomeAssistantView):
                 uid, token, devices = await hass.async_add_executor_job(
                     discover_devices, cloud_host, username, password
                 )
+
+                # Update keys on running MQTT devices (same objects as coordinators)
+                runtime = getattr(entry, "runtime_data", None)
+                mqtt = runtime.get("mqtt") if runtime else None
+                key_changes = []
+                for d in devices:
+                    existing = mqtt.devices.get(d.mac) if mqtt else None
+                    if existing and existing.key != d.key:
+                        old_key = existing.key
+                        existing.key = d.key
+                        existing._cipher = None  # force cipher re-creation with new key
+                        key_changes.append({
+                            "mac": d.mac,
+                            "name": d.name,
+                            "old_key": old_key,
+                            "new_key": d.key,
+                        })
+                        _LOGGER.info("Re-auth: key updated for %s (%s)", d.mac, d.name)
+
                 result = {
                     "uid": uid,
                     "token": f"{token[:8]}...{token[-4:]}",
                     "server_region": server,
                     "cloud_host": cloud_host,
+                    "key_changes": key_changes,
                     "devices": [
                         {
                             "mac": d.mac,
@@ -419,6 +439,16 @@ class GreePanelDevicesInfoView(HomeAssistantView):
                         for d in devices
                     ],
                 }
+
+                if key_changes:
+                    _LOGGER.info(
+                        "Re-auth: %d key(s) updated: %s",
+                        len(key_changes),
+                        ", ".join(f"{c['mac']}: {c['old_key'][:8]}... → {c['new_key'][:8]}..." for c in key_changes),
+                    )
+                else:
+                    _LOGGER.info("Re-auth: no key changes detected")
+
                 return self.json(result)
             except Exception as exc:
                 return self.json({"error": str(exc)}, status=500)
@@ -1827,8 +1857,9 @@ async function loadInfo() {
       html += '</div>';
     }
     html += '<div style="margin-top:12px;">';
-    html += '<button class="btn" onclick="reDiscoverDevices()" title="Re-fetch device info from Gree Cloud API">🔄 Re-discover from Cloud</button>';
+    html += '<button class="btn" onclick="reDiscoverDevices()" title="Re-authenticate: fetch fresh device keys from Gree Cloud API and update running integration">🔑 Re-authenticate &amp; Update Keys</button>';
     html += '<span id="rediscoverStatus" style="margin-left:8px;font-size:11px;color:var(--text2);"></span>';
+    html += '<div id="keyChanges" style="margin-top:8px;"></div>';
     html += '</div>';
     el.innerHTML = html;
   } catch (e) {
@@ -1839,16 +1870,29 @@ async function loadInfo() {
 async function reDiscoverDevices() {
   const btn = document.querySelector('button[onclick="reDiscoverDevices()"]');
   const status = document.getElementById('rediscoverStatus');
+  const changes = document.getElementById('keyChanges');
   if (btn) btn.disabled = true;
-  if (status) status.textContent = 'Re-discovering...';
+  if (status) status.textContent = 'Re-authenticating with Gree Cloud...';
+  if (changes) changes.innerHTML = '';
   try {
     const resp = await (await fetch(PANEL_DEVICES_INFO_URL, {method:'POST'})).json();
     if (resp.error) {
       if (status) status.textContent = '❌ ' + resp.error;
       return;
     }
-    if (status) status.textContent = `✅ Found ${resp.devices.length} devices. Last keys: ${resp.devices.map(d=>d.key.slice(0,4)+'...').join(', ')}`;
-    // Re-load the info tab
+    const kc = resp.key_changes || [];
+    if (kc.length) {
+      let tbl = '<table class="wt" style="margin-top:4px;"><tr><th>MAC</th><th>Name</th><th>Old Key</th><th>→ New Key</th></tr>';
+      for (const c of kc) {
+        tbl += `<tr><td><code>${c.mac}</code></td><td>${escHtml(c.name)}</td><td><code style="font-size:9px;color:var(--red);">${c.old_key}</code></td><td><code style="font-size:9px;color:var(--green);">${c.new_key}</code></td></tr>`;
+      }
+      tbl += '</table>';
+      if (changes) changes.innerHTML = '<div style="font-size:11px;color:var(--yellow);font-weight:600;margin-bottom:2px;">🔑 Keys updated</div>' + tbl;
+    } else {
+      if (changes) changes.innerHTML = '<span style="font-size:11px;color:var(--green);">✓ Keys unchanged</span>';
+    }
+    if (status) status.textContent = `✅ Found ${resp.devices.length} devices. Cloud: ${resp.server_region}`;
+    // Reload content to show current keys
     loadInfo();
   } catch (e) {
     if (status) status.textContent = '❌ ' + e.message;

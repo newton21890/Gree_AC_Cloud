@@ -252,6 +252,8 @@ class GreeMQTTClient:
             qos=1,
         )
         _LOGGER.info("send_command: %s options=%s values=%s", mac, options, values)
+        if ok:
+            self._last_seen[mac] = time.monotonic()
 
         up = self._user_params.setdefault(mac, set())
         for opt, val in zip(options, values):
