@@ -59,8 +59,10 @@ import os as _os
 
 _README_CACHE = "# README\n(file not found)"
 _CHANGELOG_CACHE = "# Changelog\n(file not found)"
+_VERSION_CACHE = "0.0.0"
 _changelog_path = _os.path.join(_os.path.dirname(__file__), "CHANGELOG.md")
 _readme_path = _os.path.join(_os.path.dirname(__file__), "README.md")
+_manifest_path = _os.path.join(_os.path.dirname(__file__), "manifest.json")
 for _cache_var, _path in [("_README_CACHE", _readme_path), ("_CHANGELOG_CACHE", _changelog_path)]:
     try:
         with open(_path, encoding="utf-8") as _f:
@@ -71,6 +73,14 @@ for _cache_var, _path in [("_README_CACHE", _readme_path), ("_CHANGELOG_CACHE", 
             _CHANGELOG_CACHE = _c
     except Exception:
         pass
+
+_try_manifest_path = _manifest_path
+try:
+    with open(_try_manifest_path, encoding="utf-8") as _f:
+        _manifest_data = json.load(_f)
+    _VERSION_CACHE = _manifest_data.get("version", "0.0.0")
+except Exception:
+    pass
 
 
 async def async_register_panel(hass: HomeAssistant):
@@ -124,6 +134,7 @@ class GreePanelView(HomeAssistantView):
         html = PANEL_HTML
         html = html.replace("__README_JSON__", json.dumps(_README_CACHE))
         html = html.replace("__CHANGELOG_JSON__", json.dumps(_CHANGELOG_CACHE))
+        html = html.replace("__VERSION__", _VERSION_CACHE)
         hass = request.app["hass"]
         names = hass.data.get(DOMAIN, {}).get("device_names", {})
         html = html.replace("__DEVICE_NAMES_JSON__", json.dumps(names))
@@ -1573,7 +1584,7 @@ async function loadData() {
     container.innerHTML = data.map(d => renderDevice(d)).join('');
 
     const info = document.getElementById('serverInfo');
-    info.textContent = 'Gree AC Cloud v0.2.0 | ' + (data[0]?.state?.host || 'mqtt-eu.gree.com');
+    info.textContent = 'Gree AC Cloud v__VERSION__ | ' + (data[0]?.state?.host || 'mqtt-eu.gree.com');
   } catch (e) {
     console.error('Load failed:', e);
     document.getElementById('statusBadge').textContent = 'error';

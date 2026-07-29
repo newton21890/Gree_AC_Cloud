@@ -136,22 +136,24 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self) -> dict[str, Any]:
         if not self._mqtt.connected:
-            _LOGGER.warning("%s: MQTT disconnected, skipping poll", self.device.name)
-            return self._build_data()
+            raise UpdateFailed(f"{self.device.name}: MQTT disconnected")
 
         await self._mqtt.refresh_device(self.device.mac)
-        secs = self._mqtt.seconds_since_last_seen(self.device.mac)
-        if secs is not None and secs > STALE_AFTER_SECONDS:
+
+        elapsed = self._mqtt.seconds_since_last_seen(self.device.mac)
+        if elapsed is None or elapsed > STALE_AFTER_SECONDS:
+            age = f"{elapsed:.0f}s" if elapsed is not None else "never"
             raise UpdateFailed(
-                f"No fresh data received (last seen {secs:.0f}s ago, "
-                f"threshold {STALE_AFTER_SECONDS}s)"
+                f"{self.device.name}: no fresh data received (last seen: {age})"
             )
+
         result = self._build_data()
         self._energy_save_counter += 1
         if self._energy_save_counter >= 5:
             self._energy_save_counter = 0
             await self.async_save_energy()
         _LOGGER.debug(
-            "%s: refresh (Pow=%s, last_seen=%.0fs ago)", self.device.name, result.get("Pow"), secs or 0,
+            "%s: refresh (Pow=%s, last_seen=%.1fs ago)",
+            self.device.name, result.get("Pow"), elapsed,
         )
         return result

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4 (2026-07-29)
+
+### Added
+
+- **Auto version in panel** — Footer version number now reads from `manifest.json` dynamically instead of being hardcoded. Bump the version in one place and the panel reflects it automatically.
+
 ## 0.2.3 (2026-07-29)
 
 ### Fixed
