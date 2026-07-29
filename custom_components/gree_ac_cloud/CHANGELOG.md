@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.1 (2026-07-29)
+
+### Added
+
+- **LCD icon reference in Wiki** — Enhanced HA Entities table with LCD display icon mappings (Table 3.1 from XE7A-24/HC manual). New "ICONE Display" section documenting all 33 LCD symbols with HA entity correlations.
+- **TemSen sensor** — Added `TemSen` (local controller temperature sensor) as a sensor entity. Confirmed not available via cloud API (always `None`).
+
+### Changed
+
+- **Wiki parameter tables** — Added descriptions, practical examples, and range info for all C00-C23 monitor codes and P01-P87 settings parameters.
+
 ## 0.2.0 (2026-07-18)
 
 ### Changed
