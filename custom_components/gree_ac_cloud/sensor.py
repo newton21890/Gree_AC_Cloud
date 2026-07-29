@@ -24,6 +24,7 @@ async def async_setup_entry(hass, entry, async_add_entities: AddEntitiesCallback
 SENSOR_CLASSES = {
     "InTem": SensorDeviceClass.TEMPERATURE,
     "OutTem": SensorDeviceClass.TEMPERATURE,
+    "TemSen": SensorDeviceClass.TEMPERATURE,
     "InHumi": SensorDeviceClass.HUMIDITY,
     "SetDeciTem": None,
 }
@@ -31,6 +32,7 @@ SENSOR_CLASSES = {
 SENSOR_UNITS = {
     "InTem": UnitOfTemperature.CELSIUS,
     "OutTem": UnitOfTemperature.CELSIUS,
+    "TemSen": UnitOfTemperature.CELSIUS,
     "InHumi": PERCENTAGE,
     "SetDeciTem": None,
 }
@@ -38,6 +40,7 @@ SENSOR_UNITS = {
 SENSOR_STATE_CLASS = {
     "InTem": SensorStateClass.MEASUREMENT,
     "OutTem": SensorStateClass.MEASUREMENT,
+    "TemSen": SensorStateClass.MEASUREMENT,
     "InHumi": SensorStateClass.MEASUREMENT,
     "SetDeciTem": SensorStateClass.MEASUREMENT,
 }
@@ -65,6 +68,8 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
             return None
         if self._key in ("InTem", "OutTem"):
             return raw / 2 if raw > 50 else raw
+        if self._key == "TemSen":
+            return raw - 40
         if self._key == "InHumi":
             return raw
         return raw

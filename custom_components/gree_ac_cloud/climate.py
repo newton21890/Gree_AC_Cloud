@@ -43,6 +43,9 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
 
     @property
     def current_temperature(self) -> float | None:
+        raw = self.coordinator.data.get("TemSen")
+        if raw is not None:
+            return float(raw - 40)
         raw = self.coordinator.data.get("InTem")
         if raw is None:
             return None
