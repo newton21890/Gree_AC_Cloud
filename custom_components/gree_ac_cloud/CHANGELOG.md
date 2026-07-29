@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.5 (2026-07-29)
+
+### Fixed
+
+- **Assume OFF on stale data** — When a device stops responding to MQTT polls (common when off), the coordinator no longer raises `UpdateFailed` (entities become `unavailable`). Instead it sets `Pow=0` and returns data normally, so HA shows the device as OFF. When the device responds again, the real state is restored.
+
 ## 0.2.4 (2026-07-29)
 
 ### Added
