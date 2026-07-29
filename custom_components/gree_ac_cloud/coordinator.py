@@ -5,9 +5,9 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, ENERGY_MODELS, STORAGE_VERSION, UPDATE_INTERVAL
+from .const import DOMAIN, ENERGY_MODELS, STORAGE_VERSION, STALE_AFTER_SECONDS, UPDATE_INTERVAL
 from .gree_api import GreeDevice, discover_devices
 
 _LOGGER = logging.getLogger(__name__)
@@ -140,12 +140,18 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
             return self._build_data()
 
         await self._mqtt.refresh_device(self.device.mac)
+        secs = self._mqtt.seconds_since_last_seen(self.device.mac)
+        if secs is not None and secs > STALE_AFTER_SECONDS:
+            raise UpdateFailed(
+                f"No fresh data received (last seen {secs:.0f}s ago, "
+                f"threshold {STALE_AFTER_SECONDS}s)"
+            )
         result = self._build_data()
         self._energy_save_counter += 1
         if self._energy_save_counter >= 5:
             self._energy_save_counter = 0
             await self.async_save_energy()
         _LOGGER.debug(
-            "%s: refresh (Pow=%s)", self.device.name, result.get("Pow"),
+            "%s: refresh (Pow=%s, last_seen=%.0fs ago)", self.device.name, result.get("Pow"), secs or 0,
         )
         return result

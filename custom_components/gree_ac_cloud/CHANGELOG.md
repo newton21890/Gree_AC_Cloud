@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.3 (2026-07-29)
+
+### Fixed
+
+- **Stale device state** — Devices that stop responding to MQTT polls (e.g. WiFi module idle when off) now correctly become `unavailable` instead of showing the last cached state forever. `coordinator.py` checks `seconds_since_last_seen()` against `STALE_AFTER_SECONDS` (60s) and raises `UpdateFailed` if exceeded.
+
+### Added
+
+- **gree_mqtt.py** — Tracks `_last_seen[mac]` timestamp on every real MQTT response; exposes `seconds_since_last_seen(mac)` for staleness checks.
+- **const.py** — `STALE_AFTER_SECONDS = UPDATE_INTERVAL * 4` (60s).
+
 ## 0.2.2 (2026-07-29)
 
 ### Added
