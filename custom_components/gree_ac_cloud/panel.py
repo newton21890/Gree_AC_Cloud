@@ -155,6 +155,9 @@ class GreePanelDataView(HomeAssistantView):
             runtime = getattr(entry, "runtime_data", None)
             if not runtime:
                 continue
+            server = entry.data.get("server", "Europe")
+            mqtt_host = GREE_MQTT_HOSTS.get(server, "mqtt-eu.gree.com")
+            cloud_host = GREE_CLOUD_SERVERS.get(server, "eugrih.gree.com")
             coordinators = runtime.get("coordinators", [])
             for coord in coordinators:
                 device = coord.device
@@ -164,6 +167,9 @@ class GreePanelDataView(HomeAssistantView):
                     "name": device.name,
                     "connected": coord._mqtt.connected if hasattr(coord, "_mqtt") else False,
                     "state": state,
+                    "server": server,
+                    "mqtt_host": mqtt_host,
+                    "cloud_host": cloud_host,
                 })
         return self.json(data)
 
@@ -1584,7 +1590,7 @@ async function loadData() {
     container.innerHTML = data.map(d => renderDevice(d)).join('');
 
     const info = document.getElementById('serverInfo');
-    info.textContent = 'Gree AC Cloud v__VERSION__ | ' + (data[0]?.state?.host || 'mqtt-eu.gree.com');
+    info.textContent = 'Gree AC Cloud v__VERSION__ | ' + (data[0]?.cloud_host || 'eugrih.gree.com') + ' | ' + (data[0]?.server || 'Europe');
   } catch (e) {
     console.error('Load failed:', e);
     document.getElementById('statusBadge').textContent = 'error';
