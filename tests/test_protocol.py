@@ -112,6 +112,10 @@ def test_dred_control_keeps_verified_protocol_mapping() -> None:
     assert 'data.get("Mod") == 1' in select_source
     assert 'int(data.get("Idemand", 0)) == 1' in select_source
     assert '"verified_levels": [0, 1, 2, 3]' in select_source
+    assert "_attr_entity_registry_enabled_default = True" in select_source
+    assert "RegistryEntryDisabler.INTEGRATION" in select_source
+    assert "registry.async_update_entity(entity_id, disabled_by=None)" in select_source
+    assert '_attr_translation_key = "dred_level"' in select_source
 
 
 def test_device_command_round_trip() -> None:

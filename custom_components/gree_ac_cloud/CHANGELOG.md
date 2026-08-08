@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.12
+
+### Controlli I-Demand in Home Assistant
+
+- Il selettore `Livello I-Demand / DRED` è ora abilitato per impostazione predefinita e compare nei controlli del dispositivo in Home Assistant.
+- Le entità create dalle versioni precedenti come disabilitate dall'integrazione vengono abilitate automaticamente durante l'aggiornamento; le scelte di disabilitazione effettuate manualmente dall'utente vengono rispettate.
+- Il controllo può essere usato dalla UI, dalle dashboard, dalle automazioni e tramite il servizio `select.select_option` con `Off`, `D1`, `D2` o `D3`.
+- Rimangono applicate le condizioni verificate del dispositivo: il controllo è disponibile quando l'unità supporta DRED, è accesa ed è in modalità raffrescamento.
+
 ## 0.2.11
 
 ### Allineamento I-Demand nel pannello

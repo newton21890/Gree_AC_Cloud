@@ -1,29 +1,48 @@
 """Select entities for enumerated Gree U-Match functions."""
 
 from homeassistant.components.select import SelectEntity
-from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DRED_OPTIONS, DRED_OPTIONS_REV
+from .const import DOMAIN, DRED_OPTIONS, DRED_OPTIONS_REV
 from .entity import GreeDeviceEntity
 
 
 async def async_setup_entry(hass, entry, async_add_entities: AddEntitiesCallback):
-    """Set up U-Match select entities."""
+    """Set up U-Match select entities and expose I-Demand controls in HA."""
+    coordinators = entry.runtime_data["coordinators"]
+
+    # Versions up to 0.2.11 registered this control disabled by the
+    # integration. Re-enable only entries disabled by the integration itself;
+    # a control explicitly disabled by the user remains untouched.
+    registry = er.async_get(hass)
+    for coordinator in coordinators:
+        unique_id = f"{coordinator.device.mac}_dred_level"
+        entity_id = registry.async_get_entity_id("select", DOMAIN, unique_id)
+        if entity_id is None:
+            continue
+        registry_entry = registry.async_get(entity_id)
+        if (
+            registry_entry
+            and registry_entry.disabled_by == er.RegistryEntryDisabler.INTEGRATION
+        ):
+            registry.async_update_entity(entity_id, disabled_by=None)
+
     async_add_entities(
-        GreeDemandResponseSelect(coordinator)
-        for coordinator in entry.runtime_data["coordinators"]
+        GreeDemandResponseSelect(coordinator) for coordinator in coordinators
     )
 
 
 class GreeDemandResponseSelect(GreeDeviceEntity, SelectEntity):
     """Control the DRED level selected by the wired controller I-DEMAND menu."""
 
-    _attr_name = "I-Demand / DRED Level"
+    _attr_translation_key = "dred_level"
     _attr_icon = "mdi:transmission-tower-import"
     _attr_options = list(DRED_OPTIONS_REV)
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_entity_registry_enabled_default = False
+    # This is an operating control, not a diagnostic/config-only entity. Keep
+    # it enabled and in the main device controls so it is usable in HA cards,
+    # automations and the select.select_option service.
+    _attr_entity_registry_enabled_default = True
 
     def __init__(self, coordinator):
         super().__init__(coordinator, coordinator.device, key_suffix="dred_level")

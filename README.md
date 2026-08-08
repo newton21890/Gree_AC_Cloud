@@ -18,6 +18,7 @@ HA (gree_ac_cloud) ─→ Gree MQTT (mqtt-eu.gree.com:1984) ←→ Devices
 - Climate control (mode, fan, swing, temperature)
 - Sensors: Indoor/Outdoor temperature, humidity, setpoint (decimal)
 - Switches: Health, Quiet, Turbo, Strong Heat, X-Fan/coil drying, Energy Saving, Sleep, optional Fresh Air, Light
+- Native Home Assistant I-Demand/DRED control: select Off, D1, D2 or D3 from the device controls, dashboards or automations (available on supported units while running in Cool mode)
 - Diagnostics: error code/type, refrigerant warning, system/Auto Clean status and filter counters when reported by the device
 - Energy consumption estimation (based on model, mode, fan speed, load)
 - Custom panel UI with live controls, log viewer, Wiki and U-Match feature/installer reference, and energy monitoring
