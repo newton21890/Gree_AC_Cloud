@@ -83,7 +83,10 @@ class _GreeLogHandler(logging.Handler):
 
 _log_handler = _GreeLogHandler()
 _logger_root = logging.getLogger("custom_components.gree_ac_cloud")
-if _log_handler not in _logger_root.handlers:
+# Keep the component logger verbose enough for the panel's in-memory handler.
+# The handler is private to this component and does not change HA's root level.
+_logger_root.setLevel(logging.DEBUG)
+if not any(isinstance(handler, _GreeLogHandler) for handler in _logger_root.handlers):
     _logger_root.addHandler(_log_handler)
 
 # ── Cached file content ──────────────────────────────
@@ -201,7 +204,7 @@ class GreePanelDataView(HomeAssistantView):
             coordinators = runtime.get("coordinators", [])
             for coord in coordinators:
                 device = coord.device
-                state = dict(device.properties) if device.properties else {}
+                state = dict(coord.data or device.properties or {})
                 data.append({
                     "mac": device.mac,
                     "name": device.name,
@@ -1374,7 +1377,7 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
 
       <h3>Funzioni utente</h3>
       <table class="wt"><tr><th>Funzione</th><th>Vincolo</th><th>Protocollo</th><th>Stato integrazione</th></tr>
-      <tr><td>I-Demand / DRED</td><td>Solo Cool; livelli Off, D1, D2, D3. L'attivazione annulla Quiet</td><td><code>DRED</code>, capability <code>DREDEn</code>; <code>Idemand</code> non rappresenta il livello</td><td>Off, D2 e D3 verificati sul comando XE7A; D1 ancora da verificare</td></tr>
+      <tr><td>I-Demand / DRED</td><td>Solo Cool: D1 arresta il compressore, D2 limita la domanda al 50%, D3 al 75%. L'attivazione annulla Quiet</td><td><code>DRED</code>, capability <code>DREDEn</code>; <code>Idemand</code> non rappresenta il livello</td><td>Off, D1, D2 e D3 verificati sui comandi XE7A. Le percentuali sono limiti massimi, non misure del consumo</td></tr>
       <tr><td>Absence / antigelo 8 °C</td><td>Solo Heat</td><td><code>GoOut</code></td><td>Da verificare sul dispositivo</td></tr>
       <tr><td>X-Fan</td><td>Cool/Dry; asciugatura evaporatore</td><td><code>Blo</code></td><td>Disponibile come switch</td></tr>
       <tr><td>Auto Clean</td><td>Avvio a unità spenta; ciclo ~30 min</td><td><code>AutoClean</code>, <code>CleanState</code></td><td>Da implementare come button + stato</td></tr>
@@ -1577,20 +1580,19 @@ async function refreshNow() {
 
 function estimatePower(s, model) {
   if (!s || !s.Pow || !model) return 0;
-  const mode = s.Mod;
+  const mode = Number(s.Mod);
   if (mode === 3) return Math.round(model.cool * 0.05 * 100) / 100;
+  let dred = Number(s.DRED || 0);
+  const iDemandActive = Number(s.Idemand || 0) === 1;
+  if (dred === 0 && iDemandActive) dred = 1;
+  if (dred === 1) return Math.round(model.cool * 0.05 * 100) / 100;
   const base = (mode === 2) ? model.heat : model.cool;
-  const dryFactor = (mode === 4) ? 0.7 : 1.0;
-  const fanMap = {0: 0.9, 1: 0.7, 2: 0.8, 3: 0.9, 4: 1.0, 5: 1.1};
-  const fanFactor = fanMap[s.WdSpd] || 0.9;
-  const turboFactor = s.Tur ? 1.2 : 1.0;
-  const setTem = (s.SetDeciTem != null) ? s.SetDeciTem / 10 : (s.SetTem || 24);
-  const inTem = s.InTem ? (s.InTem > 50 ? s.InTem / 2 : s.InTem) : setTem;
-  const delta = Math.abs(setTem - inTem);
-  const loadFactor = Math.min(1.0, 0.5 + delta * 0.05);
-  let power = base * fanFactor * turboFactor * loadFactor * dryFactor;
-  power = Math.min(power, model.max);
-  return Math.round(power * 100) / 100;
+  let duty = mode === 4 ? 0.55 : 0.70;
+  if (dred === 2) duty = Math.min(duty, 0.50);
+  if (dred === 3) duty = Math.min(duty, 0.75);
+  if (s.Quiet) duty *= 0.85;
+  if (s.Tur) duty = Math.min(1.0, duty * 1.20);
+  return Math.round(Math.min(base * duty, model.max) * 100) / 100;
 }
 
 // Track kWh per device (in memory)
@@ -1603,11 +1605,14 @@ function renderDevice(d) {
   const tem = s.SetDeciTem != null ? (s.SetDeciTem / 10).toFixed(1) : (s.SetTem || '--');
   const inTem = s.InTem;
   const outTem = s.OutTem;
+  const measuredAir = s.TemSen;
   const inHumi = s.InHumi;
   const fan = s.WdSpd;
   const swingV = s.SwUpDn;
   const swingH = s.SwingLfRig;
   const connected = d.connected;
+  const effectiveDred = Number(s.DRED || 0) === 0 && Number(s.Idemand || 0) === 1
+    ? 1 : Number(s.DRED || 0);
   const safeMac = escHtml(String(d.mac || ''));
   const modelKey = getModelKey(d.mac);
   const model = MODELS[modelKey] || null;
@@ -1682,13 +1687,13 @@ function renderDevice(d) {
   </div>
 
   <div class="sensors">
-    <div class="sensor">
-      <div class="value ${pow ? 'green' : ''}">${parseTemp(inTem)}°</div>
-      <div class="label">Interno</div>
+    <div class="sensor" title="TemSen: sensore aria dell’unità interna, codifica +40. È l’unico valore documentato come temperatura aria misurata.">
+      <div class="value ${pow ? 'green' : ''}">${measuredAir != null ? (Number(measuredAir) - 40).toFixed(1) : '--'}°</div>
+      <div class="label">Aria unità interna</div>
     </div>
-    <div class="sensor">
-      <div class="value ${pow ? '' : ''}">${parseTemp(outTem)}°</div>
-      <div class="label">Esterno</div>
+    <div class="sensor" title="InTem=${escHtml(String(inTem))}, OutTem=${escHtml(String(outTem))}. Le sonde fisiche non sono identificate dai manuali: non sono temperatura stanza/meteo.">
+      <div class="value">${parseTemp(inTem)}° / ${parseTemp(outTem)}°</div>
+      <div class="label">Sonde grezze IDU/ODU</div>
     </div>
     <div class="sensor">
       <div class="value">${inHumi != null ? inHumi + '%' : '--'}</div>
@@ -1759,10 +1764,11 @@ function renderDevice(d) {
       <label>I-Demand / DRED</label>
       <div class="btn-group">
         ${[['Off',0],['D1',1],['D2',2],['D3',3]].map(([label,value]) =>
-          `<button class="btn ${Number(s.DRED) === value ? 'active' : ''}" onclick="setDred('${safeMac}',${value})" title="${value === 1 ? 'D1: livello previsto dal protocollo, non ancora verificato sul display' : 'Livello verificato dal comando a filo'}">${label}</button>`
+          `<button class="btn ${effectiveDred === value ? 'active' : ''}" onclick="setDred('${safeMac}',${value})" title="${value === 0 ? 'Nessun livello DRED' : value === 1 ? 'D1: compressore disabilitato; la ventola interna può continuare' : value === 2 ? 'D2: domanda elettrica limitata a non oltre il 50%' : 'D3: domanda elettrica limitata a non oltre il 75%'}">${label}</button>`
         ).join('')}
+        ${Number(s.Idemand || 0) === 1 ? '<span class="switch-btn on" title="Flag I-Demand separato riportato dal dispositivo">I-Demand attivo</span>' : ''}
       </div>
-      <span style="color:var(--text-secondary);font-size:11px;">Solo Cool. Selezionare un livello disattiva Quiet.</span>
+      <span style="color:var(--text-secondary);font-size:11px;">D1: compressore fermo · D2: max 50% · D3: max 75%. Solo Cool; l’attivazione annulla Quiet.</span>
     </div>` : ''}
 
     ${['Errcode','ErrType','RefLeak','MSysStatus','CleanState','CleanTime','FClTime','CleanDataFlag']

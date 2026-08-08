@@ -48,15 +48,16 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
 
     @property
     def current_temperature(self) -> float | None:
+        """Return only the documented measured-air value.
+
+        `TemSen` is encoded with Gree's +40 offset. The physical probes behind
+        U-Match `InTem` and `OutTem` are not identified by the supplied manuals,
+        so they must not be presented as the actual room temperature.
+        """
         raw = self.coordinator.data.get("TemSen")
-        if raw is not None:
-            return float(raw - 40)
-        raw = self.coordinator.data.get("InTem")
-        if raw is None:
+        if raw is None or not isinstance(raw, (int, float)):
             return None
-        if raw > 50:
-            return raw / 2
-        return float(raw)
+        return float(raw - 40)
 
     @property
     def target_temperature(self) -> float | None:

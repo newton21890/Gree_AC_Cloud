@@ -56,7 +56,7 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
         self._attr_native_unit_of_measurement = SENSOR_UNITS.get(key)
         self._attr_state_class = SENSOR_STATE_CLASS.get(key)
         self._attr_entity_registry_enabled_default = (
-            key in ("InTem", "OutTem", "InHumi") or cfg.get("diagnostic", False)
+            key in ("InHumi",) or cfg.get("diagnostic", False)
         )
 
         if cfg.get("diagnostic"):
@@ -76,8 +76,11 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
         if raw is None:
             return None
         if self._key in ("InTem", "OutTem") and isinstance(raw, (int, float)):
+            # The cloud samples resemble half-degree values, but the supplied
+            # manuals do not identify their physical probes.
             return raw / 2 if raw > 50 else raw
         if self._key == "TemSen" and isinstance(raw, (int, float)):
+            # Gree measured-air temperatures use a +40 protocol offset.
             return raw - 40
         if isinstance(raw, list):
             return ", ".join(str(item) for item in raw) if raw else "0"
@@ -85,12 +88,29 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
             return str(raw)
         return raw
 
+    @property
+    def extra_state_attributes(self):
+        if self._key == "TemSen":
+            return {
+                "protocol_property": "TemSen",
+                "source": "indoor-unit air sensor",
+                "encoding": "raw value minus 40 °C",
+            }
+        if self._key in ("InTem", "OutTem"):
+            return {
+                "protocol_property": self._key,
+                "raw_value": self.coordinator.data.get(self._key),
+                "source": "physical probe not identified by the supplied manuals",
+                "warning": "Do not interpret this as room or outdoor ambient temperature.",
+            }
+        return None
+
 
 class GreePowerSensor(GreeDeviceEntity, SensorEntity):
 
     def __init__(self, coordinator):
         super().__init__(coordinator, coordinator.device, key_suffix="power")
-        self._attr_name = f"{coordinator.device.name} Power"
+        self._attr_name = "Estimated Power"
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_native_unit_of_measurement = UnitOfPower.WATT
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -101,12 +121,21 @@ class GreePowerSensor(GreeDeviceEntity, SensorEntity):
     def native_value(self):
         return self.coordinator.data.get("estimated_power_w")
 
+    @property
+    def extra_state_attributes(self):
+        return {
+            "estimated": True,
+            "model": self.coordinator._model_key or None,
+            "method": "nominal input adjusted by HVAC mode and verified DRED limit",
+            "not_a_meter": True,
+        }
+
 
 class GreeEnergySensor(GreeDeviceEntity, SensorEntity):
 
     def __init__(self, coordinator):
         super().__init__(coordinator, coordinator.device, key_suffix="energy")
-        self._attr_name = f"{coordinator.device.name} Energy"
+        self._attr_name = "Estimated Energy"
         self._attr_device_class = SensorDeviceClass.ENERGY
         self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
@@ -116,3 +145,12 @@ class GreeEnergySensor(GreeDeviceEntity, SensorEntity):
     @property
     def native_value(self):
         return self.coordinator.data.get("estimated_energy_kwh")
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "estimated": True,
+            "model": self.coordinator._model_key or None,
+            "method": "time integral of estimated power; not suitable for billing",
+            "not_a_meter": True,
+        }

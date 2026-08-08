@@ -99,6 +99,8 @@ def test_dred_control_keeps_verified_protocol_mapping() -> None:
     assert '["DRED"]' in select_source
     assert 'data.get("DREDEn") == 1' in select_source
     assert 'data.get("Mod") == 1' in select_source
+    assert 'data.get("Idemand") == 1' in select_source
+    assert '"verified_levels": [0, 1, 2, 3]' in select_source
 
 
 def test_device_command_round_trip() -> None:

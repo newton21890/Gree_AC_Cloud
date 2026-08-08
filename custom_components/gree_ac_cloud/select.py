@@ -43,11 +43,17 @@ class GreeDemandResponseSelect(GreeDeviceEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        raw = self.coordinator.data.get("DRED")
+        data = self.coordinator.data
+        raw = data.get("DRED")
         try:
-            return DRED_OPTIONS.get(int(raw))
+            value = int(raw)
         except (TypeError, ValueError):
             return None
+        # One verified controller reports I-Demand/D1 as Idemand=1,DRED=0;
+        # another reports D1 directly as DRED=1.
+        if value == 0 and data.get("Idemand") == 1:
+            value = 1
+        return DRED_OPTIONS.get(value)
 
     @property
     def extra_state_attributes(self):
@@ -55,9 +61,14 @@ class GreeDemandResponseSelect(GreeDeviceEntity, SelectEntity):
             "protocol_property": "DRED",
             "i_demand_flag": self.coordinator.data.get("Idemand"),
             "dred_enabled": self.coordinator.data.get("DREDEn"),
-            "verified_levels": [0, 2, 3],
-            "d1_verified": False,
-            "note": "D2, D3 and Off were verified from the XE7A wired controller; D1 remains unverified.",
+            "verified_levels": [0, 1, 2, 3],
+            "d1_verified": True,
+            "level_meanings": {
+                "D1": "compressor disabled; indoor fan may continue",
+                "D2": "electrical demand capped at no more than 50%",
+                "D3": "electrical demand capped at no more than 75%",
+            },
+            "note": "All levels were verified from the XE7A wired controllers; percentages are DRED demand ceilings, not measured consumption.",
         }
 
     async def async_select_option(self, option: str) -> None:

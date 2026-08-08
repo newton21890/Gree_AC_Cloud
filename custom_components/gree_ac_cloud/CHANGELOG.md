@@ -1,13 +1,27 @@
 # Changelog
 
+## 0.2.10
+
+### DRED, logs, temperatures and estimates
+
+- Normalized the two verified D1 representations (`DRED=1` and `Idemand=1,DRED=0`).
+- Added D1/D2/D3 descriptions and DRED-aware estimated power.
+- Restored the panel's live log capture.
+- Reclassified unidentified `InTem`/`OutTem` values as raw diagnostic probes instead of room/outdoor ambient temperatures.
+- Climate current temperature now uses only documented `TemSen`; estimates are clearly marked as non-meter values.
+
 ## 0.2.9
 
 ### U-Match verification
 
 - Added a disabled-by-default `I-Demand / DRED Level` select with Off, D1, D2 and D3.
-- Confirmed on the XE7A wired controller that Off, D2 and D3 map to `DRED=0`, `2` and `3`; D1 remains explicitly marked as unverified.
+- Confirmed on both XE7A wired controllers that all levels are available. Firmware can report D1 as either `DRED=1` or `Idemand=1,DRED=0`; both forms are now normalized to D1.
+- Added descriptions: D1 disables the compressor, D2 caps demand at 50%, and D3 caps demand at 75%. These are ceilings, not power measurements.
 - Confirmed that selecting a DRED level cancels Quiet and that the control is available only while the unit is on in Cool mode.
-- Added the DRED control and verification notes to the custom panel.
+- Restored panel log capture after reload by setting the component logger level and avoiding duplicate in-memory handlers.
+- Renamed `InTem`/`OutTem` as unverified raw IDU/ODU probes; they are no longer presented as actual room/outdoor ambient temperatures.
+- Climate current temperature now uses only documented `TemSen` (`raw - 40 °C`) and remains unavailable when the device does not provide it.
+- Reworked estimated power to avoid using unidentified temperature probes and to account for DRED demand ceilings. Energy entities are explicitly marked as estimates, not meters.
 
 ## 0.2.8
 

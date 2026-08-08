@@ -108,6 +108,15 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         return ENERGY_MODELS.get(self._model_key)
 
     def _estimate_power_w(self, state: dict) -> float:
+        """Estimate electrical input without pretending raw probes are ambient.
+
+        The model values are nominal electrical inputs, not measured power. The
+        supplied documentation does not identify the physical `InTem` probe, so
+        temperature delta must not be used as a compressor-load measurement.
+        DRED limits follow the standard demand-response ceilings; D1 means no
+        compressor, D2 <= 50%, D3 <= 75%. Off uses a conservative 70% duty-cycle
+        estimate. Fan-only is approximated at 5% of nominal cooling input.
+        """
         model = self._model_specs
         if not model or not state.get("Pow"):
             return 0.0
@@ -116,21 +125,33 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         if mode == 3:
             return round(model["cool"] * 0.05 * 1000)
 
+        dred = state.get("DRED", 0)
+        try:
+            dred = int(dred)
+        except (TypeError, ValueError):
+            dred = 0
+        # Firmware variants report D1 either as DRED=1 or as the separate
+        # Idemand=1 flag while leaving DRED=0. Both forms were observed live.
+        if dred == 0 and state.get("Idemand") == 1:
+            dred = 1
+        if dred == 1:
+            return round(model["cool"] * 0.05 * 1000)
+
         base = model["heat"] if mode == 2 else model["cool"]
-        dry_factor = 0.7 if mode == 4 else 1.0
+        duty_factor = 0.70
+        if mode == 4:
+            duty_factor = 0.55
+        if dred == 2:
+            duty_factor = min(duty_factor, 0.50)
+        elif dred == 3:
+            duty_factor = min(duty_factor, 0.75)
 
-        fan_map = {0: 0.9, 1: 0.7, 2: 0.8, 3: 0.9, 4: 1.0, 5: 1.1}
-        fan_factor = fan_map.get(state.get("WdSpd"), 0.9)
-        turbo_factor = 1.2 if state.get("Tur") else 1.0
+        if state.get("Quiet"):
+            duty_factor *= 0.85
+        if state.get("Tur"):
+            duty_factor = min(1.0, duty_factor * 1.20)
 
-        set_tem_raw = state.get("SetDeciTem")
-        set_tem = set_tem_raw / 10 if set_tem_raw else (state.get("SetTem", 24) or 24)
-        in_tem_raw = state.get("InTem")
-        in_tem = in_tem_raw / 2 if in_tem_raw and in_tem_raw > 50 else (in_tem_raw or set_tem)
-        delta = abs(set_tem - in_tem)
-        load_factor = min(1.0, 0.5 + delta * 0.05)
-
-        power_kw = base * fan_factor * turbo_factor * load_factor * dry_factor
+        power_kw = base * duty_factor
         return round(min(power_kw, model["max"]) * 1000)
 
     def _build_data(self) -> dict[str, Any]:

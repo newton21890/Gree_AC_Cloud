@@ -22,10 +22,10 @@
   },
   "entity": {
     "sensor": {
-      "in_tem": { "name": "Temperatura interna" },
-      "out_tem": { "name": "Temperatura esterna" },
+      "in_tem": { "name": "Sonda unità interna (grezza/non verificata)" },
+      "out_tem": { "name": "Sonda unità esterna (grezza/non verificata)" },
       "in_humi": { "name": "Umidità interna" },
-      "tem_sen": { "name": "Temperatura sensore" },
+      "tem_sen": { "name": "Temperatura aria unità interna" },
       "set_deci_tem": { "name": "Temperatura target (decimale)" },
       "errcode": { "name": "Codice errore" },
       "err_type": { "name": "Tipo errore" },

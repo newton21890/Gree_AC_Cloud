@@ -22,10 +22,10 @@
   },
   "entity": {
     "sensor": {
-      "in_tem": { "name": "Indoor Temperature" },
-      "out_tem": { "name": "Outdoor Temperature" },
+      "in_tem": { "name": "Indoor Unit Air Sensor (Raw/Unverified)" },
+      "out_tem": { "name": "Outdoor Unit Sensor (Raw/Unverified)" },
       "in_humi": { "name": "Indoor Humidity" },
-      "tem_sen": { "name": "Sensor Temperature" },
+      "tem_sen": { "name": "Indoor Air Temperature" },
       "set_deci_tem": { "name": "Target Temperature (Decimal)" },
       "errcode": { "name": "Error Code" },
       "err_type": { "name": "Error Type" },
