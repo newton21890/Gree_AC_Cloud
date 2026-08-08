@@ -32,7 +32,9 @@
       "m_sys_status": { "name": "System Status" },
       "clean_state": { "name": "Auto Clean Status" },
       "clean_time": { "name": "Filter Runtime" },
-      "f_cl_time": { "name": "Filter Cleaning Interval" }
+      "f_cl_time": { "name": "Filter Cleaning Interval" },
+      "power": { "name": "Estimated Power" },
+      "energy": { "name": "Estimated Energy" }
     },
     "switch": {
       "health": { "name": "Health/Ionizer" },

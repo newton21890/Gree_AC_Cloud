@@ -1606,6 +1606,9 @@ function renderDevice(d) {
   const inTem = s.InTem;
   const outTem = s.OutTem;
   const measuredAir = s.TemSen;
+  const roomTemp = measuredAir != null ? Number(measuredAir) - 40 : null;
+  const probeIn = inTem != null ? Number(parseTemp(inTem)) : null;
+  const probeOut = outTem != null ? Number(parseTemp(outTem)) : null;
   const inHumi = s.InHumi;
   const fan = s.WdSpd;
   const swingV = s.SwUpDn;
@@ -1616,7 +1619,8 @@ function renderDevice(d) {
   const safeMac = escHtml(String(d.mac || ''));
   const modelKey = getModelKey(d.mac);
   const model = MODELS[modelKey] || null;
-  const estPower = estimatePower(s, model);
+  const estPower = s.estimated_power_w != null
+    ? Number(s.estimated_power_w) / 1000 : estimatePower(s, model);
   
   // Track kWh: accumulate when card is rendered (every ~10s)
   if (pow && modelKey && estPower > 0) {
@@ -1628,8 +1632,10 @@ function renderDevice(d) {
   } else if (!pow) {
     if (_kwhTracker[d.mac]) _kwhTracker[d.mac].kwh = 0;
   }
-  const totalKwh = (_kwhTracker[d.mac] && _kwhTracker[d.mac].kwh)
-    ? _kwhTracker[d.mac].kwh.toFixed(2) : '0.00';
+  const totalKwh = s.estimated_energy_kwh != null
+    ? Number(s.estimated_energy_kwh).toFixed(2)
+    : ((_kwhTracker[d.mac] && _kwhTracker[d.mac].kwh)
+      ? _kwhTracker[d.mac].kwh.toFixed(2) : '0.00');
 
   const modeCls = ['auto','cool','heat','fan','dry'];
   const modeLabels = ['Auto','Cool','Heat','Fan','Dry'];
@@ -1687,13 +1693,13 @@ function renderDevice(d) {
   </div>
 
   <div class="sensors">
-    <div class="sensor" title="TemSen: sensore aria dell’unità interna, codifica +40. È l’unico valore documentato come temperatura aria misurata.">
-      <div class="value ${pow ? 'green' : ''}">${measuredAir != null ? (Number(measuredAir) - 40).toFixed(1) : '--'}°</div>
-      <div class="label">Aria unità interna</div>
+    <div class="sensor" title="${roomTemp != null ? 'TemSen: sensore aria dell’unità interna, codifica +40.' : 'TemSen non fornito: non è disponibile una temperatura ambiente verificata.'}">
+      <div class="value ${pow ? 'green' : ''}">${roomTemp != null ? roomTemp.toFixed(1) : '--'}°</div>
+      <div class="label">Aria interna verificata</div>
     </div>
     <div class="sensor" title="InTem=${escHtml(String(inTem))}, OutTem=${escHtml(String(outTem))}. Le sonde fisiche non sono identificate dai manuali: non sono temperatura stanza/meteo.">
-      <div class="value">${parseTemp(inTem)}° / ${parseTemp(outTem)}°</div>
-      <div class="label">Sonde grezze IDU/ODU</div>
+      <div class="value">${probeIn != null ? probeIn.toFixed(1) : '--'}° / ${probeOut != null ? probeOut.toFixed(1) : '--'}°</div>
+      <div class="label">Sonde diagnostiche</div>
     </div>
     <div class="sensor">
       <div class="value">${inHumi != null ? inHumi + '%' : '--'}</div>
@@ -1702,8 +1708,8 @@ function renderDevice(d) {
   </div>
 
   ${modelKey ? `<div class="power-row">
-    <div class="p-item"><div class="p-val">${estPower.toFixed(2)} kW</div><div class="p-label">Stima istantanea</div></div>
-    <div class="p-item"><div class="p-val">${totalKwh} kWh</div><div class="p-label">Da accensione</div></div>
+    <div class="p-item"><div class="p-val">${estPower.toFixed(2)} kW</div><div class="p-label">Stima, non misurata</div></div>
+    <div class="p-item"><div class="p-val">${totalKwh} kWh</div><div class="p-label">Stima integrata HA</div></div>
     <div class="p-item"><div class="p-val">${(estPower * 730).toFixed(0)} kWh</div><div class="p-label">Mese stimato</div></div>
   </div>` : ''}
 

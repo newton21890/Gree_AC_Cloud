@@ -38,6 +38,13 @@ def test_panel_data_apis_require_authentication() -> None:
     assert source.count("requires_auth = False") == 1
 
 
+def test_panel_keeps_log_capture_and_d1_normalization() -> None:
+    source = (COMPONENT / "panel.py").read_text()
+    assert "_logger_root.setLevel(logging.DEBUG)" in source
+    assert "Number(s.Idemand || 0) === 1" in source
+    assert "I-Demand attivo" in source
+
+
 def test_insecure_tls_is_not_used_by_component() -> None:
     sources = "\n".join(path.read_text() for path in COMPONENT.glob("*.py"))
     assert "verify=False" not in sources

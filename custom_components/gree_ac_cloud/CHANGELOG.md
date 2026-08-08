@@ -4,11 +4,12 @@
 
 ### DRED, logs, temperatures and estimates
 
-- Normalized the two verified D1 representations (`DRED=1` and `Idemand=1,DRED=0`).
+- Normalized the two verified D1 representations (`DRED=1` and `Idemand=1,DRED=0`); the panel shows the separate I-Demand flag and highlights D1 correctly.
 - Added D1/D2/D3 descriptions and DRED-aware estimated power.
 - Restored the panel's live log capture.
 - Reclassified unidentified `InTem`/`OutTem` values as raw diagnostic probes instead of room/outdoor ambient temperatures.
-- Climate current temperature now uses only documented `TemSen`; estimates are clearly marked as non-meter values.
+- Climate current temperature now uses only documented `TemSen`; the panel shows unavailable when it is absent and keeps raw probes separate.
+- The panel uses persistent backend estimated power/energy and labels both explicitly as estimates rather than relying on a browser-only counter.
 
 ## 0.2.9
 
