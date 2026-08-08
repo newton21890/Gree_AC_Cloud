@@ -50,6 +50,9 @@
       "err": { "name": "Stato errore" },
       "filter": { "name": "Stato filtro" },
       "ref_leak": { "name": "Avviso refrigerante" }
+    },
+    "select": {
+      "dred_level": { "name": "Livello I-Demand / DRED" }
     }
   }
 }

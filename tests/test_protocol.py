@@ -89,6 +89,18 @@ def _load_protocol_module():
     return module
 
 
+def test_dred_control_keeps_verified_protocol_mapping() -> None:
+    const_source = (COMPONENT / "const.py").read_text()
+    select_source = (COMPONENT / "select.py").read_text()
+    assert '0: "Off"' in const_source
+    assert '1: "D1"' in const_source
+    assert '2: "D2"' in const_source
+    assert '3: "D3"' in const_source
+    assert '["DRED"]' in select_source
+    assert 'data.get("DREDEn") == 1' in select_source
+    assert 'data.get("Mod") == 1' in select_source
+
+
 def test_device_command_round_trip() -> None:
     module = _load_protocol_module()
     device = module.GreeDevice(

@@ -45,10 +45,11 @@ Le fonti più utili per l'integrazione sono:
 
 ### Alta priorità
 
-1. **I-Demand**
-   - Manuale: limita l'unità al 75% della capacità nominale; solo raffreddamento.
-   - Proprietà osservata: `Idemand`.
-   - Entità proposta: switch, disponibile solo in modalità Cool.
+1. **I-Demand / DRED**
+   - Manuale: funzione di risparmio disponibile solo in raffreddamento; documenta inoltre gli stati operativi DRED `d1`, `d2` e `d3` senza specificarne le percentuali.
+   - Verifica sul comando XE7A della zona notte: Off → `DRED=0`, D2 → `DRED=2`, D3 → `DRED=3`; `DREDEn=1` indica la capability. L'attivazione di un livello annulla Quiet. D1 non è ancora stato provato.
+   - `Idemand` non contiene il livello: durante D2/D3 è rimasto a 0; nella prima attivazione ha transitoriamente assunto 1.
+   - Entità implementata: select Off/D1/D2/D3, disabilitata per default e disponibile solo con unità accesa in Cool. D1 è marcato non verificato.
 
 2. **Absence / antigelo 8 °C**
    - Manuale: funzionamento minimo in assenza, anti-gelo a 8 °C; solo riscaldamento.
@@ -201,7 +202,7 @@ Mantenere tutte le tab esistenti e aggiungere/migliorare:
 2. Aggiungere capability registry e diagnostica read-only (`Errcode`, filtro, clean,
    stati sistema).
 3. Aggiungere entità `button`, `number` e `select` con disponibilità dinamica.
-4. Verificare sul dispositivo, una funzione per volta, `Idemand`, `GoOut`, `Blo`,
+4. Verificare sul dispositivo, una funzione per volta, D1 della proprietà `DRED`, `GoOut`, `Blo`,
    `AutoClean`, `LowDeHumi`, `AirLevel`, `SwhSlp`/`SlpMod`.
 5. Solo dopo conferma del read-back, attivare i controlli nel pannello.
 6. Lasciare P20/P22/P30 e gli altri parametri installatore in sola documentazione finché

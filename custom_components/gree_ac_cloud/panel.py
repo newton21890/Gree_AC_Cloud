@@ -1374,7 +1374,7 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
 
       <h3>Funzioni utente</h3>
       <table class="wt"><tr><th>Funzione</th><th>Vincolo</th><th>Protocollo</th><th>Stato integrazione</th></tr>
-      <tr><td>I-Demand</td><td>Solo Cool; limita la capacità nominale al 75%</td><td><code>Idemand</code></td><td>Da verificare sul dispositivo</td></tr>
+      <tr><td>I-Demand / DRED</td><td>Solo Cool; livelli Off, D1, D2, D3. L'attivazione annulla Quiet</td><td><code>DRED</code>, capability <code>DREDEn</code>; <code>Idemand</code> non rappresenta il livello</td><td>Off, D2 e D3 verificati sul comando XE7A; D1 ancora da verificare</td></tr>
       <tr><td>Absence / antigelo 8 °C</td><td>Solo Heat</td><td><code>GoOut</code></td><td>Da verificare sul dispositivo</td></tr>
       <tr><td>X-Fan</td><td>Cool/Dry; asciugatura evaporatore</td><td><code>Blo</code></td><td>Disponibile come switch</td></tr>
       <tr><td>Auto Clean</td><td>Avvio a unità spenta; ciclo ~30 min</td><td><code>AutoClean</code>, <code>CleanState</code></td><td>Da implementare come button + stato</td></tr>
@@ -1755,6 +1755,16 @@ function renderDevice(d) {
       </div>
     </div>
 
+    ${s.DREDEn === 1 && s.DRED !== undefined ? `<div class="control-row">
+      <label>I-Demand / DRED</label>
+      <div class="btn-group">
+        ${[['Off',0],['D1',1],['D2',2],['D3',3]].map(([label,value]) =>
+          `<button class="btn ${Number(s.DRED) === value ? 'active' : ''}" onclick="setDred('${safeMac}',${value})" title="${value === 1 ? 'D1: livello previsto dal protocollo, non ancora verificato sul display' : 'Livello verificato dal comando a filo'}">${label}</button>`
+        ).join('')}
+      </div>
+      <span style="color:var(--text-secondary);font-size:11px;">Solo Cool. Selezionare un livello disattiva Quiet.</span>
+    </div>` : ''}
+
     ${['Errcode','ErrType','RefLeak','MSysStatus','CleanState','CleanTime','FClTime','CleanDataFlag']
       .some(k => s[k] !== undefined && s[k] !== null) ? `<div class="control-row">
       <label>Diagnostica</label>
@@ -1828,6 +1838,17 @@ async function setTemp(mac, delta) {
 async function setFan(mac, val) {
   await sendCommand(mac, ['WdSpd'], [val]);
   setTimeout(loadData, 1000);
+}
+
+async function setDred(mac, val) {
+  if (![0,1,2,3].includes(val)) return;
+  const label = val === 0 ? 'Off' : `D${val}`;
+  const warning = val === 1
+    ? 'D1 non è ancora stato verificato sul comando a filo. Continuare?'
+    : `${label} modifica il limite I-Demand e disattiva Quiet. Continuare?`;
+  if (!window.confirm(warning)) return;
+  await sendCommand(mac, ['DRED'], [val]);
+  setTimeout(loadData, 1500);
 }
 
 async function setSwing(mac, mode) {

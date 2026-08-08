@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["climate", "sensor", "switch", "binary_sensor"]
+PLATFORMS = ["climate", "sensor", "switch", "binary_sensor", "select"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry):

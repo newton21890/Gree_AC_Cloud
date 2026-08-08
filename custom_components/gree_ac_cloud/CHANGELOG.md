@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.9
+
+### U-Match verification
+
+- Added a disabled-by-default `I-Demand / DRED Level` select with Off, D1, D2 and D3.
+- Confirmed on the XE7A wired controller that Off, D2 and D3 map to `DRED=0`, `2` and `3`; D1 remains explicitly marked as unverified.
+- Confirmed that selecting a DRED level cancels Quiet and that the control is available only while the unit is on in Cool mode.
+- Added the DRED control and verification notes to the custom panel.
+
 ## 0.2.8
 
 ### Security

@@ -48,16 +48,24 @@ POLL_COLS = [
     "InTem", "OutTem", "TemSen", "InHumi", "SetDeciTem",
     "Err", "Errcode", "ErrType", "RefLeak", "MSysStatus",
     "Filter", "CleanEn", "CleanTime", "CleanDataFlag", "CleanState", "FClTime",
-    "WaterSen",
+    "Idemand", "DRED", "DREDEn", "WaterSen",
 ]
 
 COMMAND_OPTIONS = frozenset(
     {
         "Pow", "Mod", "SetTem", "SetDeciTem", "WdSpd", "Air", "Blo",
         "Health", "SwhSlp", "Lig", "SwUpDn", "SwingLfRig", "Quiet", "Tur",
-        "StHt", "TemUn", "TemRec", "SvSt", "SlpMod",
+        "StHt", "TemUn", "TemRec", "SvSt", "SlpMod", "DRED",
     }
 )
+
+DRED_OPTIONS = {
+    0: "Off",
+    1: "D1",
+    2: "D2",
+    3: "D3",
+}
+DRED_OPTIONS_REV = {value: key for key, value in DRED_OPTIONS.items()}
 
 FAN_MAP = {
     0: "Auto", 1: "Bassa", 2: "Media-Bassa", 3: "Media",
