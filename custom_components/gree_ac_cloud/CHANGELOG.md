@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.11
+
+### Allineamento I-Demand nel pannello
+
+- Il backend espone ora al pannello il livello DRED effettivo già normalizzato, incluso il firmware della zona giorno che riporta D1 come `DRED=0, Idemand=1`.
+- Il pannello evidenzia D1 e mostra esplicitamente `Stato effettivo: D1 attivo (I-Demand)` in questo caso.
+- La pagina del pannello usa intestazioni `no-cache` e un URL legato alla versione per impedire che Home Assistant conservi il vecchio JavaScript dopo un aggiornamento.
+- La normalizzazione accetta valori numerici e stringhe restituiti dai diversi firmware.
+
 ## 0.2.10
 
 ### DRED, logs, temperatures and estimates

@@ -149,7 +149,9 @@ async def async_register_panel(hass: HomeAssistant):
                 sidebar_title="Gree AC Cloud",
                 sidebar_icon="mdi:air-conditioner",
                 frontend_url_path="gree-ac-cloud",
-                config={"url": PANEL_URL},
+                # Version the iframe URL so HA clients do not retain an old
+                # panel shell after an integration update.
+                config={"url": f"{PANEL_URL}?v={_VERSION_CACHE}"},
                 require_admin=True,
             )
             _LOGGER.info("Panel registered in sidebar")
@@ -181,7 +183,14 @@ class GreePanelView(HomeAssistantView):
         html = html.replace("__CHANGELOG_JSON__", _safe_json_for_script(_CHANGELOG_CACHE))
         html = html.replace("__VERSION__", _VERSION_CACHE)
         html = html.replace("__DEVICE_NAMES_JSON__", "{}")
-        return web.Response(text=html, content_type="text/html")
+        return web.Response(
+            text=html,
+            content_type="text/html",
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+            },
+        )
 
 
 class GreePanelDataView(HomeAssistantView):
@@ -205,6 +214,20 @@ class GreePanelDataView(HomeAssistantView):
             for coord in coordinators:
                 device = coord.device
                 state = dict(coord.data or device.properties or {})
+                try:
+                    raw_dred = int(state.get("DRED", 0))
+                except (TypeError, ValueError):
+                    raw_dred = 0
+                try:
+                    idemand_active = int(state.get("Idemand", 0)) == 1
+                except (TypeError, ValueError):
+                    idemand_active = False
+                # Some firmware exposes D1 through Idemand instead of DRED.
+                # Send the normalized value explicitly to avoid UI ambiguity.
+                state["DREDEffective"] = (
+                    1 if raw_dred == 0 and idemand_active else raw_dred
+                )
+                state["IdemandActive"] = idemand_active
                 data.append({
                     "mac": device.mac,
                     "name": device.name,
@@ -1614,8 +1637,10 @@ function renderDevice(d) {
   const swingV = s.SwUpDn;
   const swingH = s.SwingLfRig;
   const connected = d.connected;
-  const effectiveDred = Number(s.DRED || 0) === 0 && Number(s.Idemand || 0) === 1
-    ? 1 : Number(s.DRED || 0);
+  const iDemandActive = s.IdemandActive === true || Number(s.Idemand || 0) === 1;
+  const effectiveDred = s.DREDEffective != null
+    ? Number(s.DREDEffective)
+    : (Number(s.DRED || 0) === 0 && iDemandActive ? 1 : Number(s.DRED || 0));
   const safeMac = escHtml(String(d.mac || ''));
   const modelKey = getModelKey(d.mac);
   const model = MODELS[modelKey] || null;
@@ -1772,9 +1797,9 @@ function renderDevice(d) {
         ${[['Off',0],['D1',1],['D2',2],['D3',3]].map(([label,value]) =>
           `<button class="btn ${effectiveDred === value ? 'active' : ''}" onclick="setDred('${safeMac}',${value})" title="${value === 0 ? 'Nessun livello DRED' : value === 1 ? 'D1: compressore disabilitato; la ventola interna può continuare' : value === 2 ? 'D2: domanda elettrica limitata a non oltre il 50%' : 'D3: domanda elettrica limitata a non oltre il 75%'}">${label}</button>`
         ).join('')}
-        ${Number(s.Idemand || 0) === 1 ? '<span class="switch-btn on" title="Flag I-Demand separato riportato dal dispositivo">I-Demand attivo</span>' : ''}
+        ${iDemandActive ? '<span class="switch-btn on" title="Flag I-Demand separato riportato dal dispositivo">I-Demand attivo</span>' : ''}
       </div>
-      <span style="color:var(--text-secondary);font-size:11px;">D1: compressore fermo · D2: max 50% · D3: max 75%. Solo Cool; l’attivazione annulla Quiet.</span>
+      <span style="color:${effectiveDred > 0 ? 'var(--green)' : 'var(--text-secondary)'};font-size:11px;font-weight:${effectiveDred > 0 ? '600' : '400'};">Stato effettivo: ${effectiveDred > 0 ? `D${effectiveDred} attivo${iDemandActive ? ' (I-Demand)' : ''}` : 'Off'} · D1: compressore fermo · D2: max 50% · D3: max 75%.</span>
     </div>` : ''}
 
     ${['Errcode','ErrType','RefLeak','MSysStatus','CleanState','CleanTime','FClTime','CleanDataFlag']

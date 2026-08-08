@@ -41,8 +41,12 @@ def test_panel_data_apis_require_authentication() -> None:
 def test_panel_keeps_log_capture_and_d1_normalization() -> None:
     source = (COMPONENT / "panel.py").read_text()
     assert "_logger_root.setLevel(logging.DEBUG)" in source
+    assert 'state["DREDEffective"]' in source
+    assert 'state["IdemandActive"]' in source
     assert "Number(s.Idemand || 0) === 1" in source
     assert "I-Demand attivo" in source
+    assert "Stato effettivo:" in source
+    assert '"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"' in source
 
 
 def test_insecure_tls_is_not_used_by_component() -> None:
@@ -106,7 +110,7 @@ def test_dred_control_keeps_verified_protocol_mapping() -> None:
     assert '["DRED"]' in select_source
     assert 'data.get("DREDEn") == 1' in select_source
     assert 'data.get("Mod") == 1' in select_source
-    assert 'data.get("Idemand") == 1' in select_source
+    assert 'int(data.get("Idemand", 0)) == 1' in select_source
     assert '"verified_levels": [0, 1, 2, 3]' in select_source
 
 

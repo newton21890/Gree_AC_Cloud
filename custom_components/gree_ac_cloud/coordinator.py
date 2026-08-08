@@ -132,7 +132,11 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
             dred = 0
         # Firmware variants report D1 either as DRED=1 or as the separate
         # Idemand=1 flag while leaving DRED=0. Both forms were observed live.
-        if dred == 0 and state.get("Idemand") == 1:
+        try:
+            idemand_active = int(state.get("Idemand", 0)) == 1
+        except (TypeError, ValueError):
+            idemand_active = False
+        if dred == 0 and idemand_active:
             dred = 1
         if dred == 1:
             return round(model["cool"] * 0.05 * 1000)

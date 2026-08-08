@@ -51,7 +51,11 @@ class GreeDemandResponseSelect(GreeDeviceEntity, SelectEntity):
             return None
         # One verified controller reports I-Demand/D1 as Idemand=1,DRED=0;
         # another reports D1 directly as DRED=1.
-        if value == 0 and data.get("Idemand") == 1:
+        try:
+            idemand_active = int(data.get("Idemand", 0)) == 1
+        except (TypeError, ValueError):
+            idemand_active = False
+        if value == 0 and idemand_active:
             value = 1
         return DRED_OPTIONS.get(value)
 
