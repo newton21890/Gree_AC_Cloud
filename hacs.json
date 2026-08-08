@@ -3,8 +3,6 @@
   "content_in_root": false,
   "render_readme": true,
   "zip_release": false,
-  "filename": false,
   "homeassistant": "2024.1.0",
-  "persistent_directory": false,
-  "iot_class": "cloud_polling"
+  "persistent_directory": false
 }
