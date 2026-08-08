@@ -106,7 +106,6 @@ def api_login(
             "Charset": "utf-8",
             "User-Agent": user_agent,
         },
-        verify=False,
         timeout=15,
     )
     resp.raise_for_status()
@@ -136,7 +135,6 @@ def api_get_homes(
             "Gaen1": "5ac2bdf935bcca70",
             "Charset": "utf-8",
         },
-        verify=False,
         timeout=15,
     )
     resp.raise_for_status()
@@ -162,7 +160,6 @@ def api_get_devices(
             "Gaen1": "5ac2bdf935bcca70",
             "Charset": "utf-8",
         },
-        verify=False,
         timeout=15,
     )
     resp.raise_for_status()
@@ -233,7 +230,7 @@ class GreeDevice:
             if "cols" in result and "dat" in result:
                 return dict(zip(result["cols"], result["dat"]))
             return result
-        except (ValueError, KeyError, json.JSONDecodeError):
+        except (ValueError, KeyError, TypeError, json.JSONDecodeError, UnicodeDecodeError):
             return None
 
 
@@ -249,27 +246,39 @@ def discover_devices(
     if not homes:
         raise ValueError("No homes found for this account")
 
-    home_id = homes[0]["id"]
-    raw_devices = api_get_devices(host, uid, token, home_id)
-    if not raw_devices:
-        raise ValueError("No devices found in home")
+    raw_devices_by_mac: dict[str, dict[str, Any]] = {}
+    for home in homes:
+        home_id = home.get("id")
+        if home_id is None:
+            continue
+        for device in api_get_devices(host, uid, token, home_id):
+            mac = device.get("mac")
+            if mac:
+                raw_devices_by_mac[mac] = device
+
+    if not raw_devices_by_mac:
+        raise ValueError("No devices found for this account")
 
     devices = [
         GreeDevice(
             mac=d["mac"],
             name=d.get("name", f"Gree Device {d['mac']}"),
-            key=d.get("key", ""),
+            key=d.get("key") or "",
             hid=d.get("hid"),
         )
-        for d in raw_devices
+        for d in raw_devices_by_mac.values()
+        if d.get("key")
     ]
+    if not devices:
+        raise ValueError("Discovered devices do not provide encryption keys")
     return uid, token, devices
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    import os, sys
+    import os
+    import sys
     creds = os.path.expanduser("~/.bridge_credentials.json")
     if not os.path.exists(creds):
         print(f"Credentials file not found: {creds}")

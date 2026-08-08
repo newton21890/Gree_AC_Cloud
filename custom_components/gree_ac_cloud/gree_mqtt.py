@@ -1,33 +1,27 @@
-"""Gree AC Cloud MQTT — async MQTT client using aiomqtt.
-
-Test: python3 -m custom_components.gree_ac_cloud.gree_mqtt
-"""
+"""Asynchronous MQTT client for Gree cloud devices."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import ssl
 import time
 from typing import Any, Callable
 
+from .const import POLL_COLS
 from .gree_api import GreeDevice
-
-POLL_COLS = [
-    "Pow", "Mod", "SetTem", "WdSpd", "Air", "Blo", "Health",
-    "SwhSlp", "Lig", "SwUpDn", "SwingLfRig", "Quiet", "Tur",
-    "StHt", "TemUn", "HeatCoolType", "TemRec", "SvSt", "SlpMod",
-    "InTem", "OutTem", "TemSen", "InHumi", "SetDeciTem",
-    "Err", "Filter", "WaterSen",
-]
 
 _LOGGER = logging.getLogger(__name__)
 
-EXTRA_KEYS = ["Health", "Quiet", "Tur", "StHt", "Blo", "SvSt", "SlpMod", "Lig", "Air", "SwingLfRig", "SwUpDn"]
+EXTRA_KEYS = [
+    "Health", "Quiet", "Tur", "StHt", "Blo", "SvSt", "SlpMod", "Lig",
+    "Air", "SwingLfRig", "SwUpDn",
+]
 
 
 class GreeMQTTClient:
-    """Async MQTT client for Gree cloud devices using aiomqtt."""
+    """Maintain an MQTT connection and process Gree device messages."""
 
     def __init__(
         self,
@@ -42,92 +36,112 @@ class GreeMQTTClient:
         self.port = port
         self.uid = uid
         self.token = token
-        self.devices = {d.mac: d for d in devices}
+        self.devices = {device.mac: device for device in devices}
         self._on_data = on_data
         self._client = None
         self._listener_task: asyncio.Task | None = None
         self._running = False
-        self._user_params: dict[str, set[str]] = {d.mac: set() for d in devices}
+        self._connected = False
+        self._connected_event = asyncio.Event()
+        self._user_params: dict[str, set[str]] = {
+            device.mac: set() for device in devices
+        }
         self._last_seen: dict[str, float] = {}
-
-    # ── lifecycle ──────────────────────────────────────
+        self._last_command: dict[str, float] = {}
 
     def _create_client(self):
-        import ssl
-
         import aiomqtt
-
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
 
         return aiomqtt.Client(
             hostname=self.host,
             port=self.port,
             username=str(self.uid),
             password=self.token,
-            identifier=f"gree_ac_{int(__import__('time').time())}",
+            identifier=f"gree_ac_{int(time.time())}",
             protocol=aiomqtt.ProtocolVersion.V311,
             keepalive=60,
-            tls_context=ctx,
+            tls_context=ssl.create_default_context(),
         )
 
     async def start(self) -> bool:
+        """Start the connection manager and wait for its first connection."""
+        if self._listener_task and not self._listener_task.done():
+            return self.connected
+
         self._running = True
-        self._client = self._create_client()
+        self._connected_event.clear()
+        loop = asyncio.get_running_loop()
+        self._listener_task = loop.create_task(
+            self._connection_loop(), name="gree_ac_cloud_mqtt"
+        )
         try:
-            await self._client.__aenter__()
-        except Exception as exc:
-            _LOGGER.error("MQTT connect failed: %s", exc)
+            await asyncio.wait_for(self._connected_event.wait(), timeout=15)
+        except asyncio.TimeoutError:
+            _LOGGER.error("MQTT connection to %s:%s timed out", self.host, self.port)
+            await self.stop()
             return False
-
-        _LOGGER.info("Connected to %s:%s", self.host, self.port)
-
-        for dev in self.devices.values():
-            pmac = dev.parent_mac
-            await self._client.subscribe(f"status/{pmac}/#", qos=1)
-            await self._client.subscribe(f"response/{pmac}/#", qos=1)
-        _LOGGER.info("Subscribed to %d devices", len(self.devices))
-
-        self._listener_task = asyncio.create_task(self._listener())
         return True
 
     async def stop(self):
+        """Stop reconnect attempts and close the active client."""
         self._running = False
+        self._connected = False
+        self._connected_event.clear()
         if self._listener_task:
             self._listener_task.cancel()
             try:
                 await self._listener_task
-            except (asyncio.CancelledError, StopAsyncIteration):
+            except asyncio.CancelledError:
                 pass
             self._listener_task = None
-        if self._client:
-            try:
-                await self._client.__aexit__(None, None, None)
-            except Exception:
-                pass
-            self._client = None
+        self._client = None
 
     @property
     def connected(self) -> bool:
-        return self._client is not None
+        return self._connected
 
-    # ── message processing ─────────────────────────────
-
-    async def _listener(self):
+    async def _connection_loop(self):
+        delay = 1
         while self._running:
             try:
-                async for msg in self._client.messages:
-                    self._process_message(msg)
-            except (asyncio.CancelledError, GeneratorExit, RuntimeError):
-                break
+                client = self._create_client()
+                self._client = client
+                async with client:
+                    for parent_mac in {d.parent_mac for d in self.devices.values()}:
+                        await client.subscribe(f"status/{parent_mac}/#", qos=1)
+                        await client.subscribe(f"response/{parent_mac}/#", qos=1)
+
+                    self._connected = True
+                    self._connected_event.set()
+                    delay = 1
+                    _LOGGER.info(
+                        "Connected to %s:%s; subscribed to %d parent devices",
+                        self.host,
+                        self.port,
+                        len({d.parent_mac for d in self.devices.values()}),
+                    )
+
+                    async for message in client.messages:
+                        self._process_message(message)
+
+                if self._running:
+                    raise ConnectionError("MQTT connection closed")
+            except asyncio.CancelledError:
+                raise
             except Exception as exc:
                 if self._running:
-                    _LOGGER.warning("MQTT listener error: %s", exc)
-                    await asyncio.sleep(1)
+                    _LOGGER.warning(
+                        "MQTT connection lost (%s); reconnecting in %ds", exc, delay
+                    )
+                    await asyncio.sleep(delay)
+                    delay = min(delay * 2, 60)
+            finally:
+                self._connected = False
+                self._client = None
 
     def _process_message(self, msg):
         import base64
+
         from Crypto.Util.Padding import unpad
 
         topic = str(msg.topic)
@@ -135,7 +149,7 @@ class GreeMQTTClient:
 
         try:
             payload = json.loads(msg.payload)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
             return
 
         pack = payload.get("pack")
@@ -143,194 +157,126 @@ class GreeMQTTClient:
             return
 
         topic_parts = topic.split("/")
-        topic_pmac = topic_parts[1] if len(topic_parts) > 1 else ""
-
+        topic_parent_mac = topic_parts[1] if len(topic_parts) > 1 else ""
         mac = None
-        dev = None
-        for m, d in self.devices.items():
-            if d.parent_mac == topic_pmac and len(m) == 12:
-                mac, dev = m, d
-                break
+        device = None
+        data = None
 
-        if mac is None:
-            for m, d in self.devices.items():
+        # Parent devices are the entities exposed by this integration.
+        for candidate_mac, candidate in self.devices.items():
+            if candidate.parent_mac == topic_parent_mac and len(candidate_mac) == 12:
+                decrypted = candidate.decrypt_pack(pack)
+                if decrypted is not None:
+                    mac, device, data = candidate_mac, candidate, decrypted
+                    break
+
+        # Some brokers do not include a useful parent MAC in the topic.
+        if device is None:
+            for candidate_mac, candidate in self.devices.items():
                 try:
-                    raw = unpad(d.cipher.decrypt(base64.b64decode(pack)), 16).decode()
+                    raw = unpad(
+                        candidate.cipher.decrypt(base64.b64decode(pack)), 16
+                    ).decode()
                     result = json.loads(raw)
                     if "cols" in result and "dat" in result:
-                        mac, dev, _data = m, d, dict(zip(result["cols"], result["dat"]))
-                        break
-                except (ValueError, KeyError, json.JSONDecodeError):
+                        result = dict(zip(result["cols"], result["dat"]))
+                    mac, device, data = candidate_mac, candidate, result
+                    break
+                except (
+                    ValueError,
+                    KeyError,
+                    TypeError,
+                    json.JSONDecodeError,
+                    UnicodeDecodeError,
+                ):
                     continue
-            if mac is None:
-                return
-        else:
-            _data = dev.decrypt_pack(pack)
-            if _data is None:
-                return
 
-        old_pow = dev.properties.get("Pow")
-        new_pow = _data.get("Pow")
-        power_on = (old_pow == 0 and new_pow == 1)
+        if device is None or mac is None or data is None:
+            return
 
-        dev.properties.update(_data)
+        old_power = device.properties.get("Pow")
+        new_power = data.get("Pow")
+        power_on = old_power == 0 and new_power == 1
+        device.properties.update(data)
         self._last_seen[mac] = time.monotonic()
 
         needs_reenable: list[str] = []
         if power_on:
             for key in EXTRA_KEYS:
-                if key not in _data:
-                    dev.properties[key] = 0
-            for key in list(self._user_params.get(mac, set())):
-                if not dev.properties.get(key):
-                    dev.properties[key] = 1
+                if key not in data:
+                    device.properties[key] = 0
+            for key in self._user_params.get(mac, set()):
+                if not device.properties.get(key):
+                    device.properties[key] = 1
                     needs_reenable.append(key)
 
         if self._on_data:
-            self._on_data(mac, dict(dev.properties))
+            self._on_data(mac, dict(device.properties))
 
-        _LOGGER.debug("MQTT: %s ⇐ %s (topic=%s)", mac, dict(sorted(_data.items())), topic)
-
+        _LOGGER.debug("MQTT: %s ⇐ %s", mac, dict(sorted(data.items())))
         if needs_reenable:
-            _LOGGER.info("Re-enabling %s on %s after power-on", needs_reenable, mac)
-            dev = self.devices.get(mac)
-            if dev:
-                pack = dev.build_command_pack(needs_reenable, [1] * len(needs_reenable))
-                asyncio.ensure_future(self._publish_json(
-                    f"request/{dev.parent_mac}",
-                    {"t": "pack", "i": 0, "uid": self.uid, "cid": "ha_ac_cloud",
-                     "tcid": mac, "pack": pack},
-                    qos=1,
-                ))
-
-    # ── publish helper ─────────────────────────────────
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                self.send_command(mac, needs_reenable, [1] * len(needs_reenable))
+            )
 
     async def _publish_json(self, topic: str, obj: dict, qos: int = 0) -> bool:
-        if not self._client:
+        client = self._client
+        if not self._connected or client is None:
             return False
-        payload = json.dumps(obj, separators=(",", ":"))
         try:
-            await self._client.publish(topic, payload, qos=qos)
+            await client.publish(
+                topic, json.dumps(obj, separators=(",", ":")), qos=qos
+            )
             return True
         except Exception as exc:
             _LOGGER.warning("Publish failed: %s", exc)
             return False
 
-    # ── public API ─────────────────────────────────────
-
-    async def refresh_device(self, mac: str, cols: list[str] | None = None) -> dict[str, Any] | None:
-        """Send a poll request (fire-and-forget) and return current device properties."""
-        dev = self.devices.get(mac)
-        if not dev:
+    async def refresh_device(
+        self, mac: str, cols: list[str] | None = None
+    ) -> dict[str, Any] | None:
+        device = self.devices.get(mac)
+        if not device:
             return None
-        pack = dev.build_status_request(cols or POLL_COLS)
         await self._publish_json(
-            f"request/{dev.parent_mac}",
-            {"t": "pack", "i": 0, "uid": self.uid, "cid": "ha_ac_cloud",
-             "tcid": mac, "pack": pack},
+            f"request/{device.parent_mac}",
+            {
+                "t": "pack", "i": 0, "uid": self.uid, "cid": "ha_ac_cloud",
+                "tcid": mac, "pack": device.build_status_request(cols or POLL_COLS),
+            },
             qos=1,
         )
-        return dict(dev.properties) if dev.properties else None
+        return dict(device.properties) if device.properties else None
 
     def seconds_since_last_seen(self, mac: str) -> float | None:
-        """Seconds since last real MQTT response, or None if never seen."""
         seen = self._last_seen.get(mac)
-        return (time.monotonic() - seen) if seen is not None else None
+        return time.monotonic() - seen if seen is not None else None
 
     async def send_command(
         self, mac: str, options: list[str], values: list[Any]
     ) -> bool:
-        """Send a command to a device (fire-and-forget)."""
-        dev = self.devices.get(mac)
-        if not dev:
+        device = self.devices.get(mac)
+        if not device or not options or len(options) != len(values):
             return False
-        pack = dev.build_command_pack(options, values)
         ok = await self._publish_json(
-            f"request/{dev.parent_mac}",
-            {"t": "pack", "i": 0, "uid": self.uid, "cid": "ha_ac_cloud",
-             "tcid": mac, "pack": pack},
+            f"request/{device.parent_mac}",
+            {
+                "t": "pack", "i": 0, "uid": self.uid, "cid": "ha_ac_cloud",
+                "tcid": mac,
+                "pack": device.build_command_pack(options, values),
+            },
             qos=1,
         )
         _LOGGER.info("send_command: %s options=%s values=%s", mac, options, values)
         if ok:
-            self._last_seen[mac] = time.monotonic()
+            self._last_command[mac] = time.monotonic()
 
-        up = self._user_params.setdefault(mac, set())
-        for opt, val in zip(options, values):
-            if opt in EXTRA_KEYS:
-                if val == 1:
-                    up.add(opt)
+        user_params = self._user_params.setdefault(mac, set())
+        for option, value in zip(options, values):
+            if option in EXTRA_KEYS:
+                if value == 1:
+                    user_params.add(option)
                 else:
-                    up.discard(opt)
+                    user_params.discard(option)
         return ok
-
-
-# ── test / standalone usage ───────────────────────────
-
-def _test():
-    import os
-
-    from .gree_api import discover_devices
-
-    logging.basicConfig(level=logging.DEBUG)
-    logging.getLogger("aiomqtt").setLevel(logging.WARNING)
-
-    project_root = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..")
-    )
-    creds = os.path.join(project_root, ".bridge_credentials.json")
-    if not os.path.exists(creds):
-        creds = os.path.expanduser("~/.bridge_credentials.json")
-
-    with open(creds) as f:
-        cfg = json.load(f)
-
-    host = "eugrih.gree.com"
-    uid, token, devices = discover_devices(host, cfg["username"], cfg["password"])
-    print(f"\nDevices ({len(devices)}):")
-    for d in devices:
-        print(f"  {d.mac:16s} {d.name} (parent={d.parent_mac}) key={d.key[:4]}...")
-
-    results = {}
-
-    def on_data(mac, data):
-        results[mac] = data
-        in_tem = data.get('InTem')
-        tem_sen = data.get('TemSen')
-        print(f"\n  ← Data for {mac}: Pow={data.get('Pow')} InTem={in_tem} TemSen={tem_sen} OutTem={data.get('OutTem')}")
-
-    client = GreeMQTTClient(
-        host="18.185.150.155",
-        port=1984,
-        uid=uid,
-        token=token,
-        devices=devices,
-        on_data=on_data,
-    )
-
-    async def run():
-        ok = await client.start()
-        print(f"\nMQTT connect: {'OK' if ok else 'FAIL'}")
-        if not ok:
-            return
-
-        parents = [d for d in devices if len(d.mac) == 12]
-        for _ in range(4):
-            await asyncio.sleep(2)
-            for d in parents:
-                mac = d.mac
-                print(f"  Refreshing {mac}...", end=" ")
-                data = await client.refresh_device(mac)
-                if data:
-                    print(f"OK Pow={data.get('Pow')} T={data.get('InTem')}°C")
-                else:
-                    print("NO DATA")
-
-        await client.stop()
-        print("\nDone.")
-
-    asyncio.run(run())
-
-
-if __name__ == "__main__":
-    _test()

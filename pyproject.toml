@@ -1,0 +1,12 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["F", "I", "ASYNC"]
+
+[tool.ruff.lint.per-file-ignores]
+"custom_components/gree_ac_cloud/panel.py" = ["E501"]

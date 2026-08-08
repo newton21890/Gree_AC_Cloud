@@ -17,12 +17,13 @@ HA (gree_ac_cloud) ─→ Gree MQTT (mqtt-eu.gree.com:1984) ←→ Devices
 
 - Climate control (mode, fan, swing, temperature)
 - Sensors: Indoor/Outdoor temperature, humidity, setpoint (decimal)
-- Switches: Health, Quiet, Turbo, Strong Heat, Blow, Energy Saving, Sleep, Light
-- Binary sensors: Error status, Filter reminder
+- Switches: Health, Quiet, Turbo, Strong Heat, X-Fan/coil drying, Energy Saving, Sleep, optional Fresh Air, Light
+- Diagnostics: error code/type, refrigerant warning, system/Auto Clean status and filter counters when reported by the device
 - Energy consumption estimation (based on model, mode, fan speed, load)
-- Custom panel UI with live controls, log viewer, Wiki reference, and energy monitoring
+- Custom panel UI with live controls, log viewer, Wiki and U-Match feature/installer reference, and energy monitoring
 - Device rename support (double-click name in panel)
 - Live log viewer with auto-refresh
+- Panel APIs are protected by Home Assistant authentication; configuration-changing actions require an administrator
 
 ## Setup
 

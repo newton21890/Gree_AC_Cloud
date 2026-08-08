@@ -1,12 +1,17 @@
 from homeassistant.components.climate import (
-    FAN_AUTO, FAN_HIGH, FAN_LOW, FAN_MEDIUM,
-    SWING_BOTH, SWING_HORIZONTAL, SWING_OFF, SWING_VERTICAL,
-    ClimateEntity, ClimateEntityFeature, HVACMode,
+    FAN_AUTO,
+    SWING_BOTH,
+    SWING_HORIZONTAL,
+    SWING_OFF,
+    SWING_VERTICAL,
+    ClimateEntity,
+    ClimateEntityFeature,
+    HVACMode,
 )
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_HALVES, UnitOfTemperature
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import FAN_MAP, FAN_MAP_REV, HVAC_MAP, HVAC_MAP_REV, MIN_TEMP_C, MAX_TEMP_C
+from .const import FAN_MAP, FAN_MAP_REV, HVAC_MAP, HVAC_MAP_REV, MAX_TEMP_C, MIN_TEMP_C
 from .entity import GreeDeviceEntity
 
 
@@ -61,8 +66,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
         raw = self.coordinator.data.get("SetTem")
         return float(raw) if raw is not None else None
 
-    async def _sync_data(self):
-        await self.coordinator.async_set_updated_data(dict(self._device.properties))
+    def _sync_data(self):
+        self.coordinator.async_set_updated_data(dict(self._device.properties))
 
     async def async_set_temperature(self, **kwargs):
         temp = kwargs.get(ATTR_TEMPERATURE)
@@ -74,7 +79,10 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
             options, values = ["SetDeciTem"], [deci]
         else:
             options, values = ["Pow", "SetDeciTem"], [1, deci]
-        await mqtt.send_command(self._device.mac, options, values)
+        if await mqtt.send_command(self._device.mac, options, values):
+            for option, value in zip(options, values):
+                self._device.properties[option] = value
+            self._sync_data()
 
     # ── hvac mode ─────────────────────────────────────
 
@@ -89,26 +97,26 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
         mqtt = self.coordinator._mqtt
         if hvac_mode == HVACMode.OFF:
-            await mqtt.send_command(self._device.mac, ["Pow"], [0])
-            self._device.properties["Pow"] = 0
+            options, values = ["Pow"], [0]
         else:
-            gree_mod = HVAC_MAP_REV.get(hvac_mode, 0)
-            await mqtt.send_command(self._device.mac, ["Pow", "Mod"], [1, gree_mod])
-            self._device.properties["Pow"] = 1
-            self._device.properties["Mod"] = gree_mod
-        await self._sync_data()
+            options = ["Pow", "Mod"]
+            values = [1, HVAC_MAP_REV.get(hvac_mode, 0)]
+        if await mqtt.send_command(self._device.mac, options, values):
+            for option, value in zip(options, values):
+                self._device.properties[option] = value
+            self._sync_data()
 
     async def async_turn_on(self):
         mqtt = self.coordinator._mqtt
-        await mqtt.send_command(self._device.mac, ["Pow"], [1])
-        self._device.properties["Pow"] = 1
-        await self._sync_data()
+        if await mqtt.send_command(self._device.mac, ["Pow"], [1]):
+            self._device.properties["Pow"] = 1
+            self._sync_data()
 
     async def async_turn_off(self):
         mqtt = self.coordinator._mqtt
-        await mqtt.send_command(self._device.mac, ["Pow"], [0])
-        self._device.properties["Pow"] = 0
-        await self._sync_data()
+        if await mqtt.send_command(self._device.mac, ["Pow"], [0]):
+            self._device.properties["Pow"] = 0
+            self._sync_data()
 
     # ── fan ───────────────────────────────────────────
 
@@ -120,9 +128,9 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
     async def async_set_fan_mode(self, fan_mode: str):
         speed = FAN_MAP_REV.get(fan_mode, 0)
         mqtt = self.coordinator._mqtt
-        await mqtt.send_command(self._device.mac, ["WdSpd"], [speed])
-        self._device.properties["WdSpd"] = speed
-        await self._sync_data()
+        if await mqtt.send_command(self._device.mac, ["WdSpd"], [speed]):
+            self._device.properties["WdSpd"] = speed
+            self._sync_data()
 
     # ── swing ─────────────────────────────────────────
 
@@ -142,7 +150,9 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
         v = 1 if swing_mode in (SWING_VERTICAL, SWING_BOTH) else 0
         h = 1 if swing_mode in (SWING_HORIZONTAL, SWING_BOTH) else 0
         mqtt = self.coordinator._mqtt
-        await mqtt.send_command(self._device.mac, ["SwUpDn", "SwingLfRig"], [v, h])
-        self._device.properties["SwUpDn"] = v
-        self._device.properties["SwingLfRig"] = h
-        await self._sync_data()
+        if await mqtt.send_command(
+            self._device.mac, ["SwUpDn", "SwingLfRig"], [v, h]
+        ):
+            self._device.properties["SwUpDn"] = v
+            self._device.properties["SwingLfRig"] = h
+            self._sync_data()
