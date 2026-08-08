@@ -20,10 +20,34 @@ class GreeBinarySensor(GreeDeviceEntity, BinarySensorEntity):
         self._key = key
         self._attr_name = cfg["name"]
         self._attr_device_class = cfg.get("device_class")
+        self._sources = cfg.get("sources", (key,))
+        self._attr_entity_registry_enabled_default = cfg.get("diagnostic", False)
+        if cfg.get("diagnostic"):
+            from homeassistant.helpers.entity import EntityCategory
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @staticmethod
+    def _active(raw) -> bool:
+        if raw is None:
+            return False
+        if isinstance(raw, list):
+            return any(GreeBinarySensor._active(item) for item in raw)
+        if isinstance(raw, str):
+            return raw.strip().lower() not in ("", "0", "00", "none", "normal", "off")
+        return bool(raw)
+
+    @property
+    def available(self) -> bool:
+        return super().available and any(key in self.coordinator.data for key in self._sources)
 
     @property
     def is_on(self) -> bool:
-        raw = self.coordinator.data.get(self._key, 0)
-        if isinstance(raw, list):
-            return len(raw) > 0
-        return bool(raw)
+        return any(self._active(self.coordinator.data.get(key)) for key in self._sources)
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            key: self.coordinator.data.get(key)
+            for key in self._sources
+            if self.coordinator.data.get(key) is not None
+        }

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections import deque
 from datetime import datetime
 
@@ -17,7 +18,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import (
+    COMMAND_OPTIONS,
     DOMAIN,
+    ENERGY_MODELS,
     GREE_CLOUD_SERVERS,
     GREE_MQTT_HOSTS,
     GREE_MQTT_PORTS,
@@ -33,6 +36,35 @@ PANEL_CMD_URL = "/api/gree_ac_cloud/panel/command"
 PANEL_LOG_URL = "/api/gree_ac_cloud/panel/log"
 PANEL_README_URL = "/api/gree_ac_cloud/panel/readme"
 PANEL_CHANGELOG_URL = "/api/gree_ac_cloud/panel/changelog"
+
+
+def _safe_json_for_script(value) -> str:
+    """Serialize JSON without allowing a value to terminate the script tag."""
+    return json.dumps(value).replace("<", "\\u003c")
+
+
+def _valid_mac(value) -> bool:
+    return (
+        isinstance(value, str)
+        and re.fullmatch(r"[0-9A-Fa-f]{12,14}", value) is not None
+    )
+
+
+def _redact_secret(value: str) -> str:
+    if not value:
+        return ""
+    return f"{value[:4]}…{value[-4:]}"
+
+
+def _is_admin(request: web.Request) -> bool:
+    user = request.get("hass_user")
+    return bool(user and user.is_admin)
+
+
+def _all_coordinators(hass: HomeAssistant) -> list:
+    entries = hass.data.get(DOMAIN, {}).get("entries", {})
+    return [coordinator for coordinators in entries.values() for coordinator in coordinators]
+
 
 # ── In-memory log capture ─────────────────────────────
 
@@ -51,8 +83,8 @@ class _GreeLogHandler(logging.Handler):
 
 _log_handler = _GreeLogHandler()
 _logger_root = logging.getLogger("custom_components.gree_ac_cloud")
-_logger_root.setLevel(logging.DEBUG)
-_logger_root.addHandler(_log_handler)
+if _log_handler not in _logger_root.handlers:
+    _logger_root.addHandler(_log_handler)
 
 # ── Cached file content ──────────────────────────────
 import os as _os
@@ -84,19 +116,28 @@ except Exception:
 
 
 async def async_register_panel(hass: HomeAssistant):
-    """Register the sidebar panel and API views."""
+    """Register the sidebar panel and API views once."""
     from homeassistant.components import frontend
 
-    hass.http.register_view(GreePanelView)
-    hass.http.register_view(GreePanelDataView)
-    hass.http.register_view(GreePanelCommandView)
-    hass.http.register_view(GreePanelLogView)
-    hass.http.register_view(GreePanelModelsView)
-    hass.http.register_view(GreePanelNamesView)
-    hass.http.register_view(GreePanelSettingsView)
-    hass.http.register_view(GreePanelRefreshView)
-    hass.http.register_view(GreePanelDevicesInfoView)
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    if domain_data.get("panel_registered"):
+        return
 
+    # HTTP routes cannot be unregistered. Keep them for the HA process lifetime
+    # and only recreate the sidebar item after an integration reload.
+    if not domain_data.get("panel_views_registered"):
+        hass.http.register_view(GreePanelView)
+        hass.http.register_view(GreePanelDataView)
+        hass.http.register_view(GreePanelCommandView)
+        hass.http.register_view(GreePanelLogView)
+        hass.http.register_view(GreePanelModelsView)
+        hass.http.register_view(GreePanelNamesView)
+        hass.http.register_view(GreePanelSettingsView)
+        hass.http.register_view(GreePanelRefreshView)
+        hass.http.register_view(GreePanelDevicesInfoView)
+        domain_data["panel_views_registered"] = True
+
+    domain_data["panel_registered"] = True
     if "frontend" in hass.config.components:
         try:
             frontend.async_register_built_in_panel(
@@ -118,13 +159,14 @@ async def async_unregister_panel(hass: HomeAssistant):
     from homeassistant.components import frontend
 
     frontend.async_remove_panel(hass, "gree-ac-cloud")
+    hass.data.get(DOMAIN, {}).pop("panel_registered", None)
 
 
 # ── Views ─────────────────────────────────────────────
 
 
 class GreePanelView(HomeAssistantView):
-    """Serves the panel HTML page."""
+    """Serve the non-sensitive panel shell; all data APIs require auth."""
 
     url = PANEL_URL
     name = "api:gree_ac_cloud:panel"
@@ -132,12 +174,10 @@ class GreePanelView(HomeAssistantView):
 
     async def get(self, request: web.Request) -> web.Response:
         html = PANEL_HTML
-        html = html.replace("__README_JSON__", json.dumps(_README_CACHE))
-        html = html.replace("__CHANGELOG_JSON__", json.dumps(_CHANGELOG_CACHE))
+        html = html.replace("__README_JSON__", _safe_json_for_script(_README_CACHE))
+        html = html.replace("__CHANGELOG_JSON__", _safe_json_for_script(_CHANGELOG_CACHE))
         html = html.replace("__VERSION__", _VERSION_CACHE)
-        hass = request.app["hass"]
-        names = hass.data.get(DOMAIN, {}).get("device_names", {})
-        html = html.replace("__DEVICE_NAMES_JSON__", json.dumps(names))
+        html = html.replace("__DEVICE_NAMES_JSON__", "{}")
         return web.Response(text=html, content_type="text/html")
 
 
@@ -146,7 +186,7 @@ class GreePanelDataView(HomeAssistantView):
 
     url = PANEL_DATA_URL
     name = "api:gree_ac_cloud:panel_data"
-    requires_auth = False
+    requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
@@ -165,7 +205,10 @@ class GreePanelDataView(HomeAssistantView):
                 data.append({
                     "mac": device.mac,
                     "name": device.name,
-                    "connected": coord._mqtt.connected if hasattr(coord, "_mqtt") else False,
+                    "connected": (
+                        coord._mqtt.connected
+                        and coord._mqtt.seconds_since_last_seen(device.mac) is not None
+                    ) if hasattr(coord, "_mqtt") else False,
                     "state": state,
                     "server": server,
                     "mqtt_host": mqtt_host,
@@ -179,10 +222,12 @@ class GreePanelCommandView(HomeAssistantView):
 
     url = PANEL_CMD_URL
     name = "api:gree_ac_cloud:panel_command"
-    requires_auth = False
+    requires_auth = True
 
     async def post(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
+        if not _is_admin(request):
+            return self.json({"error": "admin required"}, status=403)
         try:
             body = await request.json()
         except Exception:
@@ -202,11 +247,27 @@ class GreePanelCommandView(HomeAssistantView):
             if mqtt:
                 for coord in coordinators:
                     if coord.device.mac == mac:
+                        if not _valid_mac(mac):
+                            return self.json({"error": "invalid mac"}, status=400)
+                        if (
+                            not isinstance(options, list)
+                            or not isinstance(values, list)
+                            or len(options) != len(values)
+                            or len(options) > 20
+                            or any(opt not in COMMAND_OPTIONS for opt in options)
+                            or any(
+                                isinstance(value, bool)
+                                or not isinstance(value, (int, float))
+                                or not -100 <= value <= 1000
+                                for value in values
+                            )
+                        ):
+                            return self.json({"error": "invalid command"}, status=400)
                         ok = await mqtt.send_command(mac, options, values)
                         if ok:
                             for opt, val in zip(options, values):
                                 coord.device.properties[opt] = val
-                            await coord.async_set_updated_data(dict(coord.device.properties))
+                            coord.async_set_updated_data(dict(coord.device.properties))
                         return self.json({"ok": ok})
 
         return self.json({"error": "device not found"}, status=404)
@@ -217,7 +278,7 @@ class GreePanelLogView(HomeAssistantView):
 
     url = PANEL_LOG_URL
     name = "api:gree_ac_cloud:panel_log"
-    requires_auth = False
+    requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
         return self.json(list(_log_handler.logs))
@@ -228,7 +289,7 @@ class GreePanelModelsView(HomeAssistantView):
 
     url = "/api/gree_ac_cloud/panel/models"
     name = "api:gree_ac_cloud:panel_models"
-    requires_auth = False
+    requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
@@ -237,14 +298,18 @@ class GreePanelModelsView(HomeAssistantView):
 
     async def post(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
+        if not _is_admin(request):
+            return self.json({"error": "admin required"}, status=403)
         try:
             body = await request.json()
         except Exception:
             return self.json({"error": "invalid JSON"}, status=400)
         mac = body.get("mac")
         model = body.get("model", "")
-        if not mac:
-            return self.json({"error": "missing mac"}, status=400)
+        if not _valid_mac(mac):
+            return self.json({"error": "invalid mac"}, status=400)
+        if model and model not in ENERGY_MODELS:
+            return self.json({"error": "invalid model"}, status=400)
         hass.data.setdefault(DOMAIN, {}).setdefault("models", {})
         if model:
             hass.data[DOMAIN]["models"][mac] = model
@@ -261,7 +326,7 @@ class GreePanelNamesView(HomeAssistantView):
 
     url = "/api/gree_ac_cloud/panel/names"
     name = "api:gree_ac_cloud:panel_names"
-    requires_auth = False
+    requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
@@ -270,14 +335,21 @@ class GreePanelNamesView(HomeAssistantView):
 
     async def post(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
+        if not _is_admin(request):
+            return self.json({"error": "admin required"}, status=403)
         try:
             body = await request.json()
         except Exception:
             return self.json({"error": "invalid JSON"}, status=400)
         mac = body.get("mac")
         name = body.get("name", "")
-        if not mac:
-            return self.json({"error": "missing mac"}, status=400)
+        if not _valid_mac(mac):
+            return self.json({"error": "invalid mac"}, status=400)
+        if not isinstance(name, str):
+            return self.json({"error": "invalid name"}, status=400)
+        name = name.strip()
+        if len(name) > 64:
+            return self.json({"error": "name too long"}, status=400)
         hass.data.setdefault(DOMAIN, {}).setdefault("device_names", {})
         if name:
             hass.data[DOMAIN]["device_names"][mac] = name
@@ -294,7 +366,7 @@ class GreePanelSettingsView(HomeAssistantView):
 
     url = "/api/gree_ac_cloud/panel/settings"
     name = "api:gree_ac_cloud:panel_settings"
-    requires_auth = False
+    requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
@@ -305,22 +377,30 @@ class GreePanelSettingsView(HomeAssistantView):
         from datetime import timedelta
 
         hass = request.app["hass"]
+        if not _is_admin(request):
+            return self.json({"error": "admin required"}, status=403)
         try:
             body = await request.json()
         except Exception:
             return self.json({"error": "invalid JSON"}, status=400)
 
         interval = body.get("update_interval")
-        if interval and isinstance(interval, (int, float)):
-            interval = max(5, min(300, int(interval)))
-            hass.data.setdefault(DOMAIN, {}).setdefault("settings", {})
-            hass.data[DOMAIN]["settings"]["update_interval"] = interval
-            for coord in hass.data.get(DOMAIN, {}).get("coordinators", []):
-                coord.update_interval = timedelta(seconds=interval)
-            _LOGGER.info("Poll interval changed to %ds", interval)
+        if (
+            isinstance(interval, bool)
+            or not isinstance(interval, (int, float))
+            or not 5 <= interval <= 300
+        ):
+            return self.json({"error": "invalid interval"}, status=400)
+
+        interval = int(interval)
+        hass.data.setdefault(DOMAIN, {}).setdefault("settings", {})
+        hass.data[DOMAIN]["settings"]["update_interval"] = interval
+        for coord in _all_coordinators(hass):
+            coord.update_interval = timedelta(seconds=interval)
+        _LOGGER.info("Poll interval changed to %ds", interval)
 
         store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.settings")
-        await store.async_save(hass.data.get(DOMAIN, {}).get("settings", {}))
+        await store.async_save(hass.data[DOMAIN]["settings"])
         return self.json({"ok": True, "update_interval": interval})
 
 
@@ -329,11 +409,13 @@ class GreePanelRefreshView(HomeAssistantView):
 
     url = "/api/gree_ac_cloud/panel/refresh"
     name = "api:gree_ac_cloud:panel_refresh"
-    requires_auth = False
+    requires_auth = True
 
     async def post(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
-        coordinators = hass.data.get(DOMAIN, {}).get("coordinators", [])
+        if not _is_admin(request):
+            return self.json({"error": "admin required"}, status=403)
+        coordinators = _all_coordinators(hass)
         for coord in coordinators:
             await coord.async_request_refresh()
         return self.json({"ok": True, "refreshed": len(coordinators)})
@@ -344,7 +426,7 @@ class GreePanelDevicesInfoView(HomeAssistantView):
 
     url = "/api/gree_ac_cloud/panel/devices-info"
     name = "api:gree_ac_cloud:panel_devices_info"
-    requires_auth = False
+    requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
@@ -367,7 +449,7 @@ class GreePanelDevicesInfoView(HomeAssistantView):
                 devices_info.append({
                     "mac": dev.mac,
                     "name": dev.name,
-                    "key": dev.key,
+                    "key": _redact_secret(dev.key),
                     "parent_mac": dev.parent_mac,
                     "hid": dev.hid,
                     "mqtt_topic_request": f"request/{dev.parent_mac}",
@@ -393,6 +475,8 @@ class GreePanelDevicesInfoView(HomeAssistantView):
         from .gree_api import discover_devices
 
         hass = request.app["hass"]
+        if not _is_admin(request):
+            return self.json({"error": "admin required"}, status=403)
         for entry in hass.config_entries.async_entries(DOMAIN):
             server = entry.data.get("server", "Europe")
             username = entry.data.get("username", "")
@@ -417,14 +501,20 @@ class GreePanelDevicesInfoView(HomeAssistantView):
                         key_changes.append({
                             "mac": d.mac,
                             "name": d.name,
-                            "old_key": old_key,
-                            "new_key": d.key,
+                            "old_key": _redact_secret(old_key),
+                            "new_key": _redact_secret(d.key),
                         })
                         _LOGGER.info("Re-auth: key updated for %s (%s)", d.mac, d.name)
 
+                if mqtt:
+                    mqtt.uid = uid
+                    mqtt.token = token
+                if runtime:
+                    runtime["uid"] = uid
+
                 result = {
                     "uid": uid,
-                    "token": f"{token[:8]}...{token[-4:]}",
+                    "token": "updated",
                     "server_region": server,
                     "cloud_host": cloud_host,
                     "key_changes": key_changes,
@@ -432,7 +522,7 @@ class GreePanelDevicesInfoView(HomeAssistantView):
                         {
                             "mac": d.mac,
                             "name": d.name,
-                            "key": d.key,
+                            "key": _redact_secret(d.key),
                             "parent_mac": d.parent_mac,
                             "hid": d.hid,
                         }
@@ -444,7 +534,7 @@ class GreePanelDevicesInfoView(HomeAssistantView):
                     _LOGGER.info(
                         "Re-auth: %d key(s) updated: %s",
                         len(key_changes),
-                        ", ".join(f"{c['mac']}: {c['old_key'][:8]}... → {c['new_key'][:8]}..." for c in key_changes),
+                        ", ".join(c["mac"] for c in key_changes),
                     )
                 else:
                     _LOGGER.info("Re-auth: no key changes detected")
@@ -890,6 +980,7 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="devices" onclick="switchTab('devices')">Devices</button>
     <button class="tab-btn" data-tab="wiki" onclick="switchTab('wiki')">Wiki</button>
+    <button class="tab-btn" data-tab="umatch" onclick="switchTab('umatch')">U-Match</button>
     <button class="tab-btn" data-tab="logs" onclick="switchTab('logs')">Logs</button>
     <button class="tab-btn" data-tab="readme" onclick="switchTab('readme')">README</button>
     <button class="tab-btn" data-tab="changelog" onclick="switchTab('changelog')">Changelog</button>
@@ -1026,11 +1117,11 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
       <tr><td>switch</td><td>Quiet</td><td><span class="hmi">🔇</span></td><td>N.21 🔇 Quiet status</td><td>Modalità silenziosa — riduce rumore ventola al minimo. Include Quiet e Auto Quiet. Sempre 0 nella scansione (non supportato dal tuo modello VRF)</td></tr>
       <tr><td>switch</td><td>Tur</td><td><span class="hmi">⚡</span></td><td>— Simbolo Turbo ⚡</td><td>Turbo — massima potenza per raggiungere velocemente la temperatura impostata. Non presente nella tabella LCD base (simbolo specifico). Sempre 0 nella scansione</td></tr>
       <tr><td>switch</td><td>StHt</td><td><span class="hmi">🔥</span></td><td>N.27 ☀ Heating mode</td><td>Strong Heat — riscaldamento intenso con temperatura mandata più alta. Usa lo stesso simbolo della modalità Riscaldamento ☀. Sempre 0 nella scansione</td></tr>
-      <tr><td>switch</td><td>Blo</td><td><span class="hmi">🌬</span></td><td>N.16 🌬 X-fan function</td><td>Blow/X-Fan — la ventola continua a girare dopo lo spegnimento del compressore per asciugare la batteria interna ed evitare muffe. Sempre 0 nella scansione</td></tr>
+      <tr><td>switch</td><td>Blo</td><td><span class="hmi">🌬</span></td><td>N.16 🌬 X-fan function</td><td>X-Fan — in raffreddamento/deumidificazione asciuga la batteria interna dopo lo spegnimento per limitare batteri e muffe.</td></tr>
       <tr><td>switch</td><td>SvSt</td><td><span class="hmi">💾</span></td><td>N.18 💾 Save status</td><td>Energy Saving — limita la potenza massima per risparmiare energia. Icona Save sul display. Confermato funzionante su device 2 (zona notte)</td></tr>
       <tr><td>switch</td><td>TemRec</td><td><span class="hmi">🔄</span></td><td>—</td><td>Temperature Recovery — alla riaccensione, recupera la temperatura precedente invece di ripartire da 24°C. Funzione cloud, nessuna icona LCD dedicata</td></tr>
       <tr><td>switch</td><td>SlpMod</td><td><span class="hmi">🌙</span></td><td>N.22 ☾ Sleep status</td><td>Sleep — regola gradualmente la temperatura durante la notte per comfort e risparmio. 3 modalità notte disponibili sul manuale. Sempre 0 nella scansione</td></tr>
-      <tr><td>switch</td><td>Air</td><td><span class="hmi">🌀</span></td><td>N.19 🌬 Air status</td><td>Air — funzione opzionale (non implementata sul tuo modello VRF, Air viene da "Air Direction"?). Sempre 0 nella scansione</td></tr>
+      <tr><td>switch</td><td>Air</td><td><span class="hmi">🌀</span></td><td>N.19 🌬 Air status</td><td>Air/Fresh Air — ricambio aria opzionale. Non è la direzione del flusso, gestita da SwUpDn/SwingLfRig.</td></tr>
       <tr><td>switch</td><td>Lig</td><td><span class="hmi">💡</span></td><td>—</td><td>Light — retroilluminazione display on/off. Nessuna icona LCD (controlla il retroilluminazione, non un simbolo)</td></tr>
       <tr><td>binary_sensor</td><td>Err</td><td><span class="hmi">⚠</span></td><td>— Mostra codice errore sul display</td><td>Errore attivo — quando ON, sul display appare un codice errore (E1, F3, L0, ecc.). Vedi tabella codici errore sotto</td></tr>
       <tr><td>binary_sensor</td><td>Filter</td><td><span class="hmi">🗓</span></td><td>N.15 🗓 Remind to clean filter</td><td>Promemoria pulizia filtro — si attiva dopo le ore accumulate impostate su C08 (4–416 giorni). P46 per resettare dopo la pulizia</td></tr>
@@ -1276,6 +1367,49 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
       </ul>
     </div>
   </div>
+  <div id="tab-umatch" style="display:none;">
+    <div class="wiki">
+      <h2 style="margin:0 0 4px;font-size:18px;font-weight:500;">U-Match Feature Matrix</h2>
+      <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">Funzioni ricavate dai manuali XE7A-24/HC e U-Match 6. I controlli marcati “da verificare” non vengono inviati al dispositivo finché la codifica MQTT non è confermata.</p>
+
+      <h3>Funzioni utente</h3>
+      <table class="wt"><tr><th>Funzione</th><th>Vincolo</th><th>Protocollo</th><th>Stato integrazione</th></tr>
+      <tr><td>I-Demand</td><td>Solo Cool; limita la capacità nominale al 75%</td><td><code>Idemand</code></td><td>Da verificare sul dispositivo</td></tr>
+      <tr><td>Absence / antigelo 8 °C</td><td>Solo Heat</td><td><code>GoOut</code></td><td>Da verificare sul dispositivo</td></tr>
+      <tr><td>X-Fan</td><td>Cool/Dry; asciugatura evaporatore</td><td><code>Blo</code></td><td>Disponibile come switch</td></tr>
+      <tr><td>Auto Clean</td><td>Avvio a unità spenta; ciclo ~30 min</td><td><code>AutoClean</code>, <code>CleanState</code></td><td>Da implementare come button + stato</td></tr>
+      <tr><td>Dry 12 °C</td><td>Solo Dry; incompatibile con alcuni limiti energy-save</td><td><code>LowDeHumi</code></td><td>Da verificare</td></tr>
+      <tr><td>Target umidità</td><td>45–75%, step 5%; solo unità compatibili</td><td><code>HumiEnable</code>, <code>SetCoolHumi</code></td><td>Da verificare</td></tr>
+      <tr><td>Fresh Air</td><td>Accessorio opzionale; livelli 1–10</td><td><code>Air</code>, <code>AirLevel</code></td><td>Switch presente; livello da verificare</td></tr>
+      <tr><td>Sleep 1/2/3</td><td>Curve comfort notturno</td><td><code>SwhSlp</code>, <code>SlpMod</code></td><td>Mappatura valori da verificare</td></tr>
+      <tr><td>Filtro</td><td>Reminder configurabile e reset accumulo</td><td><code>CleanEn</code>, <code>CleanTime</code>, <code>FClTime</code>, <code>FClRes</code></td><td>Diagnostica e reset da implementare</td></tr>
+      </table>
+
+      <h3>Pressione statica esterna — parametro installatore P30</h3>
+      <p>Il manuale associa P30 alle curve del ventilatore. Non viene esposto come comando cloud: una taratura errata può compromettere portata, rumore e funzionamento.</p>
+      <table class="wt"><tr><th>Modello</th><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5 default</th><th>P6</th><th>P7</th><th>P8</th><th>P9</th></tr>
+      <tr><td>GUD35/50</td><td>—</td><td>—</td><td>0 Pa</td><td>15</td><td>25</td><td>50</td><td>80</td><td>—</td><td>—</td></tr>
+      <tr><td>GUD71</td><td>0</td><td>10</td><td>15</td><td>20</td><td>25</td><td>50</td><td>75</td><td>100</td><td>160</td></tr>
+      <tr><td>GUD85</td><td>0</td><td>10</td><td>15</td><td>20</td><td>37</td><td>50</td><td>75</td><td>100</td><td>160</td></tr>
+      <tr><td>GUD100</td><td>0</td><td>10</td><td>15</td><td>25</td><td>37</td><td>50</td><td>75</td><td>100</td><td>160</td></tr>
+      <tr><td>GUD140/160</td><td>0</td><td>10</td><td>25</td><td>37</td><td>50</td><td>75</td><td>100</td><td>150</td><td>200</td></tr>
+      </table>
+
+      <h3>Parametri installatore documentati</h3>
+      <table class="wt"><tr><th>Parametro</th><th>Funzione</th><th>Politica integrazione</th></tr>
+      <tr><td>P20</td><td>Sensore ambiente: ripresa/controller/misto</td><td>Sola documentazione</td></tr>
+      <tr><td>P22</td><td>Compensazione temperatura in Heat (-15..15)</td><td>Sola documentazione</td></tr>
+      <tr><td>P30</td><td>Curva ventilatore / pressione statica</td><td>Sola documentazione</td></tr>
+      <tr><td>P37/P38</td><td>Setpoint Auto Cool/Heat</td><td>Sola documentazione</td></tr>
+      <tr><td>P46</td><td>Reset tempo filtro</td><td>Da associare a comando MQTT verificato</td></tr>
+      <tr><td>P71–P74</td><td>Ripristino e limiti temperatura</td><td>Sola documentazione</td></tr>
+      <tr><td>P82–P87</td><td>Sensori, limiti, umidità, Dry e step 0,5 °C</td><td>Sola documentazione</td></tr>
+      </table>
+
+      <p style="margin-top:14px;color:var(--text-secondary);">Analisi completa: <code>UMATCH_FEATURE_ANALYSIS.md</code> nel repository.</p>
+    </div>
+  </div>
+
   <div id="tab-logs" style="display:none;">
     <div class="log-toolbar">
       <button class="btn" onclick="copyAllLogs()">📋 Copy all</button>
@@ -1322,7 +1456,21 @@ const __README_CONTENT__ = __README_JSON__;
 const __CHANGELOG_CONTENT__ = __CHANGELOG_JSON__;
 const __DEVICE_NAMES__ = __DEVICE_NAMES_JSON__;
 
+function authHeaders(extra = {}) {
+  const headers = Object.assign({}, extra);
+  let token = null;
+  try { token = window.parent.localStorage.getItem('hassTokens'); } catch (e) {}
+  if (token) {
+    try {
+      const parsed = JSON.parse(token);
+      if (parsed.access_token) headers.Authorization = 'Bearer ' + parsed.access_token;
+    } catch (e) {}
+  }
+  return headers;
+}
+
 async function apiFetch(url, opts = {}) {
+  opts.headers = authHeaders(opts.headers || {});
   const resp = await fetch(url, opts);
   if (!resp.ok) throw new Error(resp.statusText);
   return resp.json();
@@ -1332,7 +1480,7 @@ async function sendCommand(mac, options, values) {
   try {
     const result = await apiFetch(PANEL_CMD_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ mac, options, values }),
     });
     return result.ok;
@@ -1350,10 +1498,10 @@ function parseTemp(val) {
 }
 
 const MODELS = {
-  'GUD35': { cool: 1.00, heat: 1.05, max: 1.40, btus: '12K', name: 'GUD35 (12K BTU/3.5kW)' },
-  'GUD50': { cool: 1.45, heat: 1.50, max: 2.00, btus: '18K', name: 'GUD50 (18K BTU/5.0kW)' },
+  'GUD35': { cool: 1.03, heat: 1.00, max: 1.30, btus: '12K', name: 'GUD35 (12K BTU/3.5kW)' },
+  'GUD50': { cool: 1.51, heat: 1.42, max: 1.90, btus: '18K', name: 'GUD50 (18K BTU/5.0kW)' },
   'GUD71': { cool: 1.92, heat: 2.00, max: 2.80, btus: '24K', name: 'GUD71 (24K BTU/7.1kW)' },
-  'GUD85': { cool: 2.50, heat: 2.26, max: 3.30, btus: '29K', name: 'GUD85 (29K BTU/8.5kW)' },
+  'GUD85': { cool: 2.50, heat: 2.25, max: 3.30, btus: '29K', name: 'GUD85 (29K BTU/8.5kW)' },
   'GUD100': { cool: 3.00, heat: 2.80, max: 4.70, btus: '36K', name: 'GUD100 (36K BTU/10.5kW)' },
   'GUD140': { cool: 4.60, heat: 4.70, max: 5.60, btus: '46K', name: 'GUD140 (46K BTU/13.4kW)' },
   'GUD160': { cool: 5.40, heat: 4.70, max: 6.80, btus: '54K', name: 'GUD160 (55K BTU/16.0kW)' },
@@ -1368,13 +1516,23 @@ async function loadModels() {
     _serverModels = {};
   }
 }
+async function loadNames() {
+  try {
+    Object.assign(
+      __DEVICE_NAMES__,
+      await apiFetch(HA_BASE + '/api/gree_ac_cloud/panel/names')
+    );
+  } catch (e) {
+    console.warn('Failed to load device names:', e);
+  }
+}
 function getModel(mac) { const k = _serverModels[mac] || localStorage.getItem('model_' + mac) || ''; return MODELS[k] || null; }
 function getModelKey(mac) { return _serverModels[mac] || localStorage.getItem('model_' + mac) || ''; }
 async function setModel(mac, val) {
   _serverModels[mac] = val;
   localStorage.setItem('model_' + mac, val);
   try {
-    await fetch(HA_BASE + '/api/gree_ac_cloud/panel/models', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({mac, model: val}) });
+    await apiFetch(HA_BASE + '/api/gree_ac_cloud/panel/models', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({mac, model: val}) });
   } catch (e) {
     console.warn('setModel server-side failed:', e);
   }
@@ -1386,7 +1544,7 @@ async function renameDevice(mac) {
   const name = prompt('Nome personalizzato per ' + mac, current);
   if (name === null) return;
   try {
-    await fetch(HA_BASE + '/api/gree_ac_cloud/panel/names', {
+    await apiFetch(HA_BASE + '/api/gree_ac_cloud/panel/names', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({mac, name})
     });
@@ -1399,7 +1557,7 @@ async function renameDevice(mac) {
 
 async function setPollInterval(val) {
   try {
-    await fetch(PANEL_SETTINGS_URL, {
+    await apiFetch(PANEL_SETTINGS_URL, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({update_interval: parseInt(val)})
     });
@@ -1410,7 +1568,7 @@ async function setPollInterval(val) {
 
 async function refreshNow() {
   try {
-    await fetch(PANEL_REFRESH_URL, { method: 'POST' });
+    await apiFetch(PANEL_REFRESH_URL, { method: 'POST' });
   } catch (e) {
     console.warn('refreshNow failed:', e);
   }
@@ -1450,6 +1608,7 @@ function renderDevice(d) {
   const swingV = s.SwUpDn;
   const swingH = s.SwingLfRig;
   const connected = d.connected;
+  const safeMac = escHtml(String(d.mac || ''));
   const modelKey = getModelKey(d.mac);
   const model = MODELS[modelKey] || null;
   const estPower = estimatePower(s, model);
@@ -1489,13 +1648,14 @@ function renderDevice(d) {
     Quiet: 'Quiet: modalità silenziosa, riduce rumore ventola',
     Tur: 'Turbo: massima potenza velocemente',
     StHt: 'Strong Heat: riscaldamento intenso per ambienti grandi',
-    Blo: 'Blow: ventola continua dopo spegnimento per asciugare',
+    Blo: 'X-Fan: asciuga la batteria dopo Cool/Dry per limitare muffe',
+    Air: 'Fresh Air: ricambio aria opzionale, se supportato dall’unità',
     SvSt: 'Energy Save: risparmio energetico',
     SlpMod: 'Sleep: regola temperatura gradualmente durante la notte',
     Lig: 'Light: retroilluminazione display controller',
   };
 
-  const deviceName = __DEVICE_NAMES__[d.mac] || d.name || 'Condizionatore';
+  const deviceName = escHtml(__DEVICE_NAMES__[d.mac] || d.name || 'Condizionatore');
 
   let curSwing = 'off';
   if (swingV && swingH) curSwing = 'both';
@@ -1503,18 +1663,18 @@ function renderDevice(d) {
   else if (swingH) curSwing = 'h';
 
   return `
-<div class="card${pow ? ' on' : ''}" data-mac="${d.mac}" style="position:relative">
+<div class="card${pow ? ' on' : ''}" data-mac="${escHtml(d.mac)}" style="position:relative">
   <div class="card-header">
     <div class="header-row1">
       <div class="name-group">
         <span class="icon-ac"><svg viewBox="0 0 24 24"><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg></span>
-        <h2 class="device-name" ondblclick="renameDevice('${d.mac}')" title="Doppio click per rinominare">${deviceName}</h2>
+        <h2 class="device-name" ondblclick="renameDevice('${safeMac}')" title="Doppio click per rinominare">${deviceName}</h2>
       </div>
       <span class="conn-badge${!connected ? ' off' : ''}">${connected ? '● online' : '○ offline'}</span>
     </div>
     <div class="header-row2">
-      <span class="mac-label">${d.mac}</span>
-      <select class="model-select" onchange="setModel('${d.mac}', this.value)" title="Seleziona modello per stima consumi">
+      <span class="mac-label">${escHtml(d.mac)}</span>
+      <select class="model-select" onchange="setModel('${safeMac}', this.value)" title="Seleziona modello per stima consumi">
         <option value="">— modello —</option>
         ${Object.entries(MODELS).map(([k,v]) => `<option value="${k}" ${modelKey === k ? 'selected' : ''}>${v.name}</option>`).join('')}
       </select>
@@ -1546,41 +1706,41 @@ function renderDevice(d) {
     <div class="control-row">
       <label>Power</label>
       <div class="btn-group">
-        <button class="btn ${!pow ? 'danger active' : ''}" onclick="setPower('${d.mac}',0)" title="Spegne il condizionatore">Off</button>
-        <button class="btn ${pow ? 'active' : ''}" onclick="setPower('${d.mac}',1)" title="Accende il condizionatore">On</button>
+        <button class="btn ${!pow ? 'danger active' : ''}" onclick="setPower('${safeMac}',0)" title="Spegne il condizionatore">Off</button>
+        <button class="btn ${pow ? 'active' : ''}" onclick="setPower('${safeMac}',1)" title="Accende il condizionatore">On</button>
       </div>
     </div>
 
     <div class="control-row">
       <label>Mode</label>
       <div class="btn-group">
-        ${[0,1,2,3,4].map(i => `<button class="btn mode-${modeCls[i]} ${mod === i && pow ? 'active' : ''}" onclick="setMode('${d.mac}',${i})" title="${modeTips[i]}">${modeLabels[i]}</button>`).join('')}
+        ${[0,1,2,3,4].map(i => `<button class="btn mode-${modeCls[i]} ${mod === i && pow ? 'active' : ''}" onclick="setMode('${safeMac}',${i})" title="${modeTips[i]}">${modeLabels[i]}</button>`).join('')}
       </div>
     </div>
 
     <div class="control-row">
       <label>Temp</label>
       <div class="temp-control">
-        <button onclick="setTemp('${d.mac}',-0.5)" title="Abbassa la temperatura di 0.5°C">−</button>
+        <button onclick="setTemp('${safeMac}',-0.5)" title="Abbassa la temperatura di 0.5°C">−</button>
         <span class="temp-value">${tem}°</span>
-        <button onclick="setTemp('${d.mac}',0.5)" title="Alza la temperatura di 0.5°C">+</button>
+        <button onclick="setTemp('${safeMac}',0.5)" title="Alza la temperatura di 0.5°C">+</button>
       </div>
     </div>
 
     <div class="control-row">
       <label>Fan</label>
       <div class="btn-group">
-        ${[0,1,2,3,4,5].map(v => `<button class="btn ${fan === v && pow ? 'active' : ''}" onclick="setFan('${d.mac}',${v})" title="${fanTips[v]}">${['Auto','Bassa','M-Bassa','Media','M-Alta','Alta'][v]}</button>`).join('')}
+        ${[0,1,2,3,4,5].map(v => `<button class="btn ${fan === v && pow ? 'active' : ''}" onclick="setFan('${safeMac}',${v})" title="${fanTips[v]}">${['Auto','Bassa','M-Bassa','Media','M-Alta','Alta'][v]}</button>`).join('')}
       </div>
     </div>
 
     <div class="control-row">
       <label>Swing</label>
       <div class="btn-group">
-        <button class="btn ${curSwing === 'off' && pow ? 'active' : ''}" onclick="setSwing('${d.mac}','off')" title="Swing disattivato">Off</button>
-        <button class="btn ${curSwing === 'v' && pow ? 'active' : ''}" onclick="setSwing('${d.mac}','v')" title="Swing verticale: palette su/giù">V</button>
-        <button class="btn ${curSwing === 'h' && pow ? 'active' : ''}" onclick="setSwing('${d.mac}','h')" title="Swing orizzontale: palette destra/sinistra">H</button>
-        <button class="btn ${curSwing === 'both' && pow ? 'active' : ''}" onclick="setSwing('${d.mac}','both')" title="Swing verticale + orizzontale">Both</button>
+        <button class="btn ${curSwing === 'off' && pow ? 'active' : ''}" onclick="setSwing('${safeMac}','off')" title="Swing disattivato">Off</button>
+        <button class="btn ${curSwing === 'v' && pow ? 'active' : ''}" onclick="setSwing('${safeMac}','v')" title="Swing verticale: palette su/giù">V</button>
+        <button class="btn ${curSwing === 'h' && pow ? 'active' : ''}" onclick="setSwing('${safeMac}','h')" title="Swing orizzontale: palette destra/sinistra">H</button>
+        <button class="btn ${curSwing === 'both' && pow ? 'active' : ''}" onclick="setSwing('${safeMac}','both')" title="Swing verticale + orizzontale">Both</button>
       </div>
     </div>
 
@@ -1589,10 +1749,25 @@ function renderDevice(d) {
       <div class="switches">
         ${Object.entries({
           Health:'Health', Quiet:'Quiet', Tur:'Turbo', StHt:'S.Heat',
-          Blo:'Blow', SvSt:'E.Save', SlpMod:'Sleep', Lig:'Light'
-        }).map(([k,l]) => `<button class="switch-btn ${(d.state||{})[k] ? 'on' : ''}" onclick="toggleSwitch('${d.mac}','${k}')" title="${switchTips[k] || k}">${l}</button>`).join('')}
+          Blo:'X-Fan', SvSt:'E.Save', SlpMod:'Sleep', Air:'Fresh Air', Lig:'Light'
+        }).filter(([k]) => Object.prototype.hasOwnProperty.call(s, k))
+          .map(([k,l]) => `<button class="switch-btn ${(d.state||{})[k] ? 'on' : ''}" onclick="toggleSwitch('${safeMac}','${k}')" title="${switchTips[k] || k}">${l}</button>`).join('')}
       </div>
     </div>
+
+    ${['Errcode','ErrType','RefLeak','MSysStatus','CleanState','CleanTime','FClTime','CleanDataFlag']
+      .some(k => s[k] !== undefined && s[k] !== null) ? `<div class="control-row">
+      <label>Diagnostica</label>
+      <div class="switches">
+        ${[
+          ['Errcode','Errore'], ['ErrType','Tipo'], ['RefLeak','Refrigerante'],
+          ['MSysStatus','Sistema'], ['CleanState','Auto Clean'],
+          ['CleanTime','Tempo filtro'], ['FClTime','Intervallo filtro'],
+          ['CleanDataFlag','Avviso filtro']
+        ].filter(([k]) => s[k] !== undefined && s[k] !== null)
+          .map(([k,l]) => `<span class="switch-btn" title="${k}">${l}: ${escHtml(Array.isArray(s[k]) ? s[k].join(', ') : String(s[k]))}</span>`).join('')}
+      </div>
+    </div>` : ''}
   </div>
 </div>`;
 }
@@ -1783,7 +1958,7 @@ function onLogAutoRefreshChange() {
 
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  const tabs = ['devices','wiki','logs','readme','changelog','info'];
+  const tabs = ['devices','wiki','umatch','logs','readme','changelog','info'];
   tabs.forEach(t => {
     const el = document.getElementById('tab-' + t);
     if (el) el.style.display = t === tab ? 'block' : 'none';
@@ -1810,7 +1985,7 @@ async function loadInfo() {
   const el = document.getElementById('infoContent');
   el.innerHTML = '<p style="color:var(--text-secondary);">Loading device info...</p>';
   try {
-    const data = await (await fetch(PANEL_DEVICES_INFO_URL)).json();
+    const data = await apiFetch(PANEL_DEVICES_INFO_URL);
     if (!data.length) {
       el.innerHTML = '<p style="color:var(--text-secondary);">No devices found. Configure the integration first.</p>';
       return;
@@ -1820,10 +1995,10 @@ async function loadInfo() {
       html += '<div class="wiki" style="margin-bottom:20px;">';
       html += `<h3 style="margin-bottom:8px;">🔒 MQTT Connection</h3>`;
       html += `<table class="wt"><tr><th>Parameter</th><th>Value</th></tr>`;
-      html += `<tr><td>UID</td><td><code>${install.uid}</code></td></tr>`;
-      html += `<tr><td>Server Region</td><td>${install.server_region}</td></tr>`;
-      html += `<tr><td>Cloud API</td><td><code>${install.cloud_host}</code></td></tr>`;
-      html += `<tr><td>MQTT Broker</td><td><code>${install.mqtt_host}:${install.mqtt_port}</code></td></tr>`;
+      html += `<tr><td>UID</td><td><code>${escHtml(install.uid)}</code></td></tr>`;
+      html += `<tr><td>Server Region</td><td>${escHtml(install.server_region)}</td></tr>`;
+      html += `<tr><td>Cloud API</td><td><code>${escHtml(install.cloud_host)}</code></td></tr>`;
+      html += `<tr><td>MQTT Broker</td><td><code>${escHtml(install.mqtt_host)}:${escHtml(install.mqtt_port)}</code></td></tr>`;
       html += `</table><br>`;
 
       html += `<h3 style="margin-bottom:8px;">📡 Devices (${install.devices.length})</h3>`;
@@ -1833,9 +2008,9 @@ async function loadInfo() {
         const connTxt = d.connected ? '✓' : '✗';
         html += `<tr>
           <td>${escHtml(d.name)}</td>
-          <td><code>${d.mac}</code></td>
-          <td><code>${d.parent_mac}</code></td>
-          <td><code style="font-size:9px;word-break:break-all;">${d.key}</code></td>
+          <td><code>${escHtml(d.mac)}</code></td>
+          <td><code>${escHtml(d.parent_mac)}</code></td>
+          <td><code style="font-size:9px;word-break:break-all;">${escHtml(d.key)}</code></td>
           <td style="font-size:10px;">${escHtml(d.hid || '-')}</td>
           <td>${d.properties_count}</td>
           <td style="color:var(--${connCls});font-weight:700;">${connTxt}</td>
@@ -1848,9 +2023,9 @@ async function loadInfo() {
       for (const d of install.devices) {
         html += `<tr>
           <td>${escHtml(d.name)}</td>
-          <td><code>${d.mqtt_topic_request}</code></td>
-          <td><code>${d.mqtt_topic_status}</code></td>
-          <td><code>${d.mqtt_topic_response}</code></td>
+          <td><code>${escHtml(d.mqtt_topic_request)}</code></td>
+          <td><code>${escHtml(d.mqtt_topic_status)}</code></td>
+          <td><code>${escHtml(d.mqtt_topic_response)}</code></td>
         </tr>`;
       }
       html += `</table>`;
@@ -1875,7 +2050,7 @@ async function reDiscoverDevices() {
   if (status) status.textContent = 'Re-authenticating with Gree Cloud...';
   if (changes) changes.innerHTML = '';
   try {
-    const resp = await (await fetch(PANEL_DEVICES_INFO_URL, {method:'POST'})).json();
+    const resp = await apiFetch(PANEL_DEVICES_INFO_URL, {method:'POST'});
     if (resp.error) {
       if (status) status.textContent = '❌ ' + resp.error;
       return;
@@ -1884,7 +2059,7 @@ async function reDiscoverDevices() {
     if (kc.length) {
       let tbl = '<table class="wt" style="margin-top:4px;"><tr><th>MAC</th><th>Name</th><th>Old Key</th><th>→ New Key</th></tr>';
       for (const c of kc) {
-        tbl += `<tr><td><code>${c.mac}</code></td><td>${escHtml(c.name)}</td><td><code style="font-size:9px;color:var(--red);">${c.old_key}</code></td><td><code style="font-size:9px;color:var(--green);">${c.new_key}</code></td></tr>`;
+        tbl += `<tr><td><code>${escHtml(c.mac)}</code></td><td>${escHtml(c.name)}</td><td><code style="font-size:9px;color:var(--red);">${escHtml(c.old_key)}</code></td><td><code style="font-size:9px;color:var(--green);">${escHtml(c.new_key)}</code></td></tr>`;
       }
       tbl += '</table>';
       if (changes) changes.innerHTML = '<div style="font-size:11px;color:var(--yellow);font-weight:600;margin-bottom:2px;">🔑 Keys updated</div>' + tbl;
@@ -1914,12 +2089,12 @@ updateViewportClass();
 window.addEventListener('resize', updateViewportClass);
 
 loadModels();
-loadData();
+loadNames().then(loadData);
 setInterval(loadData, 10000);
 
 (async function initSettings() {
   try {
-    const s = await (await fetch(PANEL_SETTINGS_URL)).json();
+    const s = await apiFetch(PANEL_SETTINGS_URL);
     const sel = document.getElementById('intervalSelect');
     if (sel && s.update_interval) sel.value = String(s.update_interval);
   } catch (e) {}

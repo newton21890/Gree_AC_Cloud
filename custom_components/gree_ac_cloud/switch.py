@@ -23,17 +23,26 @@ class GreeSwitch(GreeDeviceEntity, SwitchEntity):
         self._attr_entity_registry_enabled_default = key in ("Quiet", "Tur", "Health")
 
     @property
+    def available(self) -> bool:
+        """Expose controls only when the device reports the capability."""
+        return super().available and self._key in self.coordinator.data
+
+    @property
     def is_on(self) -> bool:
         return bool(self.coordinator.data.get(self._key, 0))
 
     async def async_turn_on(self, **kwargs):
         mqtt = self.coordinator._mqtt
-        await mqtt.send_command(self.coordinator.device.mac, [self._key], [1])
-        self.coordinator.device.properties[self._key] = 1
-        self.async_write_ha_state()
+        if await mqtt.send_command(self.coordinator.device.mac, [self._key], [1]):
+            self.coordinator.device.properties[self._key] = 1
+            self.coordinator.async_set_updated_data(
+                dict(self.coordinator.device.properties)
+            )
 
     async def async_turn_off(self, **kwargs):
         mqtt = self.coordinator._mqtt
-        await mqtt.send_command(self.coordinator.device.mac, [self._key], [0])
-        self.coordinator.device.properties[self._key] = 0
-        self.async_write_ha_state()
+        if await mqtt.send_command(self.coordinator.device.mac, [self._key], [0]):
+            self.coordinator.device.properties[self._key] = 0
+            self.coordinator.async_set_updated_data(
+                dict(self.coordinator.device.properties)
+            )

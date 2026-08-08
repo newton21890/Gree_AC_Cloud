@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import logging
 import time
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, ENERGY_MODELS, STORAGE_VERSION, STALE_AFTER_SECONDS, UPDATE_INTERVAL
+from .const import DOMAIN, ENERGY_MODELS, STALE_AFTER_SECONDS, STORAGE_VERSION, UPDATE_INTERVAL
 from .gree_api import GreeDevice, discover_devices
+
+if TYPE_CHECKING:
+    from .gree_mqtt import GreeMQTTClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +33,8 @@ async def async_discover_and_connect(
     )
 
     parent_devices = [d for d in devices if len(d.mac) == 12]
+    if not parent_devices:
+        raise ValueError("No supported parent devices found for this account")
 
     _LOGGER.info(
         "Discovered %d devices (%d parent units)",
@@ -46,8 +53,13 @@ async def async_discover_and_connect(
         on_data=on_data_callback,
     )
 
-    ok = await mqtt.start()
+    try:
+        ok = await mqtt.start()
+    except Exception:
+        await mqtt.stop()
+        raise
     if not ok:
+        await mqtt.stop()
         raise ConnectionError("Failed to connect to MQTT broker")
 
     return uid, token, parent_devices, mqtt
@@ -71,9 +83,8 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         )
         self.device = device
         self._mqtt = mqtt
-        self._error_count = 0
         self._total_energy_kwh: float = 0.0
-        self._last_energy_time: float = time.time()
+        self._last_energy_time: float = time.monotonic()
         self._energy_save_counter = 0
         self._energy_store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.energy.{device.mac}")
 
@@ -81,12 +92,11 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         data = await self._energy_store.async_load()
         if data:
             self._total_energy_kwh = data.get("total_kwh", 0.0)
-            self._last_energy_time = data.get("last_time", time.time())
+        self._last_energy_time = time.monotonic()
 
     async def async_save_energy(self):
         await self._energy_store.async_save({
             "total_kwh": self._total_energy_kwh,
-            "last_time": self._last_energy_time,
         })
 
     @property
@@ -126,7 +136,7 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
     def _build_data(self) -> dict[str, Any]:
         data = dict(self.device.properties)
         data["estimated_power_w"] = self._estimate_power_w(data)
-        now = time.time()
+        now = time.monotonic()
         elapsed_h = (now - self._last_energy_time) / 3600.0
         self._last_energy_time = now
         if data.get("Pow") and elapsed_h > 0 and elapsed_h < 1:
@@ -141,19 +151,15 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         await self._mqtt.refresh_device(self.device.mac)
 
         elapsed = self._mqtt.seconds_since_last_seen(self.device.mac)
-        if elapsed is None or elapsed > STALE_AFTER_SECONDS:
+        interval = self.update_interval or timedelta(seconds=UPDATE_INTERVAL)
+        stale_after = max(STALE_AFTER_SECONDS, interval.total_seconds() * 4)
+        if elapsed is None or elapsed > stale_after:
             age = f"{elapsed:.0f}s" if elapsed is not None else "never"
-            if self.device.properties.get("Pow"):
-                _LOGGER.warning(
-                    "%s: no fresh data (last seen: %s) — resetting Pow=0",
-                    self.device.name, age,
-                )
-                self.device.properties["Pow"] = 0
-            else:
-                _LOGGER.debug(
-                    "%s: no fresh data (last seen: %s) — device already OFF",
-                    self.device.name, age,
-                )
+            _LOGGER.warning(
+                "%s: no fresh MQTT data (last seen: %s); keeping last known state",
+                self.device.name,
+                age,
+            )
         else:
             _LOGGER.debug(
                 "%s: refresh (Pow=%s, last_seen=%.1fs ago)",

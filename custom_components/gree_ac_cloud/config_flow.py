@@ -22,14 +22,14 @@ class GreeACCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            await self.async_set_unique_id(user_input[CONF_USERNAME])
+            await self.async_set_unique_id(user_input[CONF_USERNAME].strip().lower())
             self._abort_if_unique_id_configured()
 
             server = GREE_CLOUD_SERVERS.get(
                 user_input[CONF_SERVER], "eugrih.gree.com"
             )
             try:
-                uid, token = await self.hass.async_add_executor_job(
+                uid, _token = await self.hass.async_add_executor_job(
                     api_login,
                     server,
                     user_input[CONF_USERNAME],

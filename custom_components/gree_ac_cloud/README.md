@@ -17,7 +17,6 @@ The integration:
 
 ## Setup
 
-- **Requires `aiomqtt`**: `pip install aiomqtt` in your HA Python environment
 - Go to **Settings → Devices & Services → Add Integration → Gree AC Cloud**
 - Select your region and enter your Gree+ account credentials
 - Two devices appear: the parent controllers (12-char MAC)
@@ -26,10 +25,11 @@ The integration:
 
 - Climate control (mode, fan, swing, temperature)
 - Sensors: Indoor/Outdoor temperature, humidity, setpoint (decimal)
-- Switches: Health, Quiet, Turbo, Strong Heat, Blow, Energy Saving, Sleep, Light
-- Binary sensors: Error status, Filter reminder
+- Switches: Health, Quiet, Turbo, Strong Heat, X-Fan/coil drying, Energy Saving, Sleep, optional Fresh Air, Light
+- Diagnostics: error code/type, refrigerant warning, system/Auto Clean status and filter counters when reported by the device
 - Energy consumption estimation (based on model, mode, fan speed, load)
-- Panel UI with live controls, log viewer, Wiki reference, energy monitoring, and device info tab
+- Panel UI with live controls, log viewer, Wiki reference, U-Match feature/installer reference, energy monitoring, and device info tab
+- Panel APIs are protected by Home Assistant authentication; configuration-changing actions require an administrator
 - Async MQTT (aiomqtt) — reliable auto-reconnect, no threads, real-time status pushes
 
 ## Hosted Regions

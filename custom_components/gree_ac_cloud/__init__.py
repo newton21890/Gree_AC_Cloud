@@ -6,7 +6,6 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from homeassistant.const import Platform
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,8 +32,8 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         UPDATE_INTERVAL,
     )
     STORAGE_KEY_NAMES = f"{DOMAIN}.names"
-    from .coordinator import async_discover_and_connect, GreeDeviceCoordinator
-    from .panel import async_register_panel, async_unregister_panel
+    from .coordinator import GreeDeviceCoordinator, async_discover_and_connect
+    from .panel import async_register_panel
 
     _LOGGER.info("Setting up %s", DOMAIN)
     server = entry.data[CONF_SERVER]
@@ -47,6 +46,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
 
     coordinators = []
     data_forwarder = {"cb": None}
+    mqtt = None
 
     def on_device_data(mac, data):
         if data_forwarder["cb"]:
@@ -76,11 +76,14 @@ async def async_setup_entry(hass: HomeAssistant, entry):
                 await asyncio.sleep(5)
 
     if last_error:
+        if mqtt:
+            await mqtt.stop()
         raise ConfigEntryNotReady(
             f"Connection failed after 3 attempts: {last_error}"
         ) from last_error
 
     hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN].setdefault("entries", {})
     hass.data[DOMAIN].setdefault("models", {})
     hass.data[DOMAIN].setdefault("device_names", {})
 
@@ -107,8 +110,6 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     ]
 
     def _forward(mac, data):
-        if "Pow" not in data:
-            return
         for coord in coordinators:
             if coord.device.mac == mac:
                 coord.async_set_updated_data(coord._build_data())
@@ -116,12 +117,16 @@ async def async_setup_entry(hass: HomeAssistant, entry):
 
     data_forwarder["cb"] = _forward
 
-    for coord in coordinators:
-        coord.update_interval = timedelta(seconds=poll_interval)
-        await coord.async_init()
-        await coord.async_config_entry_first_refresh()
+    try:
+        for coord in coordinators:
+            coord.update_interval = timedelta(seconds=poll_interval)
+            await coord.async_init()
+            await coord.async_config_entry_first_refresh()
+    except Exception:
+        await mqtt.stop()
+        raise
 
-    hass.data[DOMAIN]["coordinators"] = coordinators
+    hass.data[DOMAIN]["entries"][entry.entry_id] = coordinators
 
     entry.runtime_data = {
         "mqtt": mqtt,
@@ -139,7 +144,9 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         for coord in coordinators:
             await coord.async_save_energy()
 
-    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _persist_all)
+    entry.async_on_unload(
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _persist_all)
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await async_register_panel(hass)
@@ -151,12 +158,19 @@ async def async_setup_entry(hass: HomeAssistant, entry):
 
 
 async def async_unload_entry(hass: HomeAssistant, entry):
+    from .const import DOMAIN
     from .panel import async_unregister_panel
 
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
+        for coordinator in entry.runtime_data.get("coordinators", []):
+            await coordinator.async_save_energy()
         mqtt = entry.runtime_data.get("mqtt")
         if mqtt:
             await mqtt.stop()
-        await async_unregister_panel(hass)
+
+        domain_data = hass.data.get(DOMAIN, {})
+        domain_data.get("entries", {}).pop(entry.entry_id, None)
+        if not domain_data.get("entries"):
+            await async_unregister_panel(hass)
     return unload_ok

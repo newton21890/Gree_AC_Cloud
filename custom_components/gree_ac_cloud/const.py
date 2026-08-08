@@ -25,7 +25,7 @@ GREE_CLOUD_SERVERS = {
 }
 
 GREE_MQTT_HOSTS = {
-    "Europe": "18.185.150.155",  # mqtt-eu.gree.com
+    "Europe": "mqtt-eu.gree.com",
     "North America": "mqtt-us.gree.com",
     "China Mainland": "mqtt-cn.gree.com",
     "Australia": "mqtt-au.gree.com",
@@ -46,8 +46,18 @@ POLL_COLS = [
     "SwhSlp", "Lig", "SwUpDn", "SwingLfRig", "Quiet", "Tur",
     "StHt", "TemUn", "HeatCoolType", "TemRec", "SvSt", "SlpMod",
     "InTem", "OutTem", "TemSen", "InHumi", "SetDeciTem",
-    "Err", "Filter", "WaterSen",
+    "Err", "Errcode", "ErrType", "RefLeak", "MSysStatus",
+    "Filter", "CleanEn", "CleanTime", "CleanDataFlag", "CleanState", "FClTime",
+    "WaterSen",
 ]
+
+COMMAND_OPTIONS = frozenset(
+    {
+        "Pow", "Mod", "SetTem", "SetDeciTem", "WdSpd", "Air", "Blo",
+        "Health", "SwhSlp", "Lig", "SwUpDn", "SwingLfRig", "Quiet", "Tur",
+        "StHt", "TemUn", "TemRec", "SvSt", "SlpMod",
+    }
+)
 
 FAN_MAP = {
     0: "Auto", 1: "Bassa", 2: "Media-Bassa", 3: "Media",
@@ -67,6 +77,12 @@ DEVICE_SENSORS = {
     "TemSen": {"name": "Indoor Sensor Temperature", "icon": "mdi:thermometer"},
     "InHumi": {"name": "Indoor Humidity", "icon": "mdi:water-percent"},
     "SetDeciTem": {"name": "Target Temperature (Decimal)", "icon": "mdi:thermometer"},
+    "Errcode": {"name": "Error Code", "icon": "mdi:alert-circle-outline", "diagnostic": True},
+    "ErrType": {"name": "Error Type", "icon": "mdi:alert-outline", "diagnostic": True},
+    "MSysStatus": {"name": "System Status", "icon": "mdi:state-machine", "diagnostic": True},
+    "CleanState": {"name": "Auto Clean Status", "icon": "mdi:auto-fix", "diagnostic": True},
+    "CleanTime": {"name": "Filter Runtime", "icon": "mdi:timer-outline", "diagnostic": True},
+    "FClTime": {"name": "Filter Cleaning Interval", "icon": "mdi:calendar-clock", "diagnostic": True},
 }
 
 DEVICE_SWITCHES = {
@@ -74,27 +90,41 @@ DEVICE_SWITCHES = {
     "Quiet": {"name": "Quiet Mode", "icon": "mdi:volume-off"},
     "Tur": {"name": "Turbo Mode", "icon": "mdi:rocket-launch"},
     "StHt": {"name": "Strong Heat", "icon": "mdi:fire"},
-    "Blo": {"name": "Blow", "icon": "mdi:air-filter"},
+    "Blo": {"name": "X-Fan / Coil Dry", "icon": "mdi:fan-clock"},
     "SvSt": {"name": "Energy Saving", "icon": "mdi:solar-power"},
     "TemRec": {"name": "Temperature Recovery", "icon": "mdi:thermostat-auto"},
     "SlpMod": {"name": "Sleep Mode", "icon": "mdi:sleep"},
-    "Air": {"name": "Air Direction", "icon": "mdi:air-conditioner"},
+    "Air": {"name": "Fresh Air", "icon": "mdi:air-filter"},
     "Lig": {"name": "Light", "icon": "mdi:lightbulb"},
 }
 
 ENERGY_MODELS = {
-    "GUD35": {"cool": 1.00, "heat": 1.05, "max": 1.40, "name": "GUD35 (12K)"},
-    "GUD50": {"cool": 1.45, "heat": 1.50, "max": 2.00, "name": "GUD50 (18K)"},
+    "GUD35": {"cool": 1.03, "heat": 1.00, "max": 1.30, "name": "GUD35 (12K)"},
+    "GUD50": {"cool": 1.51, "heat": 1.42, "max": 1.90, "name": "GUD50 (18K)"},
     "GUD71": {"cool": 1.92, "heat": 2.00, "max": 2.80, "name": "GUD71 (24K)"},
-    "GUD85": {"cool": 2.50, "heat": 2.26, "max": 3.30, "name": "GUD85 (29K)"},
+    "GUD85": {"cool": 2.50, "heat": 2.25, "max": 3.30, "name": "GUD85 (29K)"},
     "GUD100": {"cool": 3.00, "heat": 2.80, "max": 4.70, "name": "GUD100 (36K)"},
     "GUD140": {"cool": 4.60, "heat": 4.70, "max": 5.60, "name": "GUD140 (46K)"},
     "GUD160": {"cool": 5.40, "heat": 4.70, "max": 6.80, "name": "GUD160 (55K)"},
 }
 
 DEVICE_BINARY_SENSORS = {
-    "Err": {"name": "Error Status", "device_class": "problem"},
-    "Filter": {"name": "Filter Status", "device_class": "cleaning"},
+    "Err": {
+        "name": "Error Status",
+        "device_class": "problem",
+        "sources": ("Err", "Errcode", "ErrType"),
+    },
+    "Filter": {
+        "name": "Filter Status",
+        "device_class": "cleaning",
+        "sources": ("Filter", "CleanDataFlag"),
+    },
+    "RefLeak": {
+        "name": "Refrigerant Warning",
+        "device_class": "problem",
+        "sources": ("RefLeak",),
+        "diagnostic": True,
+    },
 }
 
 STORAGE_VERSION = 1

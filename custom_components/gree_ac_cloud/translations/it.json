@@ -26,23 +26,30 @@
       "out_tem": { "name": "Temperatura esterna" },
       "in_humi": { "name": "Umidità interna" },
       "tem_sen": { "name": "Temperatura sensore" },
-      "set_deci_tem": { "name": "Temperatura target (decimale)" }
+      "set_deci_tem": { "name": "Temperatura target (decimale)" },
+      "errcode": { "name": "Codice errore" },
+      "err_type": { "name": "Tipo errore" },
+      "m_sys_status": { "name": "Stato sistema" },
+      "clean_state": { "name": "Stato pulizia automatica" },
+      "clean_time": { "name": "Tempo utilizzo filtro" },
+      "f_cl_time": { "name": "Intervallo pulizia filtro" }
     },
     "switch": {
       "health": { "name": "Ionizzatore" },
       "quiet": { "name": "Modalità silenziosa" },
       "tur": { "name": "Modalità turbo" },
       "st_ht": { "name": "Riscaldamento intenso" },
-      "blo": { "name": "Ventilazione" },
+      "blo": { "name": "X-Fan / Asciugatura batteria" },
       "sv_st": { "name": "Risparmio energetico" },
       "tem_rec": { "name": "Recupero temperatura" },
       "slp_mod": { "name": "Modalità notte" },
-      "air": { "name": "Direzione aria" },
+      "air": { "name": "Ricambio aria" },
       "lig": { "name": "Luce" }
     },
     "binary_sensor": {
       "err": { "name": "Stato errore" },
-      "filter": { "name": "Stato filtro" }
+      "filter": { "name": "Stato filtro" },
+      "ref_leak": { "name": "Avviso refrigerante" }
     }
   }
 }

@@ -55,23 +55,34 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
         self._attr_device_class = SENSOR_CLASSES.get(key)
         self._attr_native_unit_of_measurement = SENSOR_UNITS.get(key)
         self._attr_state_class = SENSOR_STATE_CLASS.get(key)
-        self._attr_entity_registry_enabled_default = key in ("InTem", "OutTem", "InHumi")
+        self._attr_entity_registry_enabled_default = (
+            key in ("InTem", "OutTem", "InHumi") or cfg.get("diagnostic", False)
+        )
 
-        config_entry_id = coordinator.config_entry.entry_id if hasattr(coordinator, "config_entry") else None
-        if key in ("SetDeciTem",):
+        if cfg.get("diagnostic"):
+            from homeassistant.helpers.entity import EntityCategory
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+        if key == "SetDeciTem":
             self._attr_entity_registry_visible_default = False
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._key in self.coordinator.data
 
     @property
     def native_value(self):
         raw = self.coordinator.data.get(self._key)
         if raw is None:
             return None
-        if self._key in ("InTem", "OutTem"):
+        if self._key in ("InTem", "OutTem") and isinstance(raw, (int, float)):
             return raw / 2 if raw > 50 else raw
-        if self._key == "TemSen":
+        if self._key == "TemSen" and isinstance(raw, (int, float)):
             return raw - 40
-        if self._key == "InHumi":
-            return raw
+        if isinstance(raw, list):
+            return ", ".join(str(item) for item in raw) if raw else "0"
+        if isinstance(raw, dict):
+            return str(raw)
         return raw
 
 

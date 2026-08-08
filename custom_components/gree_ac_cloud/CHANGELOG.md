@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.2.8
+
+### Security
+
+- All panel data and command APIs now require Home Assistant authentication; mutating endpoints require an administrator.
+- Device keys are redacted in the Info tab and API responses.
+- Added command, MAC, model, and device-name validation and hardened dynamic panel rendering.
+- Enabled certificate verification for the Cloud API and MQTT broker.
+- Kept dependency ranges compatible with Home Assistant's Python environment.
+
+### U-Match documentation
+
+- Analysed the supplied XE7A-24/HC and U-Match 6 manuals and added an U-Match feature matrix to the custom panel.
+- Corrected `Blo` to X-Fan/coil drying and `Air` to optional fresh-air control.
+- Added documented external-static-pressure P30 tables as read-only installer reference.
+- Corrected nominal energy-estimation data for GUD35, GUD50 and GUD85.
+- Added read-only diagnostics for error code/type, refrigerant warnings, system status, Auto Clean status and filter counters when reported by the device.
+- The Devices panel now displays available U-Match diagnostic values without enabling unverified write commands.
+
+### Fixed
+
+- Fixed the coordinator forward annotation that could prevent the integration from importing.
+- Fixed invalid `await` calls on `async_set_updated_data()`.
+- Added MQTT reconnect with exponential backoff and accurate connection status.
+- Command publishing no longer counts as a real device response for staleness tracking.
+- Staleness timeout now follows the configurable poll interval and no longer forces an unconfirmed OFF state.
+- Energy integration uses a monotonic session clock and no longer counts Home Assistant downtime.
+- Panel registration and coordinator data now support multiple config entries safely.
+- Device discovery now includes all homes in the Gree account.
+
 ## 0.2.7 (2026-07-29)
 
 ### Fixed
