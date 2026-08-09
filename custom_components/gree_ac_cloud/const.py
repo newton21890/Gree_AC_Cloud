@@ -22,6 +22,23 @@ CONF_PRESET_DEADBAND = "deadband"
 CONF_PRESET_ADAPTIVE = "outdoor_compensation"
 CONF_PRESET_FAN = "fan_speed"
 CONF_PRESET_QUIET = "quiet"
+PRESET_FAN_SMART = "Smart"
+PRESET_FAN_OPTIONS = (
+    "Auto",
+    PRESET_FAN_SMART,
+    "Bassa",
+    "Media-Bassa",
+    "Media",
+    "Media-Alta",
+    "Alta",
+)
+PRESET_FAN_ALIASES = {
+    "Low": "Bassa",
+    "Med-Low": "Media-Bassa",
+    "Medium": "Media",
+    "Med-High": "Media-Alta",
+    "High": "Alta",
+}
 SMART_MODE_AUTO = "auto"
 SMART_MODE_COOL = "cool"
 SMART_MODE_HEAT = "heat"

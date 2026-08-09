@@ -49,6 +49,8 @@ from .const import (
     MAX_TEMP_C,
     MIN_TEMP_C,
     PRESET_DAY,
+    PRESET_FAN_ALIASES,
+    PRESET_FAN_SMART,
     PRESET_NAMES,
     SMART_COMMAND_COOLDOWN_SECONDS,
     SMART_MODE_AUTO,
@@ -92,6 +94,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         self._smart_effective_target: float | None = None
         self._smart_last_command_at = 0.0
         self._smart_holding = False
+        self._smart_manual_power: bool | None = None
+        self._smart_fan_speed: str | None = None
 
     @property
     def _room_options(self) -> dict:
@@ -210,6 +214,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             "smart_profile_active": self._smart_profile_enabled if self._preset_mode else False,
             "smart_effective_target": self._smart_effective_target,
             "smart_last_action": self._smart_last_action,
+            "smart_fan_speed": self._smart_fan_speed,
+            "smart_manual_power_override": self._smart_manual_power,
         }
 
     @property
@@ -227,6 +233,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if preset_mode not in self.preset_modes:
             raise ValueError(f"Unsupported or disabled preset: {preset_mode}")
         self._preset_mode = preset_mode
+        self._smart_manual_power = None
+        self._smart_holding = False
         await self._async_apply_preset()
         self.async_write_ha_state()
 
@@ -238,6 +246,46 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
     @property
     def _smart_profile_enabled(self) -> bool:
         return bool(self._active_preset().get(CONF_PRESET_SMART, True))
+
+    @staticmethod
+    def _normalize_preset_fan(fan: str | None) -> str:
+        return PRESET_FAN_ALIASES.get(fan, fan or PRESET_FAN_SMART)
+
+    @staticmethod
+    def _smart_fan_for_demand(error: float, deadband: float) -> str:
+        """Choose a quiet but responsive fan speed from room demand."""
+        demand = max(0.0, error - deadband)
+        if demand >= 3.0:
+            return "Alta"
+        if demand >= 2.0:
+            return "Media-Alta"
+        if demand >= 1.2:
+            return "Media"
+        if demand >= 0.6:
+            return "Media-Bassa"
+        return "Bassa"
+
+    async def _async_apply_smart_fan(
+        self,
+        preset: dict,
+        desired_mode: HVACMode,
+        current: float,
+        target: float,
+        deadband: float,
+    ) -> None:
+        configured = self._normalize_preset_fan(preset.get(CONF_PRESET_FAN))
+        if configured == PRESET_FAN_SMART:
+            if desired_mode == HVACMode.COOL:
+                fan = self._smart_fan_for_demand(current - target, deadband)
+            elif desired_mode == HVACMode.HEAT:
+                fan = self._smart_fan_for_demand(target - current, deadband)
+            else:
+                fan = "Bassa"
+        else:
+            fan = configured
+        self._smart_fan_speed = fan
+        if fan in FAN_MAP_REV and self.fan_mode != fan:
+            await self.async_set_fan_mode(fan)
 
     def _effective_smart_target(self, preset: dict) -> float:
         target = float(preset.get(CONF_PRESET_TARGET, 26))
@@ -267,8 +315,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if not preset:
             return
         self._smart_effective_target = self._effective_smart_target(preset)
-        fan = preset.get(CONF_PRESET_FAN)
-        if fan in FAN_MAP:
+        fan = self._normalize_preset_fan(preset.get(CONF_PRESET_FAN))
+        if fan in FAN_MAP_REV:
             await self.async_set_fan_mode(fan)
         quiet = preset.get(CONF_PRESET_QUIET)
         if quiet is not None and "Quiet" in self.coordinator.data:
@@ -330,6 +378,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                 desired_mode = HVACMode.HEAT
 
         if not self._smart_profile_enabled:
+            self._smart_fan_speed = None
             if self.target_temperature != target:
                 await self.async_set_temperature(**{ATTR_TEMPERATURE: target})
             self._smart_last_action = "fixed_target"
@@ -339,7 +388,29 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         now = time.monotonic()
         can_command = force or now - self._smart_last_command_at >= SMART_COMMAND_COOLDOWN_SECONDS
         is_on = bool(self.coordinator.data.get("Pow"))
+
+        # Explicit user power commands always win. Keep the selected profile and
+        # continue monitoring, but do not countermand that choice until the room
+        # crosses the opposite hysteresis boundary or the profile is reselected.
+        if self._smart_manual_power is False:
+            if desired_mode is None:
+                self._smart_manual_power = None
+                self._smart_last_action = "manual_off_rearmed"
+            else:
+                self._smart_last_action = "manual_off"
+                self.async_write_ha_state()
+                return
+        elif self._smart_manual_power is True:
+            if desired_mode is not None:
+                self._smart_manual_power = None
+                self._smart_last_action = "manual_on_rearmed"
+            else:
+                self._smart_last_action = "manual_on"
+                self.async_write_ha_state()
+                return
+
         if desired_mode is None:
+            self._smart_fan_speed = None
             self._smart_last_action = "comfort_hold"
             if is_on and can_command:
                 self._preset_action_lock = True
@@ -351,6 +422,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                 finally:
                     self._preset_action_lock = False
         else:
+            await self._async_apply_smart_fan(preset, desired_mode, current, target, deadband)
             self._smart_last_action = f"request_{desired_mode.value}"
             if can_command and (not is_on or self.hvac_mode != desired_mode):
                 self._preset_action_lock = True
@@ -415,6 +487,10 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             self._sync_data()
             if hvac_mode == HVACMode.COOL:
                 await self.coordinator.async_apply_startup_settings()
+            if not self._preset_action_lock and self._smart_profile_enabled:
+                self._smart_manual_power = hvac_mode != HVACMode.OFF
+                self._smart_last_action = "manual_on" if self._smart_manual_power else "manual_off"
+                self.async_write_ha_state()
 
     async def async_turn_on(self):
         mqtt = self.coordinator._mqtt
@@ -422,12 +498,20 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             self._device.properties["Pow"] = 1
             self._sync_data()
             await self.coordinator.async_apply_startup_settings()
+            if not self._preset_action_lock and self._smart_profile_enabled:
+                self._smart_manual_power = True
+                self._smart_last_action = "manual_on"
+                self.async_write_ha_state()
 
     async def async_turn_off(self):
         mqtt = self.coordinator._mqtt
         if await mqtt.send_command(self._device.mac, ["Pow"], [0]):
             self._device.properties["Pow"] = 0
             self._sync_data()
+            if not self._preset_action_lock and self._smart_profile_enabled:
+                self._smart_manual_power = False
+                self._smart_last_action = "manual_off"
+                self.async_write_ha_state()
 
     # ── fan ───────────────────────────────────────────
 

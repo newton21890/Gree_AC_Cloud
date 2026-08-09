@@ -45,6 +45,7 @@ from .const import (
     GREE_CLOUD_SERVERS,
     GREE_MQTT_HOSTS,
     GREE_MQTT_PORTS,
+    PRESET_FAN_ALIASES,
     STORAGE_KEY_MODELS,
     STORAGE_VERSION,
 )
@@ -416,7 +417,11 @@ class GreePanelRoomSensorsView(HomeAssistantView):
                     CONF_PRESET_SMART: bool(preset.get(CONF_PRESET_SMART, True)),
                     CONF_PRESET_MODE: preset.get(CONF_PRESET_MODE, "auto"),
                     CONF_PRESET_ADAPTIVE: bool(preset.get(CONF_PRESET_ADAPTIVE, True)),
-                    CONF_PRESET_FAN: preset.get(CONF_PRESET_FAN, "Auto"),
+                    CONF_PRESET_FAN: (
+                        PRESET_FAN_ALIASES.get(preset.get(CONF_PRESET_FAN))
+                        or preset.get(CONF_PRESET_FAN)
+                        or "Smart"
+                    ),
                     CONF_PRESET_QUIET: bool(preset.get(CONF_PRESET_QUIET, False)),
                 }
                 for key in (
@@ -1342,7 +1347,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .config-help { color:var(--text2); font-size:9px; }
 .config-section-title { margin:18px 0 9px; color:#b9c8da; font-size:9px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
 .preset-table { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
-.preset-head,.preset-row { display:grid; grid-template-columns:100px 55px 65px 92px 70px 75px 75px 82px 88px 86px 60px; gap:1px; min-width:900px; align-items:center; }
+.preset-head,.preset-row { display:grid; grid-template-columns:100px 55px 65px 92px 70px 75px 75px 82px 88px 110px 60px; gap:1px; min-width:925px; align-items:center; }
 .preset-head { color:#718097; background:#0d131c; font-size:8px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
 .preset-head span { padding:9px 8px; }
 .preset-row { border-top:1px solid var(--border); background:#121923; }
@@ -1913,7 +1918,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
       <button class="config-close" onclick="closeSensorSettings()" aria-label="Chiudi configurazione">×</button>
     </header>
     <div class="config-body">
-      <p class="config-intro">Associa i sensori dell’abitazione alle unità Gree. Selezionando più sensori, il pannello calcola automaticamente la media dei soli valori disponibili.</p>
+      <p class="config-intro">Associa i sensori dell’abitazione alle unità Gree. Selezionando più sensori, il pannello calcola automaticamente la media dei soli valori disponibili. Ventola <b>Smart</b> varia la portata in base alla distanza dal target; <b>Auto</b> lascia la decisione al controller Gree. I comandi manuali On/Off hanno sempre priorità sul profilo.</p>
       <div id="sensorSettingsContent" class="config-loading">Caricamento configurazione…</div>
     </div>
     <footer class="config-footer">
@@ -2014,7 +2019,8 @@ async function openSensorSettings() {
         const label = {day:'Giorno',night:'Notte',away:'Assente'}[name];
         const field = (key, value, title, min, max) => `<input class="config-input" id="${key}-${name}-${safeMac}" aria-label="${title} ${label}" title="${title}" type="number" step="0.5" min="${min}" max="${max}" value="${value ?? ''}" placeholder="—">`;
         const smartMode = p.smart_mode || 'auto';
-        const fanMode = p.fan_speed || 'Auto';
+        const fanAliases = {'Low':'Bassa','Med-Low':'Media-Bassa','Medium':'Media','Med-High':'Media-Alta','High':'Alta'};
+        const fanMode = fanAliases[p.fan_speed] || p.fan_speed || 'Smart';
         return `<div class="preset-row"><div class="preset-name">${label}</div><div class="preset-enable"><input id="enabled-${name}-${safeMac}" aria-label="Abilita profilo ${label}" type="checkbox" ${p.enabled ? 'checked' : ''}></div>
           <div class="preset-enable" title="Regolazione automatica continua"><input id="smart-${name}-${safeMac}" aria-label="Profilo smart ${label}" type="checkbox" ${p.smart_enabled !== false ? 'checked' : ''}></div>
           <select class="config-select" id="mode-${name}-${safeMac}" aria-label="Strategia ${label}">${[['auto','Auto'],['cool','Freddo'],['heat','Caldo'],['dry','Deumidifica']].map(([v,l]) => `<option value="${v}" ${smartMode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
@@ -2023,7 +2029,7 @@ async function openSensorSettings() {
           ${field('min', p.min_temperature, 'Soglia minima °C', 10, 30)}
           ${field('max', p.max_temperature, 'Soglia massima °C', 16, 35)}
           ${field('humidity', p.humidity_threshold, 'Umidità massima %', 0, 100)}
-          <select class="config-select" id="fan-${name}-${safeMac}" aria-label="Ventola profilo ${label}">${['Auto','Low','Med-Low','Medium','Med-High','High'].map(value => `<option ${fanMode === value ? 'selected' : ''}>${value}</option>`).join('')}</select>
+          <select class="config-select" id="fan-${name}-${safeMac}" aria-label="Ventola profilo ${label}">${['Smart','Auto','Bassa','Media-Bassa','Media','Media-Alta','Alta'].map(value => `<option ${fanMode === value ? 'selected' : ''}>${value === 'Smart' ? 'Smart (profilo)' : value}</option>`).join('')}</select>
           <div class="preset-enable" title="Compensazione con temperatura esterna"><input id="adaptive-${name}-${safeMac}" aria-label="Adattivo esterno ${label}" type="checkbox" ${p.outdoor_compensation !== false ? 'checked' : ''}></div>
           <input id="off-${name}-${safeMac}" type="hidden" value="">
           <input id="dred-${name}-${safeMac}" type="hidden" value="${escHtml(p.dred || 'No action')}">
@@ -2676,8 +2682,23 @@ async function setPreset(mac, preset) {
 }
 
 async function setPower(mac, val) {
-  await sendCommand(mac, ['Pow'], [val]);
-  setTimeout(loadData, 1000);
+  try {
+    const devices = await apiFetch(PANEL_DATA_URL);
+    const device = devices.find(d => d.mac === mac);
+    const entityId = device && device.state && device.state.ClimateEntityId;
+    if (entityId) {
+      await apiFetch(HA_BASE + `/api/services/climate/${val ? 'turn_on' : 'turn_off'}`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ entity_id: entityId }),
+      });
+    } else {
+      await sendCommand(mac, ['Pow'], [val]);
+    }
+    setTimeout(loadData, 1000);
+  } catch (e) {
+    console.error('Power command failed:', e);
+  }
 }
 
 async function setMode(mac, val) {

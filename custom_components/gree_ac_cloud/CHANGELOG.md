@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+### Ventilazione Smart e priorità manuale
+
+- Aggiunta ai profili la gestione ventilatore **Smart**: la velocità passa progressivamente da Bassa ad Alta in base alla distanza della temperatura ambiente dal target.
+- L’opzione **Auto** resta disponibile e continua a delegare integralmente la ventilazione al controller Gree; sono disponibili anche tutte le velocità fisse.
+- In deumidificazione Smart viene usata la velocità Bassa per favorire la rimozione dell’umidità e limitare rumore e raffreddamento eccessivo.
+- I comandi manuali di accensione e spegnimento hanno sempre priorità: il profilo resta selezionato e monitora l’ambiente, ma non annulla immediatamente la scelta dell’utente.
+- L’override manuale viene riarmato solo dopo il rientro/uscita dalla banda di comfort oppure riselezionando il profilo.
+- Il pannello usa ora i servizi climate per On/Off, così anche i comandi impartiti dall’interfaccia vengono riconosciuti come scelta manuale.
+- Aggiunti agli attributi diagnostici la velocità Smart scelta e lo stato dell’override manuale.
+
 ## 0.3.2
 
 ### Accesso al pannello da smartphone

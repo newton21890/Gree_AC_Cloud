@@ -140,6 +140,9 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "_async_evaluate_smart_profile" in climate_source
     assert "SMART_COMMAND_COOLDOWN_SECONDS" in climate_source
     assert "smart_effective_target" in climate_source
+    assert "_smart_fan_for_demand" in climate_source
+    assert "smart_manual_power_override" in climate_source
+    assert '"manual_off"' in climate_source
     assert "current_humidity" in climate_source
     assert "_average_entities" in climate_source
     assert "sum(values) / len(values)" in climate_source
@@ -175,6 +178,8 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "window.parent.localStorage" in panel_source
     assert "opts.credentials = 'same-origin'" in panel_source
     assert "Sessione non disponibile" in panel_source
+    assert "Smart (profilo)" in panel_source
+    assert "api/services/climate/${val ? 'turn_on' : 'turn_off'}" in panel_source
 
 
 def test_device_command_round_trip() -> None:

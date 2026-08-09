@@ -35,6 +35,7 @@ from .const import (
     GREE_CLOUD_SERVERS,
     PRESET_AWAY,
     PRESET_DAY,
+    PRESET_FAN_OPTIONS,
     PRESET_NIGHT,
     SMART_MODES,
 )
@@ -231,8 +232,8 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                 ): bool,
                 vol.Required(
                     CONF_PRESET_FAN,
-                    default=defaults.get(CONF_PRESET_FAN, "Auto"),
-                ): vol.In(["Auto", "Low", "Med-Low", "Medium", "Med-High", "High"]),
+                    default=defaults.get(CONF_PRESET_FAN, "Smart"),
+                ): vol.In(PRESET_FAN_OPTIONS),
                 vol.Required(
                     CONF_PRESET_QUIET,
                     default=defaults.get(CONF_PRESET_QUIET, preset == PRESET_NIGHT),
