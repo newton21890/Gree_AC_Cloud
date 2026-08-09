@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.20
+
+### Posizionamento fisso dell’intestazione laterale
+
+- Corretto un conflitto con le precedenti regole desktop che trasformava la barra laterale in una riga centrata verticalmente.
+- `Gree Control` resta ora fissato nella parte alta della colonna, mentre stato cloud e azioni rimangono ancorati in basso.
+- Applicate regole esplicite di larghezza, altezza, margini, direzione e allineamento anche quando la classe viewport `desktop` è attiva.
+
 ## 0.2.19
 
 ### Coerenza grafica della barra laterale

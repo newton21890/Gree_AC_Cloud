@@ -1215,11 +1215,12 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
   --text:#f1f5f9; --text2:#8290a5; --border:#263142;
 }
 body { background:var(--bg); color:var(--text); font-size:14px; padding:0; }
-.app-shell { min-height:100vh; display:grid; grid-template-columns:220px minmax(0,1fr); }
-.header {
-  position:sticky; top:0; z-index:20; height:100vh; padding:18px 14px;
+.app-shell { min-height:100vh; display:grid; grid-template-columns:220px minmax(0,1fr); align-items:start; }
+.header,
+body.desktop .header {
+  position:sticky; top:0; z-index:20; width:220px; height:100vh; margin:0; padding:18px 14px;
   border:0; border-right:1px solid var(--border); border-radius:0;
-  background:#0c111a; display:flex; flex-direction:column; align-items:stretch;
+  background:#0c111a; display:flex; flex-direction:column; align-items:stretch; gap:0;
 }
 .header-top { padding:6px 8px 24px; margin:0; gap:10px; }
 .header .icon-ac { width:32px; height:32px; padding:7px; border-radius:9px; color:#06262d; background:var(--primary); }
@@ -1232,7 +1233,8 @@ body { background:var(--bg); color:var(--text); font-size:14px; padding:0; }
 .nav-icon svg,.sidebar-action-icon svg { width:100%; height:100%; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .nav-icon svg rect { fill:none; }
 .tab-btn.active { color:#d9fbff; background:#152733; border-color:#1d4753; box-shadow:inset 3px 0 0 var(--primary); }
-.header-controls { order:3; margin-top:auto; padding:14px 8px 0; border-top:1px solid var(--border); display:grid; gap:8px; }
+.header-controls,
+body.desktop .header-controls { order:3; margin:0; margin-top:auto; padding:14px 8px 0; border-top:1px solid var(--border); display:grid; align-items:stretch; gap:8px; }
 .sidebar-connection { display:flex; align-items:center; gap:9px; min-height:38px; padding:0 10px; border-radius:8px; background:#0f1722; }
 .connection-dot { width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 0 3px rgba(52,211,153,.12); }
 .sidebar-connection div { min-width:0; display:grid; line-height:1.2; }
@@ -1299,7 +1301,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 #sensorSettings .card { padding:18px; }
 @media (max-width:1100px) {
   .app-shell { grid-template-columns:76px minmax(0,1fr); }
-  .header { padding:16px 10px; }
+  .header,
+  body.desktop .header { width:76px; padding:16px 10px; }
   .header h1,.nav-label,.sidebar-action-label { display:none; }
   .header-top { justify-content:center; padding-inline:0; }
   .tab-btn { justify-content:center; padding:0; }
@@ -1316,7 +1319,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 }
 @media (max-width:720px) {
   .app-shell { display:block; }
-  .header { position:sticky; width:auto; height:auto; padding:10px 14px; border-right:0; border-bottom:1px solid var(--border); display:grid; grid-template-columns:auto 1fr; gap:8px; }
+  .header,
+  body.desktop .header { position:sticky; width:100%; height:auto; margin:0; padding:10px 14px; border-right:0; border-bottom:1px solid var(--border); display:grid; grid-template-columns:auto 1fr; align-items:center; gap:8px; }
   .header-top { justify-content:flex-start; padding:0; }
   .header h1 { display:block; font-size:14px; }
   .header .icon-ac { width:30px; height:30px; }
@@ -1326,7 +1330,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .nav-label { display:inline; font-size:10px; }
   .nav-icon { width:14px; height:14px; flex-basis:14px; }
   .tab-btn.active { box-shadow:inset 0 -2px 0 var(--primary); }
-  .header-controls { position:absolute; top:9px; right:13px; display:flex; margin:0; padding:0; border:0; }
+  .header-controls,
+  body.desktop .header-controls { position:absolute; top:9px; right:13px; display:flex; margin:0; padding:0; border:0; }
   .interval-label,.header-controls .refresh-btn:first-of-type { display:none; }
   .refresh-btn { width:36px; min-height:34px; }
   .sidebar-action-icon { display:grid; }
