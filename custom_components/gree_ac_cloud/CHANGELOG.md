@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+### Attivazione iniziale dei profili Smart
+
+- Se dopo l’aggiornamento non esiste ancora un profilo precedentemente memorizzato, viene attivato automaticamente Giorno quando è abilitato.
+- La regolazione Smart inizia quindi subito dopo il riavvio senza richiedere il primo clic manuale sul profilo.
+
 ## 0.3.0
 
 ### Profili climatici Smart

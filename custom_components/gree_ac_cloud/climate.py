@@ -48,6 +48,7 @@ from .const import (
     HVAC_MAP_REV,
     MAX_TEMP_C,
     MIN_TEMP_C,
+    PRESET_DAY,
     PRESET_NAMES,
     SMART_COMMAND_COOLDOWN_SECONDS,
     SMART_MODE_AUTO,
@@ -153,8 +154,11 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                 )
             )
         previous = await self.async_get_last_state()
-        if previous and previous.attributes.get("preset_mode") in self.preset_modes:
-            self._preset_mode = previous.attributes["preset_mode"]
+        restored_preset = previous.attributes.get("preset_mode") if previous else None
+        if restored_preset not in self.preset_modes and self.preset_modes:
+            restored_preset = PRESET_DAY
+        if restored_preset in self.preset_modes:
+            self._preset_mode = restored_preset
         self.async_on_remove(
             async_track_time_interval(self.hass, self._async_smart_interval, timedelta(minutes=2))
         )
