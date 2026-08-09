@@ -335,6 +335,8 @@ class GreePanelDataView(HomeAssistantView):
                         "smart_last_action",
                         "smart_fan_speed",
                         "smart_dred_level",
+                        "smart_dred_applied",
+                        "smart_dred_verified",
                         "profile_control_enabled",
                         "smart_effective_target",
                     ):
@@ -1364,6 +1366,13 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .chart-detail-card h3 { margin:0 0 4px; font-size:15px; }
 .chart-detail-card p { margin:0 0 12px; color:var(--text2); font-size:10px; }
 .chart-detail-card .ops-chart { margin:0; }
+.chart-detail-card .ops-chart svg { height:300px; }
+.chart-detail-card.expanded { position:fixed; inset:12px; z-index:1100; overflow:auto; background:#111722; box-shadow:0 20px 80px #000; }
+.chart-detail-card.expanded .ops-chart svg { height:calc(100vh - 235px); min-height:420px; }
+.chart-expand { float:right; padding:6px 10px; border:1px solid var(--border); border-radius:7px; background:#172131; color:var(--text); cursor:pointer; }
+.chart-axis { fill:#8c99ae; font-size:3px; }
+.chart-point { cursor:pointer; stroke:#0d131d; stroke-width:.7; }
+.chart-point:hover { r:2.3; stroke:#fff; }
 .chart-values { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; margin-top:10px; }
 .chart-values div { padding:7px; border-radius:7px; background:#0d131d; text-align:center; font-size:9px; color:var(--text2); }
 .chart-values b { display:block; margin-top:2px; color:var(--text); font-size:12px; }
@@ -2569,16 +2578,34 @@ function updateEnvironmentHistory(mac, state) {
   while (history.length > 180) history.shift();
   return history;
 }
-function renderEnvironmentChart(mac, state) {
+function renderEnvironmentChart(mac, state, detailed = false) {
   const history = updateEnvironmentHistory(mac, state);
-  const draw = (key, min, max, color) => {
-    const pts = history.map((p,i) => p[key] == null || !Number.isFinite(p[key]) ? null : `${history.length === 1 ? 0 : i * 100 / (history.length - 1)},${100 - Math.max(0,Math.min(1,(p[key]-min)/(max-min))) * 100}`).filter(Boolean);
-    return pts.length > 1 ? `<polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/>` : '';
-  };
+  const left = 10, right = 94, top = 8, bottom = 86;
+  const x = i => history.length === 1 ? left : left + i * (right-left) / (history.length-1);
+  const y = (value,min,max) => bottom - Math.max(0,Math.min(1,(value-min)/(max-min))) * (bottom-top);
+  const series = [['room','Interna','#22d3ee','°C'],['target','Target','#facc15','°C'],['outdoor','Esterna','#fb7185','°C'],['humidity','Umi. interna','#60a5fa','%'],['outdoorHumidity','Umi. esterna','#a78bfa','%']];
   const temperatures = history.flatMap(p => [p.room,p.target,p.outdoor]).filter(Number.isFinite);
-  const minT = temperatures.length ? Math.min(...temperatures) - 1 : 15;
-  const maxT = temperatures.length ? Math.max(...temperatures) + 1 : 35;
-  return `<div class="ops-chart"><div class="ops-chart-legend"><span><i style="background:#22d3ee"></i>Interna</span><span><i style="background:#facc15"></i>Target</span><span><i style="background:#fb7185"></i>Esterna</span><span><i style="background:#60a5fa"></i>Umi. interna</span><span><i style="background:#a78bfa"></i>Umi. esterna</span></div><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 50H100 M0 25H100 M0 75H100" stroke="#273244" stroke-width=".4"/>${draw('room',minT,maxT,'#22d3ee')}${draw('target',minT,maxT,'#facc15')}${draw('outdoor',minT,maxT,'#fb7185')}${draw('humidity',0,100,'#60a5fa')}${draw('outdoorHumidity',0,100,'#a78bfa')}</svg></div>`;
+  const minT = temperatures.length ? Math.floor(Math.min(...temperatures)-1) : 15;
+  const maxT = temperatures.length ? Math.ceil(Math.max(...temperatures)+1) : 35;
+  const draw = ([key,label,color,unit]) => {
+    const range = unit === '%' ? [0,100] : [minT,maxT];
+    const valid = history.map((p,i) => p[key] == null || !Number.isFinite(p[key]) ? null : {p,i}).filter(Boolean);
+    const line = valid.length > 1 ? `<polyline points="${valid.map(v => `${x(v.i)},${y(v.p[key],...range)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="${detailed ? 1.2 : 2}" vector-effect="non-scaling-stroke"/>` : '';
+    const points = detailed ? valid.map(v => `<circle class="chart-point" cx="${x(v.i)}" cy="${y(v.p[key],...range)}" r="1.25" fill="${color}"><title>${label}: ${Number(v.p[key]).toFixed(1)} ${unit} · ${new Date(v.p.t).toLocaleString('it-IT')}</title></circle>`).join('') : '';
+    return line + points;
+  };
+  const start = history[0]?.t || Date.now(), end = history[history.length-1]?.t || start;
+  const time = t => new Date(t).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const axes = detailed ? `<path d="M${left} ${top}V${bottom}H${right} M${right} ${top}V${bottom}" stroke="#526177" stroke-width=".5"/><g class="chart-axis"><text x="1" y="${top+1}">${maxT}°</text><text x="1" y="${bottom}">${minT}°</text><text x="95" y="${top+1}">100%</text><text x="97" y="${bottom}">0%</text><text x="${left}" y="96">${time(start)}</text><text x="52" y="96" text-anchor="middle">${time((start+end)/2)}</text><text x="${right}" y="96" text-anchor="end">${time(end)}</text></g>` : '';
+  return `<div class="ops-chart"><div class="ops-chart-legend">${series.map(([,label,color]) => `<span><i style="background:${color}"></i>${label}</span>`).join('')}</div><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M${left} ${top+19.5}H${right} M${left} ${top+39}H${right} M${left} ${top+58.5}H${right}" stroke="#273244" stroke-width=".4"/>${axes}${series.map(draw).join('')}</svg></div>`;
+}
+
+function toggleChartExpand(mac) {
+  const card = document.getElementById(`detail-chart-${mac}`);
+  if (!card) return;
+  const expanded = card.classList.toggle('expanded');
+  const button = card.querySelector('.chart-expand');
+  if (button) button.textContent = expanded ? '✕ Riduci' : '⛶ Espandi';
 }
 
 function renderChartsPage(data) {
@@ -2587,7 +2614,7 @@ function renderChartsPage(data) {
   content.innerHTML = data.map(d => {
     const s = d.state || {};
     const value = (number, suffix) => Number.isFinite(Number(number)) ? Number(number).toFixed(1) + suffix : '--';
-    return `<article class="chart-detail-card"><h3>${escHtml(__DEVICE_NAMES__[d.mac] || d.name || d.mac)}</h3><p>Profilo ${escHtml(s.ActivePreset || 'manuale')} · ${s.Pow ? 'unità accesa' : 'unità spenta'} · ${escHtml(s.smart_last_action || 'nessuna decisione')}</p>${renderEnvironmentChart(d.mac,s)}<div class="chart-values"><div>Interna<b>${value(s.RoomTemperature,'°')}</b></div><div>Target<b>${value(s.smart_effective_target ?? (s.SetDeciTem != null ? s.SetDeciTem/10 : s.SetTem),'°')}</b></div><div>Esterna<b>${value(s.OutdoorTemperature,'°')}</b></div><div>Umi. interna<b>${value(s.RoomHumidity,'%')}</b></div><div>Umi. esterna<b>${value(s.OutdoorHumidity,'%')}</b></div></div></article>`;
+    return `<article class="chart-detail-card" id="detail-chart-${escHtml(d.mac)}"><button class="chart-expand" onclick="toggleChartExpand('${escHtml(d.mac)}')">⛶ Espandi</button><h3>${escHtml(__DEVICE_NAMES__[d.mac] || d.name || d.mac)}</h3><p>Profilo ${escHtml(s.ActivePreset || 'manuale')} · ${s.Pow ? 'unità accesa' : 'unità spenta'} · ${escHtml(s.smart_last_action || 'nessuna decisione')}</p>${renderEnvironmentChart(d.mac,s,true)}<div class="chart-values"><div>Interna<b>${value(s.RoomTemperature,'°')}</b></div><div>Target<b>${value(s.smart_effective_target ?? (s.SetDeciTem != null ? s.SetDeciTem/10 : s.SetTem),'°')}</b></div><div>Esterna<b>${value(s.OutdoorTemperature,'°')}</b></div><div>Umi. interna<b>${value(s.RoomHumidity,'%')}</b></div><div>Umi. esterna<b>${value(s.OutdoorHumidity,'%')}</b></div></div></article>`;
   }).join('');
 }
 
@@ -2634,7 +2661,7 @@ function renderOperationsDevice(d) {
     !profileEnabled || activePreset === 'manual' ? '<span class="ops-alert manual">Controllo manuale</span>' : '',
     override === false ? '<span class="ops-alert">Override manuale: spento</span>' : '',
     override === true ? '<span class="ops-alert">Override manuale: acceso</span>' : '',
-    s.smart_dred_level ? `<span class="ops-alert manual">I-Demand Smart: ${escHtml(s.smart_dred_level)}</span>` : '',
+    s.smart_dred_level ? `<span class="ops-alert ${s.smart_dred_verified === false ? '' : 'manual'}">I-Demand Smart: ${escHtml(s.smart_dred_level)} · applicato ${escHtml(s.smart_dred_applied || '?')}${s.smart_dred_verified === false ? ' ⚠' : ' ✓'}</span>` : '',
   ].filter(Boolean).join('');
   const fanLabels = ['Auto', 'Bassa', 'Medio-bassa', 'Media', 'Medio-alta', 'Alta'];
 
@@ -2706,7 +2733,7 @@ function renderOperationsDevice(d) {
         <div class="ops-data-row"><span>Ventilatore</span><b>${fanLabels[Number(s.WdSpd)] || s.WdSpd || '--'}</b></div>
         <div class="ops-data-row"><span>Profilo</span><b>${activePreset ? (presetLabels[activePreset] || escHtml(activePreset).toUpperCase()) : 'MANUALE'}</b></div>
         <div class="ops-data-row"><span>Decisione Smart</span><b>${escHtml(s.smart_last_action || '--')}</b></div>
-        <div class="ops-data-row"><span>I-Demand</span><b>${s.DREDEn === 1 ? (effectiveDred === 0 ? 'OFF' : (effectiveDred === 1 ? '100%' : effectiveDred === 2 ? '50%' : '75%')) : 'N/D'}</b></div>
+        <div class="ops-data-row"><span>I-Demand</span><b>${s.DREDEn === 1 ? (effectiveDred === 0 ? 'OFF' : (effectiveDred === 1 ? 'D1 · compressore escluso' : effectiveDred === 2 ? 'D2 · limite 50%' : 'D3 · limite 75%')) : 'N/D'}</b></div>
         <div class="ops-data-row"><span>Sonde IDU / ODU</span><b>${probeIn != null ? probeIn.toFixed(1) + '°' : '--'} / ${probeOut != null ? probeOut.toFixed(1) + '°' : '--'}</b></div>
         <details class="ops-details"><summary>APRI CONTROLLI AVANZATI ↓</summary>
           <div class="control-row"><label>Ventilatore</label><div class="btn-group">${[0,1,2,3,4,5].map(value => `<button class="btn ${Number(s.WdSpd) === value ? 'active' : ''}" onclick="setFan('${safeMac}',${value})">${fanLabels[value]}</button>`).join('')}</div></div>

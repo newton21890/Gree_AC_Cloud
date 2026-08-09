@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.4
+
+### Grafici leggibili e interattivi
+
+- I grafici della pagina dedicata sono ora molto più grandi e possono essere espansi quasi a schermo intero.
+- Aggiunte scala temperatura a sinistra, scala umidità a destra e asse temporale con ora iniziale, centrale e finale.
+- Disegnati i punti di campionamento su tutte le serie; toccando o passando su un punto vengono mostrati valore, unità, data e ora.
+- Il grafico compatto resta disponibile nella pagina Controllo senza sovraccaricare la scheda.
+
+## 0.5.3
+
+### Verifica reale I-Demand
+
+- Aggiunta la verifica continua fra livello I-Demand richiesto dal profilo Smart e valore DRED realmente restituito dalla macchina.
+- Il pannello mostra ora `richiesto · applicato` con conferma ✓ o avviso ⚠, evitando di confondere una decisione software con l’attuazione hardware.
+- Chiarito il significato dei livelli: D1 esclude il compressore, D2 limita al 50% e D3 limita al 75%.
+- Verificato sulla macchina zona notte il passaggio reale D2 → D3: il controller ha confermato `DRED=3` e l’entità I-Demand riporta D3.
+
 ## 0.5.2
 
 ### Correzione override, profili rapidi e pagina Grafici

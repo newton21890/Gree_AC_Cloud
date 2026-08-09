@@ -264,10 +264,25 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             "smart_last_action": self._smart_last_action,
             "smart_fan_speed": self._smart_fan_speed,
             "smart_dred_level": self._smart_dred_level,
+            "smart_dred_applied": self._effective_dred_label,
+            "smart_dred_verified": (
+                self._smart_dred_level is None
+                or self._smart_dred_level == self._effective_dred_label
+            ),
             "smart_manual_power_override": self._smart_manual_power,
             "smart_manual_override_explicit": self._smart_manual_override_explicit,
             "profile_control_enabled": self._profile_control_enabled,
         }
+
+    @property
+    def _effective_dred_label(self) -> str | None:
+        try:
+            raw = int(self.coordinator.data.get("DRED", 0))
+            if raw == 0 and int(self.coordinator.data.get("Idemand", 0)) == 1:
+                raw = 1
+        except (TypeError, ValueError):
+            return None
+        return {value: label for label, value in DRED_OPTIONS_REV.items()}.get(raw)
 
     @property
     def _profile_control_enabled(self) -> bool:

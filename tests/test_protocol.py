@@ -148,6 +148,8 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "PRESET_MANUAL" in climate_source
     assert "_smart_dred_for_profile" in climate_source
     assert "smart_dred_level" in climate_source
+    assert "smart_dred_applied" in climate_source
+    assert "smart_dred_verified" in climate_source
     assert '"manual_off"' in climate_source
     assert "_last_observed_power" in climate_source
     assert "def _handle_coordinator_update" in climate_source
@@ -191,8 +193,13 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "renderEnvironmentChart" in panel_source
     assert "renderChartsPage" in panel_source
     assert "Andamento climatico" in panel_source
+    assert "toggleChartExpand" in panel_source
+    assert "chart-point" in panel_source
+    assert "toLocaleTimeString" in panel_source
     assert "Override manuale" in panel_source
     assert "I-Demand Smart" in panel_source
+    assert "applicato" in panel_source
+    assert "D3 · limite 75%" in panel_source
     assert "api/services/climate/${val ? 'turn_on' : 'turn_off'}" in panel_source
 
 
