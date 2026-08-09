@@ -12,6 +12,7 @@ from .const import (
     CONF_DEVICES,
     CONF_HUMIDITY_SENSOR,
     CONF_HUMIDITY_SENSORS,
+    CONF_OUTDOOR_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMPERATURE_SENSOR,
     CONF_PRESET_ADAPTIVE,
     CONF_PRESET_AUTO_OFF,
@@ -31,10 +32,10 @@ from .const import (
     CONF_TEMPERATURE_SENSOR,
     CONF_TEMPERATURE_SENSORS,
     DOMAIN,
-    DRED_OPTIONS,
     GREE_CLOUD_SERVERS,
     PRESET_AWAY,
     PRESET_DAY,
+    PRESET_DRED_OPTIONS,
     PRESET_FAN_OPTIONS,
     PRESET_NIGHT,
     SMART_MODES,
@@ -103,6 +104,7 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
     def __init__(self):
         self._device_mac: str | None = None
         self._outdoor_sensor: str | None = None
+        self._outdoor_humidity_sensor: str | None = None
 
     def _coordinators(self):
         runtime = getattr(self.config_entry, "runtime_data", None) or {}
@@ -114,8 +116,10 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
             return self.async_abort(reason="devices_not_ready")
         if user_input is not None and CONF_OUTDOOR_TEMPERATURE_SENSOR in user_input:
             self._outdoor_sensor = user_input.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
+            self._outdoor_humidity_sensor = user_input.get(CONF_OUTDOOR_HUMIDITY_SENSOR)
             return await self.async_step_device()
         current_outdoor = self.config_entry.options.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
+        current_outdoor_humidity = self.config_entry.options.get(CONF_OUTDOOR_HUMIDITY_SENSOR)
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -125,7 +129,13 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                         description={"suggested_value": current_outdoor},
                     ): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
-                    )
+                    ),
+                    vol.Optional(
+                        CONF_OUTDOOR_HUMIDITY_SENSOR,
+                        description={"suggested_value": current_outdoor_humidity},
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor", device_class="humidity")
+                    ),
                 }
             ),
         )
@@ -257,7 +267,7 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_PRESET_DRED,
                     default=defaults.get(CONF_PRESET_DRED, "No action"),
-                ): vol.In(["No action", *DRED_OPTIONS.values()]),
+                ): vol.In(PRESET_DRED_OPTIONS),
             }
         )
 
@@ -274,6 +284,7 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                 data={
                     CONF_DEVICES: devices,
                     CONF_OUTDOOR_TEMPERATURE_SENSOR: self._outdoor_sensor,
+                    CONF_OUTDOOR_HUMIDITY_SENSOR: self._outdoor_humidity_sensor,
                 },
             )
         return self.async_show_form(step_id=preset, data_schema=self._preset_schema(preset))

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0
+
+### Profili disattivabili, override visivi, grafici e I-Demand Smart
+
+- Aggiunto il profilo Manuale e un interruttore generale per disattivare completamente il regolatore automatico per ogni unità.
+- Lo spegnimento o l’accensione manuale sono evidenziati direttamente nella scheda dell’unità e restano prioritari.
+- Aggiunti grafici live che mettono in relazione temperatura interna, target, temperatura esterna, umidità interna ed esterna.
+- Aggiunta la selezione del sensore di umidità esterna.
+- I-Demand Smart varia dinamicamente fra Off, D1, D2 e D3 in base alla domanda termica e all’umidità, usando D3 in mantenimento e rimuovendo il limite quando serve massima resa.
+- I valori Smart correnti di ventola, I-Demand e decisione del regolatore sono esposti nella UI e negli attributi climate.
+
 ## 0.4.1
 
 ### Override manuale dal controller a parete

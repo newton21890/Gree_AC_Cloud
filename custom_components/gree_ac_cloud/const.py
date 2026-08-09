@@ -9,6 +9,8 @@ CONF_HUMIDITY_SENSOR = "humidity_sensor"  # Legacy single selection
 CONF_TEMPERATURE_SENSORS = "temperature_sensors"
 CONF_HUMIDITY_SENSORS = "humidity_sensors"
 CONF_OUTDOOR_TEMPERATURE_SENSOR = "outdoor_temperature_sensor"
+CONF_OUTDOOR_HUMIDITY_SENSOR = "outdoor_humidity_sensor"
+CONF_PROFILE_CONTROL_ENABLED = "profile_control_enabled"
 CONF_PRESET_ENABLED = "enabled"
 CONF_PRESET_TARGET = "target_temperature"
 CONF_PRESET_AUTO_OFF = "auto_off_temperature"
@@ -52,6 +54,7 @@ CONF_PRESETS = "presets"
 PRESET_DAY = "day"
 PRESET_NIGHT = "night"
 PRESET_AWAY = "away"
+PRESET_MANUAL = "manual"
 PRESET_NAMES = (PRESET_DAY, PRESET_NIGHT, PRESET_AWAY)
 
 UPDATE_INTERVAL = 15
@@ -117,7 +120,9 @@ DRED_OPTIONS = {
 }
 DRED_OPTIONS_REV = {value: key for key, value in DRED_OPTIONS.items()}
 STARTUP_DRED_NO_ACTION = "No action"
+PRESET_DRED_SMART = "Smart"
 STARTUP_DRED_OPTIONS = [STARTUP_DRED_NO_ACTION, *DRED_OPTIONS_REV]
+PRESET_DRED_OPTIONS = [STARTUP_DRED_NO_ACTION, PRESET_DRED_SMART, *DRED_OPTIONS_REV]
 
 FAN_MAP = {
     0: "Auto", 1: "Bassa", 2: "Media-Bassa", 3: "Media",

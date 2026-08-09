@@ -26,7 +26,8 @@
         "title": "Sensore esterno",
         "description": "Scegli un sensore temperatura esterna opzionale, comune a tutto l'impianto.",
         "data": {
-          "outdoor_temperature_sensor": "Sensore temperatura esterna"
+          "outdoor_temperature_sensor": "Sensore temperatura esterna",
+          "outdoor_humidity_sensor": "Sensore umidità esterna"
         }
       },
       "device": {

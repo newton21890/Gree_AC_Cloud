@@ -26,7 +26,8 @@
         "title": "Outdoor sensor",
         "description": "Choose one optional outdoor temperature sensor shared by the whole system.",
         "data": {
-          "outdoor_temperature_sensor": "Outdoor temperature sensor"
+          "outdoor_temperature_sensor": "Outdoor temperature sensor",
+          "outdoor_humidity_sensor": "Outdoor humidity sensor"
         }
       },
       "device": {

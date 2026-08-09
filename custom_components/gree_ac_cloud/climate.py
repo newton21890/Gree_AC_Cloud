@@ -25,6 +25,7 @@ from .const import (
     CONF_DEVICES,
     CONF_HUMIDITY_SENSOR,
     CONF_HUMIDITY_SENSORS,
+    CONF_OUTDOOR_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMPERATURE_SENSOR,
     CONF_PRESET_ADAPTIVE,
     CONF_PRESET_DEADBAND,
@@ -39,6 +40,7 @@ from .const import (
     CONF_PRESET_SMART,
     CONF_PRESET_TARGET,
     CONF_PRESETS,
+    CONF_PROFILE_CONTROL_ENABLED,
     CONF_TEMPERATURE_SENSOR,
     CONF_TEMPERATURE_SENSORS,
     DRED_OPTIONS_REV,
@@ -48,9 +50,10 @@ from .const import (
     HVAC_MAP_REV,
     MAX_TEMP_C,
     MIN_TEMP_C,
-    PRESET_DAY,
+    PRESET_DRED_SMART,
     PRESET_FAN_ALIASES,
     PRESET_FAN_SMART,
+    PRESET_MANUAL,
     PRESET_NAMES,
     SMART_COMMAND_COOLDOWN_SECONDS,
     SMART_MODE_AUTO,
@@ -96,6 +99,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         self._smart_holding = False
         self._smart_manual_power: bool | None = None
         self._smart_fan_speed: str | None = None
+        self._smart_dred_level: str | None = None
         self._last_observed_power = bool(coordinator.data.get("Pow"))
 
     @property
@@ -123,6 +127,10 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
     def _outdoor_temperature_entity(self) -> str | None:
         return self.coordinator.config_entry.options.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
 
+    @property
+    def _outdoor_humidity_entity(self) -> str | None:
+        return self.coordinator.config_entry.options.get(CONF_OUTDOOR_HUMIDITY_SENSOR)
+
     def _average_entities(self, entity_ids: list[str]) -> float | None:
         values = [
             value
@@ -148,6 +156,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                     *self._external_temperature_entities,
                     *self._external_humidity_entities,
                     self._outdoor_temperature_entity,
+                    self._outdoor_humidity_entity,
                 ]
             )
         )
@@ -160,8 +169,12 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             )
         previous = await self.async_get_last_state()
         restored_preset = previous.attributes.get("preset_mode") if previous else None
-        if restored_preset not in self.preset_modes and self.preset_modes:
-            restored_preset = PRESET_DAY
+        if not self._profile_control_enabled:
+            restored_preset = PRESET_MANUAL
+        elif restored_preset not in self.preset_modes:
+            # Safety-first migration: never start regulating (and possibly
+            # power on) until the user explicitly selects an automatic profile.
+            restored_preset = PRESET_MANUAL
         if restored_preset in self.preset_modes:
             self._preset_mode = restored_preset
         self.async_on_remove(
@@ -217,6 +230,12 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             "temperature_average_sources": len(self._external_temperature_entities),
             "humidity_average_sources": len(self._external_humidity_entities),
             "outdoor_temperature_sensor": self._outdoor_temperature_entity,
+            "outdoor_humidity_sensor": self._outdoor_humidity_entity,
+            "outdoor_humidity": self._numeric_state(
+                self.hass.states.get(self._outdoor_humidity_entity)
+            )
+            if self._outdoor_humidity_entity
+            else None,
             "outdoor_temperature": self._numeric_state(
                 self.hass.states.get(self._outdoor_temperature_entity)
             )
@@ -227,15 +246,23 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             "smart_effective_target": self._smart_effective_target,
             "smart_last_action": self._smart_last_action,
             "smart_fan_speed": self._smart_fan_speed,
+            "smart_dred_level": self._smart_dred_level,
             "smart_manual_power_override": self._smart_manual_power,
+            "profile_control_enabled": self._profile_control_enabled,
         }
+
+    @property
+    def _profile_control_enabled(self) -> bool:
+        return bool(self._room_options.get(CONF_PROFILE_CONTROL_ENABLED, True))
 
     @property
     def preset_modes(self) -> list[str]:
         presets = self._room_options.get(CONF_PRESETS, {})
-        return [
+        modes = [PRESET_MANUAL]
+        modes.extend(
             preset for preset in PRESET_NAMES if presets.get(preset, {}).get(CONF_PRESET_ENABLED)
-        ]
+        )
+        return modes
 
     @property
     def preset_mode(self) -> str | None:
@@ -247,17 +274,25 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         self._preset_mode = preset_mode
         self._smart_manual_power = None
         self._smart_holding = False
-        await self._async_apply_preset()
+        if preset_mode == PRESET_MANUAL:
+            self._smart_effective_target = None
+            self._smart_fan_speed = None
+            self._smart_dred_level = None
+            self._smart_last_action = "manual_profile"
+        else:
+            await self._async_apply_preset()
         self.async_write_ha_state()
 
     def _active_preset(self) -> dict:
-        if not self._preset_mode:
+        if not self._preset_mode or self._preset_mode == PRESET_MANUAL:
             return {}
         return self._room_options.get(CONF_PRESETS, {}).get(self._preset_mode, {})
 
     @property
     def _smart_profile_enabled(self) -> bool:
-        return bool(self._active_preset().get(CONF_PRESET_SMART, True))
+        return self._profile_control_enabled and bool(
+            self._active_preset().get(CONF_PRESET_SMART, True)
+        )
 
     @staticmethod
     def _normalize_preset_fan(fan: str | None) -> str:
@@ -299,6 +334,57 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if fan in FAN_MAP_REV and self.fan_mode != fan:
             await self.async_set_fan_mode(fan)
 
+    async def _async_apply_smart_dred(
+        self,
+        preset: dict,
+        desired_mode: HVACMode | None,
+        current: float,
+        target: float,
+        deadband: float,
+    ) -> None:
+        """Choose I-Demand from thermal demand while preserving comfort."""
+        configured = preset.get(CONF_PRESET_DRED, "No action")
+        if configured == PRESET_DRED_SMART and desired_mode is None:
+            self._smart_dred_level = "D3"
+            if (
+                self.coordinator.data.get("DREDEn") == 1
+                and self.coordinator.data.get("Mod") == 1
+                and int(self.coordinator.data.get("DRED", 0)) != DRED_OPTIONS_REV["D3"]
+            ):
+                await self._send(["DRED"], [DRED_OPTIONS_REV["D3"]])
+            return
+        if desired_mode != HVACMode.COOL or configured == "No action":
+            self._smart_dred_level = None
+            return
+        if configured == PRESET_DRED_SMART:
+            demand = current - target - deadband
+            humidity = self.current_humidity
+            humidity_limit = preset.get(CONF_PRESET_HUMIDITY)
+            humidity_pressure = (
+                humidity is not None
+                and humidity_limit is not None
+                and humidity > float(humidity_limit)
+            )
+            if demand >= 2.5 or humidity_pressure:
+                dred = "Off"
+            elif demand >= 1.5:
+                dred = "D1"
+            elif demand >= 0.8:
+                dred = "D2"
+            else:
+                dred = "D3"
+        else:
+            dred = configured
+        self._smart_dred_level = dred
+        if (
+            dred in DRED_OPTIONS_REV
+            and self.coordinator.data.get("DREDEn") == 1
+            and self.coordinator.data.get("Mod") == 1
+        ):
+            wanted = DRED_OPTIONS_REV[dred]
+            if int(self.coordinator.data.get("DRED", 0)) != wanted:
+                await self._send(["DRED"], [wanted])
+
     def _effective_smart_target(self, preset: dict) -> float:
         target = float(preset.get(CONF_PRESET_TARGET, 26))
         if not preset.get(CONF_PRESET_ADAPTIVE, True):
@@ -324,7 +410,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
 
     async def _async_apply_preset(self) -> None:
         preset = self._active_preset()
-        if not preset:
+        if not preset or not self._profile_control_enabled:
             return
         self._smart_effective_target = self._effective_smart_target(preset)
         fan = self._normalize_preset_fan(preset.get(CONF_PRESET_FAN))
@@ -336,6 +422,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         dred = preset.get(CONF_PRESET_DRED, "No action")
         if dred in DRED_OPTIONS_REV and self._device.properties.get("Mod") == 1:
             await self._send(["DRED"], [DRED_OPTIONS_REV[dred]])
+            self._smart_dred_level = dred
         await self._async_evaluate_smart_profile(force=True)
 
     async def _async_evaluate_smart_profile(self, force: bool = False) -> None:
@@ -343,7 +430,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if self._preset_action_lock:
             return
         preset = self._active_preset()
-        if not preset:
+        if not preset or not self._profile_control_enabled:
+            self._smart_last_action = "profile_disabled"
             return
         current = self.current_temperature
         humidity = self.current_humidity
@@ -391,7 +479,10 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
 
         if not self._smart_profile_enabled:
             self._smart_fan_speed = None
-            if self.target_temperature != target:
+            self._smart_dred_level = None
+            # Smart disabled means monitoring/configuration only: never power
+            # the machine on just to apply a target.
+            if self.coordinator.data.get("Pow") and self.target_temperature != target:
                 await self.async_set_temperature(**{ATTR_TEMPERATURE: target})
             self._smart_last_action = "fixed_target"
             self.async_write_ha_state()
@@ -405,21 +496,15 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         # continue monitoring, but do not countermand that choice until the room
         # crosses the opposite hysteresis boundary or the profile is reselected.
         if self._smart_manual_power is False:
-            if desired_mode is None:
-                self._smart_manual_power = None
-                self._smart_last_action = "manual_off_rearmed"
-            else:
-                self._smart_last_action = "manual_off"
-                self.async_write_ha_state()
-                return
+            self._smart_last_action = "manual_off"
+            self.async_write_ha_state()
+            return
         elif self._smart_manual_power is True:
-            if desired_mode is not None:
-                self._smart_manual_power = None
-                self._smart_last_action = "manual_on_rearmed"
-            else:
-                self._smart_last_action = "manual_on"
-                self.async_write_ha_state()
-                return
+            self._smart_last_action = "manual_on"
+            self.async_write_ha_state()
+            return
+
+        await self._async_apply_smart_dred(preset, desired_mode, current, target, deadband)
 
         if desired_mode is None:
             self._smart_fan_speed = None

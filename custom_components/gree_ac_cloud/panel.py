@@ -23,6 +23,7 @@ from .const import (
     CONF_DEVICES,
     CONF_HUMIDITY_SENSOR,
     CONF_HUMIDITY_SENSORS,
+    CONF_OUTDOOR_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMPERATURE_SENSOR,
     CONF_PRESET_ADAPTIVE,
     CONF_PRESET_AUTO_OFF,
@@ -38,6 +39,7 @@ from .const import (
     CONF_PRESET_SMART,
     CONF_PRESET_TARGET,
     CONF_PRESETS,
+    CONF_PROFILE_CONTROL_ENABLED,
     CONF_TEMPERATURE_SENSOR,
     CONF_TEMPERATURE_SENSORS,
     DOMAIN,
@@ -296,6 +298,22 @@ class GreePanelDataView(HomeAssistantView):
                     )
                 except (TypeError, ValueError):
                     state["OutdoorTemperature"] = None
+                outdoor_humidity_entity = entry.options.get(CONF_OUTDOOR_HUMIDITY_SENSOR)
+                outdoor_humidity_state = (
+                    hass.states.get(outdoor_humidity_entity)
+                    if outdoor_humidity_entity
+                    else None
+                )
+                try:
+                    state["OutdoorHumidity"] = (
+                        float(outdoor_humidity_state.state)
+                        if outdoor_humidity_state
+                        and outdoor_humidity_state.state
+                        not in ("unknown", "unavailable")
+                        else None
+                    )
+                except (TypeError, ValueError):
+                    state["OutdoorHumidity"] = None
                 registry = er.async_get(hass)
                 climate_entity_id = registry.async_get_entity_id(
                     "climate", DOMAIN, f"climate_{device.mac}"
@@ -309,6 +327,17 @@ class GreePanelDataView(HomeAssistantView):
                     if climate_state
                     else None
                 )
+                if climate_state:
+                    for key in (
+                        "smart_profile_active",
+                        "smart_manual_power_override",
+                        "smart_last_action",
+                        "smart_fan_speed",
+                        "smart_dred_level",
+                        "profile_control_enabled",
+                        "smart_effective_target",
+                    ):
+                        state[key] = climate_state.attributes.get(key)
                 data.append({
                     "mac": device.mac,
                     "name": device.name,
@@ -351,6 +380,7 @@ class GreePanelRoomSensorsView(HomeAssistantView):
             runtime = getattr(entry, "runtime_data", None) or {}
             configured = entry.options.get(CONF_DEVICES, {})
             outdoor = entry.options.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
+            outdoor_humidity = entry.options.get(CONF_OUTDOOR_HUMIDITY_SENSOR)
             for coord in runtime.get("coordinators", []):
                 room = configured.get(coord.device.mac, {})
                 devices.append(
@@ -363,6 +393,10 @@ class GreePanelRoomSensorsView(HomeAssistantView):
                         "humidity_sensors": room.get(CONF_HUMIDITY_SENSORS)
                         or ([room[CONF_HUMIDITY_SENSOR]] if room.get(CONF_HUMIDITY_SENSOR) else []),
                         "outdoor_temperature_sensor": outdoor,
+                        "outdoor_humidity_sensor": outdoor_humidity,
+                        "profile_control_enabled": room.get(
+                            CONF_PROFILE_CONTROL_ENABLED, True
+                        ),
                         "presets": room.get(CONF_PRESETS, {}),
                     }
                 )
@@ -381,7 +415,9 @@ class GreePanelRoomSensorsView(HomeAssistantView):
         temperatures = body.get("temperature_sensors", [])
         humidities = body.get("humidity_sensors", [])
         outdoor = body.get("outdoor_temperature_sensor") or None
+        outdoor_humidity = body.get("outdoor_humidity_sensor") or None
         presets = body.get("presets")
+        profile_control = body.get("profile_control_enabled")
         if not entry_id or not _valid_mac(mac):
             return self.json({"error": "invalid device"}, status=400)
         if not isinstance(temperatures, list) or not isinstance(humidities, list):
@@ -390,6 +426,7 @@ class GreePanelRoomSensorsView(HomeAssistantView):
             (temperatures, "temperature"),
             (humidities, "humidity"),
             ([outdoor] if outdoor else [], "temperature"),
+            ([outdoor_humidity] if outdoor_humidity else [], "humidity"),
         ):
             for entity_id in entity_ids:
                 state = hass.states.get(entity_id)
@@ -402,6 +439,8 @@ class GreePanelRoomSensorsView(HomeAssistantView):
         room = dict(devices.get(mac, {}))
         room[CONF_TEMPERATURE_SENSORS] = temperatures
         room[CONF_HUMIDITY_SENSORS] = humidities
+        if profile_control is not None:
+            room[CONF_PROFILE_CONTROL_ENABLED] = bool(profile_control)
         if presets is not None:
             if not isinstance(presets, dict):
                 return self.json({"error": "invalid presets"}, status=400)
@@ -443,6 +482,10 @@ class GreePanelRoomSensorsView(HomeAssistantView):
             new_options[CONF_OUTDOOR_TEMPERATURE_SENSOR] = outdoor
         else:
             new_options.pop(CONF_OUTDOOR_TEMPERATURE_SENSOR, None)
+        if outdoor_humidity:
+            new_options[CONF_OUTDOOR_HUMIDITY_SENSOR] = outdoor_humidity
+        else:
+            new_options.pop(CONF_OUTDOOR_HUMIDITY_SENSOR, None)
         hass.config_entries.async_update_entry(entry, options=new_options)
         return self.json({"ok": True})
 
@@ -1304,6 +1347,13 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-presets { display:flex; gap:5px; margin-top:10px; }
 .ops-presets .btn { flex:1; min-height:32px; border-radius:7px; font-size:9px; }
 .ops-presets .btn.active { color:#10151c; border-color:var(--yellow); background:var(--yellow); box-shadow:none; }
+.ops-alerts { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0 0; }
+.ops-alert { padding:5px 8px; border-radius:7px; border:1px solid rgba(255,193,7,.4); background:rgba(255,193,7,.12); color:#ffd966; font-size:9px; font-weight:800; text-transform:uppercase; }
+.ops-alert.manual { border-color:rgba(3,169,244,.45); background:rgba(3,169,244,.12); color:#7dd3fc; }
+.ops-chart { margin-top:12px; padding:10px; border:1px solid var(--border); border-radius:9px; background:#0d131d; }
+.ops-chart svg { width:100%; height:105px; display:block; }
+.ops-chart-legend { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; font-size:9px; color:var(--text2); }
+.ops-chart-legend i { width:8px; height:8px; display:inline-block; border-radius:50%; margin-right:3px; }
 .ops-empty { margin-top:10px; color:var(--text2); font-size:10px; }
 .ops-telemetry-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:11px; }
 .ops-health { color:var(--green); font-size:9px; }
@@ -1347,7 +1397,9 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .config-help { color:var(--text2); font-size:9px; }
 .config-section-title { margin:18px 0 9px; color:#b9c8da; font-size:9px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
 .preset-table { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
-.preset-head,.preset-row { display:grid; grid-template-columns:100px 55px 65px 92px 70px 75px 75px 82px 88px 110px 60px; gap:1px; min-width:925px; align-items:center; }
+.preset-head,.preset-row { display:grid; grid-template-columns:100px 55px 65px 92px 70px 75px 75px 82px 88px 110px 60px 86px; gap:1px; min-width:1015px; align-items:center; }
+.profile-master { display:flex; gap:8px; align-items:center; padding:10px 12px; margin-bottom:12px; border:1px solid rgba(255,193,7,.35); border-radius:8px; background:rgba(255,193,7,.08); font-weight:700; }
+.profile-master small { color:var(--text-secondary); font-weight:400; }
 .preset-head { color:#718097; background:#0d131c; font-size:8px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
 .preset-head span { padding:9px 8px; }
 .preset-row { border-top:1px solid var(--border); background:#121923; }
@@ -2010,7 +2062,8 @@ async function openSensorSettings() {
     const temperatures = data.sensors.filter(s => s.device_class === 'temperature');
     const humidities = data.sensors.filter(s => s.device_class === 'humidity');
     const outdoor = data.devices.find(d => d.outdoor_temperature_sensor)?.outdoor_temperature_sensor || '';
-    let html = `<div class="config-common"><label for="outdoorSensor">Temperatura esterna comune</label><select class="config-select" id="outdoorSensor"><option value="">Nessun sensore esterno</option>${sensorOptions(temperatures, [outdoor])}</select></div>`;
+    const outdoorHumidity = data.devices.find(d => d.outdoor_humidity_sensor)?.outdoor_humidity_sensor || '';
+    let html = `<div class="config-common"><label for="outdoorSensor">Temperatura esterna comune</label><select class="config-select" id="outdoorSensor"><option value="">Nessun sensore esterno</option>${sensorOptions(temperatures, [outdoor])}</select><label for="outdoorHumiditySensor">Umidità esterna comune</label><select class="config-select" id="outdoorHumiditySensor"><option value="">Nessun sensore esterno</option>${sensorOptions(humidities, [outdoorHumidity])}</select></div>`;
     for (const d of data.devices) {
       const presets = d.presets || {};
       const safeMac = escHtml(d.mac);
@@ -2031,15 +2084,16 @@ async function openSensorSettings() {
           ${field('humidity', p.humidity_threshold, 'Umidità massima %', 0, 100)}
           <select class="config-select" id="fan-${name}-${safeMac}" aria-label="Ventola profilo ${label}">${['Smart','Auto','Bassa','Media-Bassa','Media','Media-Alta','Alta'].map(value => `<option ${fanMode === value ? 'selected' : ''}>${value === 'Smart' ? 'Smart (profilo)' : value}</option>`).join('')}</select>
           <div class="preset-enable" title="Compensazione con temperatura esterna"><input id="adaptive-${name}-${safeMac}" aria-label="Adattivo esterno ${label}" type="checkbox" ${p.outdoor_compensation !== false ? 'checked' : ''}></div>
+          <select class="config-select" id="dred-${name}-${safeMac}" aria-label="I-Demand profilo ${label}">${['Smart','No action','Off','D1','D2','D3'].map(value => `<option ${String(p.dred || 'No action') === value ? 'selected' : ''}>${value === 'No action' ? 'Invariato' : value}</option>`).join('')}</select>
           <input id="off-${name}-${safeMac}" type="hidden" value="">
-          <input id="dred-${name}-${safeMac}" type="hidden" value="${escHtml(p.dred || 'No action')}">
           <input id="quiet-${name}-${safeMac}" type="hidden" value="${name === 'night' ? '1' : '0'}">
         </div>`;
       }).join('');
       html += `<section class="config-device" data-entry-id="${escHtml(d.entry_id)}" data-config-mac="${safeMac}"><header class="config-device-head"><h3>${escHtml(d.name)}</h3><code>${safeMac}</code></header><div class="config-device-body">
+        <label class="profile-master"><input id="profile-control-${safeMac}" type="checkbox" ${d.profile_control_enabled !== false ? 'checked' : ''}> Regolazione profili attiva <small>(disattiva per controllo completamente manuale)</small></label>
         <div class="config-sensor-grid"><div class="config-field"><label for="temp-${safeMac}">Temperatura ambiente</label><select class="config-select" id="temp-${safeMac}" multiple size="5">${sensorOptions(temperatures, d.temperature_sensors)}</select><span class="config-help">⌘/Ctrl + clic per selezionare più sensori.</span></div>
         <div class="config-field"><label for="hum-${safeMac}">Umidità ambiente</label><select class="config-select" id="hum-${safeMac}" multiple size="5">${sensorOptions(humidities, d.humidity_sensors)}</select><span class="config-help">I valori validi vengono mediati automaticamente.</span></div></div>
-        <div class="config-section-title">Profili automatici</div><div class="preset-table"><div class="preset-head"><span>Profilo</span><span>On</span><span>Smart</span><span>Strategia</span><span>Comfort</span><span>Isteresi</span><span>Min</span><span>Max</span><span>Umidità</span><span>Ventola</span><span>Esterno</span></div>${presetHtml}</div>
+        <div class="config-section-title">Profili automatici</div><div class="preset-table"><div class="preset-head"><span>Profilo</span><span>On</span><span>Smart</span><span>Strategia</span><span>Comfort</span><span>Isteresi</span><span>Min</span><span>Max</span><span>Umidità</span><span>Ventola</span><span>Esterno</span><span>I-Demand</span></div>${presetHtml}</div>
         <span id="sensor-status-${safeMac}" class="config-help"></span></div></section>`;
     }
     content.classList.remove('config-loading');
@@ -2111,6 +2165,8 @@ async function saveRoomSensors(entryId, mac, closeAfter = false) {
         entry_id: entryId,
         mac,
         outdoor_temperature_sensor: document.getElementById('outdoorSensor').value || null,
+        outdoor_humidity_sensor: document.getElementById('outdoorHumiditySensor').value || null,
+        profile_control_enabled: document.getElementById(`profile-control-${mac}`).checked,
         temperature_sensors: selected(`temp-${mac}`),
         humidity_sensors: selected(`hum-${mac}`),
         presets,
@@ -2477,6 +2533,34 @@ function renderDevice(d) {
 </div>`;
 }
 
+const _environmentHistory = {};
+function updateEnvironmentHistory(mac, state) {
+  const now = Date.now();
+  const point = {
+    t: now,
+    room: Number.isFinite(Number(state.RoomTemperature)) ? Number(state.RoomTemperature) : null,
+    target: Number.isFinite(Number(state.smart_effective_target)) ? Number(state.smart_effective_target) : (state.SetDeciTem != null ? Number(state.SetDeciTem) / 10 : Number(state.SetTem)),
+    outdoor: Number.isFinite(Number(state.OutdoorTemperature)) ? Number(state.OutdoorTemperature) : null,
+    humidity: Number.isFinite(Number(state.RoomHumidity)) ? Number(state.RoomHumidity) : null,
+    outdoorHumidity: Number.isFinite(Number(state.OutdoorHumidity)) ? Number(state.OutdoorHumidity) : null,
+  };
+  const history = _environmentHistory[mac] || (_environmentHistory[mac] = []);
+  if (!history.length || now - history[history.length - 1].t >= 9000) history.push(point);
+  while (history.length > 180) history.shift();
+  return history;
+}
+function renderEnvironmentChart(mac, state) {
+  const history = updateEnvironmentHistory(mac, state);
+  const draw = (key, min, max, color) => {
+    const pts = history.map((p,i) => p[key] == null || !Number.isFinite(p[key]) ? null : `${history.length === 1 ? 0 : i * 100 / (history.length - 1)},${100 - Math.max(0,Math.min(1,(p[key]-min)/(max-min))) * 100}`).filter(Boolean);
+    return pts.length > 1 ? `<polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/>` : '';
+  };
+  const temperatures = history.flatMap(p => [p.room,p.target,p.outdoor]).filter(Number.isFinite);
+  const minT = temperatures.length ? Math.min(...temperatures) - 1 : 15;
+  const maxT = temperatures.length ? Math.max(...temperatures) + 1 : 35;
+  return `<div class="ops-chart"><div class="ops-chart-legend"><span><i style="background:#22d3ee"></i>Interna</span><span><i style="background:#facc15"></i>Target</span><span><i style="background:#fb7185"></i>Esterna</span><span><i style="background:#60a5fa"></i>Umi. interna</span><span><i style="background:#a78bfa"></i>Umi. esterna</span></div><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 50H100 M0 25H100 M0 75H100" stroke="#273244" stroke-width=".4"/>${draw('room',minT,maxT,'#22d3ee')}${draw('target',minT,maxT,'#facc15')}${draw('outdoor',minT,maxT,'#fb7185')}${draw('humidity',0,100,'#60a5fa')}${draw('outdoorHumidity',0,100,'#a78bfa')}</svg></div>`;
+}
+
 function renderOperationsDevice(d) {
   const s = d.state || {};
   const pow = Number(s.Pow || 0) === 1;
@@ -2513,7 +2597,15 @@ function renderOperationsDevice(d) {
   const startupDred = s.StartupDRED == null ? 'none' : String(s.StartupDRED);
   const errorCode = Number(s.Errcode || 0);
   const deviceName = __DEVICE_NAMES__[d.mac] || d.name || 'Gree AC';
-  const presetLabels = { day: 'GIORNO', night: 'NOTTE', away: 'ASSENTE' };
+  const presetLabels = { day: 'GIORNO', night: 'NOTTE', away: 'ASSENTE', manual: 'MANUALE' };
+  const override = s.smart_manual_power_override;
+  const profileEnabled = s.profile_control_enabled !== false;
+  const alerts = [
+    !profileEnabled || activePreset === 'manual' ? '<span class="ops-alert manual">Controllo manuale</span>' : '',
+    override === false ? '<span class="ops-alert">Override manuale: spento</span>' : '',
+    override === true ? '<span class="ops-alert">Override manuale: acceso</span>' : '',
+    s.smart_dred_level ? `<span class="ops-alert manual">I-Demand Smart: ${escHtml(s.smart_dred_level)}</span>` : '',
+  ].filter(Boolean).join('');
   const fanLabels = ['Auto', 'Bassa', 'Medio-bassa', 'Media', 'Medio-alta', 'Alta'];
 
   if (pow && modelKey && estPower > 0) {
@@ -2573,7 +2665,9 @@ function renderOperationsDevice(d) {
           ${[0,1,2,3,4].map(value => `<button class="btn mode-${modeClasses[value]} ${mod === value && pow ? 'active' : ''}" onclick="setMode('${safeMac}',${value})" title="${modeNames[value]}"><span style="display:block;font-size:15px">${modeIcons[value]}</span>${modeShort[value]}</button>`).join('')}
         </div>
         <div class="ops-section-label" style="margin-top:12px">Profili ambiente</div>
-        ${enabledPresets.length ? `<div class="ops-presets">${enabledPresets.map(([name]) => `<button class="btn ${activePreset === name ? 'active' : ''}" onclick="setPreset('${safeMac}','${escHtml(name)}')">${presetLabels[name] || escHtml(name).toUpperCase()}</button>`).join('')}</div>` : '<div class="ops-empty">Nessun profilo abilitato. Configuralo dal menu impostazioni.</div>'}
+        <div class="ops-presets"><button class="btn ${activePreset === 'manual' || !profileEnabled ? 'active' : ''}" onclick="setPreset('${safeMac}','manual')">MANUALE</button>${enabledPresets.map(([name]) => `<button class="btn ${activePreset === name ? 'active' : ''}" onclick="setPreset('${safeMac}','${escHtml(name)}')">${presetLabels[name] || escHtml(name).toUpperCase()}</button>`).join('')}</div>
+        <div class="ops-alerts">${alerts}</div>
+        ${renderEnvironmentChart(d.mac, s)}
       </section>
       <section class="ops-telemetry">
         <div class="ops-telemetry-head"><span class="ops-section-label">Telemetria</span><span class="ops-health">${errorCode === 0 ? '● NESSUN ERRORE' : '● ERRORE ' + errorCode}</span></div>
@@ -2581,6 +2675,7 @@ function renderOperationsDevice(d) {
         <div class="ops-data-row"><span>Energia sessione</span><b>${modelKey || s.estimated_energy_kwh != null ? energy + ' kWh' : '--'}</b></div>
         <div class="ops-data-row"><span>Ventilatore</span><b>${fanLabels[Number(s.WdSpd)] || s.WdSpd || '--'}</b></div>
         <div class="ops-data-row"><span>Profilo</span><b>${activePreset ? (presetLabels[activePreset] || escHtml(activePreset).toUpperCase()) : 'MANUALE'}</b></div>
+        <div class="ops-data-row"><span>Decisione Smart</span><b>${escHtml(s.smart_last_action || '--')}</b></div>
         <div class="ops-data-row"><span>I-Demand</span><b>${s.DREDEn === 1 ? (effectiveDred === 0 ? 'OFF' : (effectiveDred === 1 ? '100%' : effectiveDred === 2 ? '50%' : '75%')) : 'N/D'}</b></div>
         <div class="ops-data-row"><span>Sonde IDU / ODU</span><b>${probeIn != null ? probeIn.toFixed(1) + '°' : '--'} / ${probeOut != null ? probeOut.toFixed(1) + '°' : '--'}</b></div>
         <details class="ops-details"><summary>APRI CONTROLLI AVANZATI ↓</summary>
