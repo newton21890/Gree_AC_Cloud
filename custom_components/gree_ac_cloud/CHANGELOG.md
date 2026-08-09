@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.15
+
+### Selezione sensori nel pannello e medie ambiente
+
+- Aggiunto un pulsante ⚙ direttamente nel pannello Gree AC Cloud per associare i sensori senza dipendere dalla voce Configura di Home Assistant.
+- È possibile scegliere un unico sensore di temperatura esterna comune a tutto l'impianto.
+- Per ogni condizionatore è possibile selezionare più sensori interni di temperatura e più sensori di umidità.
+- L'integrazione calcola separatamente la media aritmetica dei soli valori validi/disponibili per temperatura e umidità; se nessun sensore temperatura interno è valido resta il fallback `TemSen`.
+- Le opzioni native dell'integrazione supportano le stesse selezioni multiple.
+
 ## 0.2.14
 
 ### Sensori ambiente HA e preset climatici

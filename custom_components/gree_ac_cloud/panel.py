@@ -19,6 +19,12 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     COMMAND_OPTIONS,
+    CONF_DEVICES,
+    CONF_HUMIDITY_SENSOR,
+    CONF_HUMIDITY_SENSORS,
+    CONF_OUTDOOR_TEMPERATURE_SENSOR,
+    CONF_TEMPERATURE_SENSOR,
+    CONF_TEMPERATURE_SENSORS,
     DOMAIN,
     ENERGY_MODELS,
     GREE_CLOUD_SERVERS,
@@ -36,6 +42,7 @@ PANEL_CMD_URL = "/api/gree_ac_cloud/panel/command"
 PANEL_LOG_URL = "/api/gree_ac_cloud/panel/log"
 PANEL_README_URL = "/api/gree_ac_cloud/panel/readme"
 PANEL_CHANGELOG_URL = "/api/gree_ac_cloud/panel/changelog"
+PANEL_ROOM_SENSORS_URL = "/api/gree_ac_cloud/panel/room-sensors"
 
 
 def _safe_json_for_script(value) -> str:
@@ -138,6 +145,7 @@ async def async_register_panel(hass: HomeAssistant):
         hass.http.register_view(GreePanelSettingsView)
         hass.http.register_view(GreePanelRefreshView)
         hass.http.register_view(GreePanelDevicesInfoView)
+        hass.http.register_view(GreePanelRoomSensorsView)
         domain_data["panel_views_registered"] = True
 
     domain_data["panel_registered"] = True
@@ -242,6 +250,94 @@ class GreePanelDataView(HomeAssistantView):
                     "cloud_host": cloud_host,
                 })
         return self.json(data)
+
+
+class GreePanelRoomSensorsView(HomeAssistantView):
+    """Read and update external HA room sensors without relying on Options UI."""
+
+    url = PANEL_ROOM_SENSORS_URL
+    name = "api:gree_ac_cloud:panel_room_sensors"
+    requires_auth = True
+
+    async def get(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        sensors = []
+        for state in hass.states.async_all("sensor"):
+            device_class = state.attributes.get("device_class")
+            if device_class in ("temperature", "humidity"):
+                sensors.append(
+                    {
+                        "entity_id": state.entity_id,
+                        "name": state.attributes.get("friendly_name", state.entity_id),
+                        "device_class": device_class,
+                        "state": state.state,
+                        "unit": state.attributes.get("unit_of_measurement"),
+                    }
+                )
+        devices = []
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            runtime = getattr(entry, "runtime_data", None) or {}
+            configured = entry.options.get(CONF_DEVICES, {})
+            outdoor = entry.options.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
+            for coord in runtime.get("coordinators", []):
+                room = configured.get(coord.device.mac, {})
+                devices.append(
+                    {
+                        "entry_id": entry.entry_id,
+                        "mac": coord.device.mac,
+                        "name": coord.device.name,
+                        "temperature_sensors": room.get(CONF_TEMPERATURE_SENSORS)
+                        or ([room[CONF_TEMPERATURE_SENSOR]] if room.get(CONF_TEMPERATURE_SENSOR) else []),
+                        "humidity_sensors": room.get(CONF_HUMIDITY_SENSORS)
+                        or ([room[CONF_HUMIDITY_SENSOR]] if room.get(CONF_HUMIDITY_SENSOR) else []),
+                        "outdoor_temperature_sensor": outdoor,
+                    }
+                )
+        return self.json({"devices": devices, "sensors": sensors})
+
+    async def post(self, request: web.Request) -> web.Response:
+        if not _is_admin(request):
+            return self.json({"error": "admin required"}, status=403)
+        hass = request.app["hass"]
+        try:
+            body = await request.json()
+        except Exception:
+            return self.json({"error": "invalid JSON"}, status=400)
+        entry_id = body.get("entry_id")
+        mac = body.get("mac")
+        temperatures = body.get("temperature_sensors", [])
+        humidities = body.get("humidity_sensors", [])
+        outdoor = body.get("outdoor_temperature_sensor") or None
+        if not entry_id or not _valid_mac(mac):
+            return self.json({"error": "invalid device"}, status=400)
+        if not isinstance(temperatures, list) or not isinstance(humidities, list):
+            return self.json({"error": "sensor selections must be lists"}, status=400)
+        for entity_ids, expected_class in (
+            (temperatures, "temperature"),
+            (humidities, "humidity"),
+            ([outdoor] if outdoor else [], "temperature"),
+        ):
+            for entity_id in entity_ids:
+                state = hass.states.get(entity_id)
+                if state is None or state.attributes.get("device_class") != expected_class:
+                    return self.json({"error": f"invalid {expected_class} sensor"}, status=400)
+        entry = hass.config_entries.async_get_entry(entry_id)
+        if entry is None or entry.domain != DOMAIN:
+            return self.json({"error": "entry not found"}, status=404)
+        devices = dict(entry.options.get(CONF_DEVICES, {}))
+        room = dict(devices.get(mac, {}))
+        room[CONF_TEMPERATURE_SENSORS] = temperatures
+        room[CONF_HUMIDITY_SENSORS] = humidities
+        room.pop(CONF_TEMPERATURE_SENSOR, None)
+        room.pop(CONF_HUMIDITY_SENSOR, None)
+        devices[mac] = room
+        new_options = {**entry.options, CONF_DEVICES: devices}
+        if outdoor:
+            new_options[CONF_OUTDOOR_TEMPERATURE_SENSOR] = outdoor
+        else:
+            new_options.pop(CONF_OUTDOOR_TEMPERATURE_SENSOR, None)
+        hass.config_entries.async_update_entry(entry, options=new_options)
+        return self.json({"ok": True})
 
 
 class GreePanelCommandView(HomeAssistantView):
@@ -1022,6 +1118,7 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
         <option value="60">60s</option>
       </select>
     </label>
+    <button class="refresh-btn" onclick="openSensorSettings()" title="Associa sensori ambiente HA">⚙</button>
     <button class="refresh-btn" onclick="refreshNow()" title="Aggiorna ora">↻</button>
   </div>
   <nav class="tab-nav">
@@ -1485,6 +1582,14 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
   </div>
 </div>
 
+<div id="sensorSettings" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1000;overflow:auto;padding:20px;">
+  <div class="card" style="max-width:850px;margin:20px auto;">
+    <div class="card-header"><h2>⚙ Sensori ambiente Home Assistant</h2><button class="btn" onclick="closeSensorSettings()">Chiudi</button></div>
+    <p style="color:var(--text-secondary);font-size:12px;">Seleziona un sensore esterno comune all’impianto e uno o più sensori interni per ciascun condizionatore. I valori interni validi vengono mediati automaticamente.</p>
+    <div id="sensorSettingsContent">Caricamento…</div>
+  </div>
+</div>
+
 <div class="server-info" id="serverInfo"></div>
 <div style="font-size:11px;color:var(--yellow);text-align:center;margin-top:6px;">
   ⚠ L'integrazione disconnette l'app Gree+ (una sessione per account)
@@ -1498,6 +1603,7 @@ const PANEL_NAMES_URL = HA_BASE + '/api/gree_ac_cloud/panel/names';
 const PANEL_SETTINGS_URL = HA_BASE + '/api/gree_ac_cloud/panel/settings';
 const PANEL_REFRESH_URL = HA_BASE + '/api/gree_ac_cloud/panel/refresh';
 const PANEL_DEVICES_INFO_URL = HA_BASE + '/api/gree_ac_cloud/panel/devices-info';
+const PANEL_ROOM_SENSORS_URL = HA_BASE + '/api/gree_ac_cloud/panel/room-sensors';
 
 const __README_CONTENT__ = __README_JSON__;
 const __CHANGELOG_CONTENT__ = __CHANGELOG_JSON__;
@@ -1521,6 +1627,63 @@ async function apiFetch(url, opts = {}) {
   const resp = await fetch(url, opts);
   if (!resp.ok) throw new Error(resp.statusText);
   return resp.json();
+}
+
+function sensorOptions(sensors, selected, multiple = false) {
+  const chosen = new Set(selected || []);
+  return sensors.map(s => `<option value="${escHtml(s.entity_id)}" ${chosen.has(s.entity_id) ? 'selected' : ''}>${escHtml(s.name)} — ${escHtml(s.state)} ${escHtml(s.unit || '')}</option>`).join('');
+}
+
+async function openSensorSettings() {
+  const modal = document.getElementById('sensorSettings');
+  const content = document.getElementById('sensorSettingsContent');
+  modal.style.display = 'block';
+  content.textContent = 'Caricamento…';
+  try {
+    const data = await apiFetch(PANEL_ROOM_SENSORS_URL);
+    const temperatures = data.sensors.filter(s => s.device_class === 'temperature');
+    const humidities = data.sensors.filter(s => s.device_class === 'humidity');
+    const outdoor = data.devices.find(d => d.outdoor_temperature_sensor)?.outdoor_temperature_sensor || '';
+    let html = `<div class="control-row"><label>Sensore temperatura esterna comune</label><select id="outdoorSensor"><option value="">Nessuno</option>${sensorOptions(temperatures, [outdoor])}</select></div>`;
+    for (const d of data.devices) {
+      html += `<div class="wiki" style="margin-top:14px;"><h3>${escHtml(d.name)} <code>${escHtml(d.mac)}</code></h3>
+        <label>Temperatura interna — selezione multipla, viene calcolata la media</label>
+        <select id="temp-${escHtml(d.mac)}" multiple size="6" style="width:100%;margin:6px 0 12px;">${sensorOptions(temperatures, d.temperature_sensors)}</select>
+        <label>Umidità interna — selezione multipla, viene calcolata la media</label>
+        <select id="hum-${escHtml(d.mac)}" multiple size="5" style="width:100%;margin:6px 0 12px;">${sensorOptions(humidities, d.humidity_sensors)}</select>
+        <button class="btn active" onclick="saveRoomSensors('${escHtml(d.entry_id)}','${escHtml(d.mac)}')">Salva sensori di questa unità</button>
+        <span id="sensor-status-${escHtml(d.mac)}" style="margin-left:8px;font-size:11px;"></span></div>`;
+    }
+    content.innerHTML = html;
+  } catch (e) {
+    content.innerHTML = `<p style="color:var(--red);">Errore: ${escHtml(e.message)}</p>`;
+  }
+}
+
+function closeSensorSettings() {
+  document.getElementById('sensorSettings').style.display = 'none';
+}
+
+async function saveRoomSensors(entryId, mac) {
+  const selected = id => Array.from(document.getElementById(id).selectedOptions).map(o => o.value);
+  const status = document.getElementById(`sensor-status-${mac}`);
+  status.textContent = 'Salvataggio…';
+  try {
+    await apiFetch(PANEL_ROOM_SENSORS_URL, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        entry_id: entryId,
+        mac,
+        outdoor_temperature_sensor: document.getElementById('outdoorSensor').value || null,
+        temperature_sensors: selected(`temp-${mac}`),
+        humidity_sensors: selected(`hum-${mac}`),
+      }),
+    });
+    status.textContent = 'Salvato. L’integrazione si ricarica…';
+  } catch (e) {
+    status.textContent = 'Errore: ' + e.message;
+  }
 }
 
 async function sendCommand(mac, options, values) {

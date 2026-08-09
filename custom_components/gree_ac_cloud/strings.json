@@ -23,6 +23,11 @@
   "options": {
     "step": {
       "init": {
+        "title": "Outdoor sensor",
+        "description": "Choose one optional outdoor temperature sensor shared by the whole system.",
+        "data": { "outdoor_temperature_sensor": "Outdoor temperature sensor" }
+      },
+      "device": {
         "title": "Room control settings",
         "description": "Choose the Gree unit to configure.",
         "data": { "device": "Air conditioner" }
@@ -31,8 +36,8 @@
         "title": "External room sensors",
         "description": "Optional Home Assistant sensors used as the climate entity's room temperature and humidity.",
         "data": {
-          "temperature_sensor": "Temperature sensor",
-          "humidity_sensor": "Humidity sensor"
+          "temperature_sensors": "Indoor temperature sensors (averaged)",
+          "humidity_sensors": "Indoor humidity sensors (averaged)"
         }
       },
       "day": {

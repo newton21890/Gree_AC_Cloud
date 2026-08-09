@@ -34,7 +34,7 @@ def test_json_files_parse() -> None:
 def test_panel_data_apis_require_authentication() -> None:
     source = (COMPONENT / "panel.py").read_text()
     # The HTML shell must stay public for the iframe; every data view is protected.
-    assert source.count("requires_auth = True") == 8
+    assert source.count("requires_auth = True") == 9
     assert source.count("requires_auth = False") == 1
 
 
@@ -129,13 +129,21 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     climate_source = (COMPONENT / "climate.py").read_text()
     assert "GreeACCloudOptionsFlow" in flow_source
     assert "EntitySelectorConfig" in flow_source
-    assert "CONF_TEMPERATURE_SENSOR" in flow_source
-    assert "CONF_HUMIDITY_SENSOR" in flow_source
+    assert "CONF_TEMPERATURE_SENSORS" in flow_source
+    assert "CONF_HUMIDITY_SENSORS" in flow_source
+    assert "CONF_OUTDOOR_TEMPERATURE_SENSOR" in flow_source
+    assert "multiple=True" in flow_source
     assert "PRESET_DAY" in flow_source
     assert "ClimateEntityFeature.PRESET_MODE" in climate_source
     assert "async_track_state_change_event" in climate_source
     assert "async_set_preset_mode" in climate_source
     assert "current_humidity" in climate_source
+    assert "_average_entities" in climate_source
+    assert "sum(values) / len(values)" in climate_source
+    panel_source = (COMPONENT / "panel.py").read_text()
+    assert "GreePanelRoomSensorsView" in panel_source
+    assert "openSensorSettings" in panel_source
+    assert "temperature_sensors" in panel_source
 
 
 def test_device_command_round_trip() -> None:

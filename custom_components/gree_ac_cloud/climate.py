@@ -16,6 +16,8 @@ from homeassistant.helpers.event import async_track_state_change_event
 from .const import (
     CONF_DEVICES,
     CONF_HUMIDITY_SENSOR,
+    CONF_HUMIDITY_SENSORS,
+    CONF_OUTDOOR_TEMPERATURE_SENSOR,
     CONF_PRESET_AUTO_OFF,
     CONF_PRESET_DRED,
     CONF_PRESET_ENABLED,
@@ -25,6 +27,7 @@ from .const import (
     CONF_PRESET_TARGET,
     CONF_PRESETS,
     CONF_TEMPERATURE_SENSOR,
+    CONF_TEMPERATURE_SENSORS,
     DRED_OPTIONS_REV,
     FAN_MAP,
     FAN_MAP_REV,
@@ -75,12 +78,34 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
         return entry.options.get(CONF_DEVICES, {}).get(self._device.mac, {})
 
     @property
-    def _external_temperature_entity(self) -> str | None:
-        return self._room_options.get(CONF_TEMPERATURE_SENSOR)
+    def _external_temperature_entities(self) -> list[str]:
+        entities = self._room_options.get(CONF_TEMPERATURE_SENSORS)
+        if entities is not None:
+            return list(entities)
+        legacy = self._room_options.get(CONF_TEMPERATURE_SENSOR)
+        return [legacy] if legacy else []
 
     @property
-    def _external_humidity_entity(self) -> str | None:
-        return self._room_options.get(CONF_HUMIDITY_SENSOR)
+    def _external_humidity_entities(self) -> list[str]:
+        entities = self._room_options.get(CONF_HUMIDITY_SENSORS)
+        if entities is not None:
+            return list(entities)
+        legacy = self._room_options.get(CONF_HUMIDITY_SENSOR)
+        return [legacy] if legacy else []
+
+    @property
+    def _outdoor_temperature_entity(self) -> str | None:
+        return self.coordinator.config_entry.options.get(
+            CONF_OUTDOOR_TEMPERATURE_SENSOR
+        )
+
+    def _average_entities(self, entity_ids: list[str]) -> float | None:
+        values = [
+            value
+            for entity_id in entity_ids
+            if (value := self._numeric_state(self.hass.states.get(entity_id))) is not None
+        ]
+        return round(sum(values) / len(values), 2) if values else None
 
     @staticmethod
     def _numeric_state(state) -> float | None:
@@ -93,14 +118,16 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
-        entities = [
-            entity_id
-            for entity_id in (
-                self._external_temperature_entity,
-                self._external_humidity_entity,
+        entities = list(
+            dict.fromkeys(
+                [
+                    *self._external_temperature_entities,
+                    *self._external_humidity_entities,
+                    self._outdoor_temperature_entity,
+                ]
             )
-            if entity_id
-        ]
+        )
+        entities = [entity_id for entity_id in entities if entity_id]
         if entities:
             self.async_on_remove(
                 async_track_state_change_event(
@@ -119,11 +146,9 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
     @property
     def current_temperature(self) -> float | None:
         """Use the configured HA room sensor, then documented TemSen."""
-        external = self._external_temperature_entity
-        if external:
-            value = self._numeric_state(self.hass.states.get(external))
-            if value is not None:
-                return value
+        value = self._average_entities(self._external_temperature_entities)
+        if value is not None:
+            return value
         raw = self.coordinator.data.get("TemSen")
         if raw is None or not isinstance(raw, (int, float)):
             return None
@@ -131,16 +156,21 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
 
     @property
     def current_humidity(self) -> float | None:
-        external = self._external_humidity_entity
-        if not external:
-            return None
-        return self._numeric_state(self.hass.states.get(external))
+        return self._average_entities(self._external_humidity_entities)
 
     @property
     def extra_state_attributes(self):
         return {
-            "temperature_sensor": self._external_temperature_entity,
-            "humidity_sensor": self._external_humidity_entity,
+            "temperature_sensors": self._external_temperature_entities,
+            "humidity_sensors": self._external_humidity_entities,
+            "temperature_average_sources": len(self._external_temperature_entities),
+            "humidity_average_sources": len(self._external_humidity_entities),
+            "outdoor_temperature_sensor": self._outdoor_temperature_entity,
+            "outdoor_temperature": self._numeric_state(
+                self.hass.states.get(self._outdoor_temperature_entity)
+            )
+            if self._outdoor_temperature_entity
+            else None,
             "preset_rules": self._room_options.get(CONF_PRESETS, {}),
         }
 

@@ -11,6 +11,8 @@ from .const import (
     CONF_DEVICE,
     CONF_DEVICES,
     CONF_HUMIDITY_SENSOR,
+    CONF_HUMIDITY_SENSORS,
+    CONF_OUTDOOR_TEMPERATURE_SENSOR,
     CONF_PRESET_AUTO_OFF,
     CONF_PRESET_DRED,
     CONF_PRESET_ENABLED,
@@ -21,6 +23,7 @@ from .const import (
     CONF_PRESETS,
     CONF_SERVER,
     CONF_TEMPERATURE_SENSOR,
+    CONF_TEMPERATURE_SENSORS,
     DOMAIN,
     DRED_OPTIONS,
     GREE_CLOUD_SERVERS,
@@ -97,6 +100,7 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self):
         self._device_mac: str | None = None
+        self._outdoor_sensor: str | None = None
 
     def _coordinators(self):
         runtime = getattr(self.config_entry, "runtime_data", None) or {}
@@ -106,6 +110,28 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
         coordinators = self._coordinators()
         if not coordinators:
             return self.async_abort(reason="devices_not_ready")
+        if user_input is not None and CONF_OUTDOOR_TEMPERATURE_SENSOR in user_input:
+            self._outdoor_sensor = user_input.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
+            return await self.async_step_device()
+        current_outdoor = self.config_entry.options.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_OUTDOOR_TEMPERATURE_SENSOR,
+                        description={"suggested_value": current_outdoor},
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain="sensor", device_class="temperature"
+                        )
+                    )
+                }
+            ),
+        )
+
+    async def async_step_device(self, user_input=None):
+        coordinators = self._coordinators()
         choices = {
             coordinator.device.mac: coordinator.device.name
             for coordinator in coordinators
@@ -114,7 +140,7 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
             self._device_mac = user_input[CONF_DEVICE]
             return await self.async_step_sensors()
         return self.async_show_form(
-            step_id="init",
+            step_id="device",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_DEVICE): selector.SelectSelector(
@@ -138,8 +164,14 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
     async def async_step_sensors(self, user_input=None):
         current = self._device_options()
         if user_input is not None:
-            current[CONF_TEMPERATURE_SENSOR] = user_input.get(CONF_TEMPERATURE_SENSOR)
-            current[CONF_HUMIDITY_SENSOR] = user_input.get(CONF_HUMIDITY_SENSOR)
+            current[CONF_TEMPERATURE_SENSORS] = user_input.get(
+                CONF_TEMPERATURE_SENSORS, []
+            )
+            current[CONF_HUMIDITY_SENSORS] = user_input.get(
+                CONF_HUMIDITY_SENSORS, []
+            )
+            current.pop(CONF_TEMPERATURE_SENSOR, None)
+            current.pop(CONF_HUMIDITY_SENSOR, None)
             self._working = current
             return await self.async_step_day()
         return self.async_show_form(
@@ -147,19 +179,25 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     vol.Optional(
-                        CONF_TEMPERATURE_SENSOR,
-                        description={"suggested_value": current.get(CONF_TEMPERATURE_SENSOR)},
+                        CONF_TEMPERATURE_SENSORS,
+                        description={
+                            "suggested_value": current.get(CONF_TEMPERATURE_SENSORS)
+                            or ([current[CONF_TEMPERATURE_SENSOR]] if current.get(CONF_TEMPERATURE_SENSOR) else [])
+                        },
                     ): selector.EntitySelector(
                         selector.EntitySelectorConfig(
-                            domain="sensor", device_class="temperature"
+                            domain="sensor", device_class="temperature", multiple=True
                         )
                     ),
                     vol.Optional(
-                        CONF_HUMIDITY_SENSOR,
-                        description={"suggested_value": current.get(CONF_HUMIDITY_SENSOR)},
+                        CONF_HUMIDITY_SENSORS,
+                        description={
+                            "suggested_value": current.get(CONF_HUMIDITY_SENSORS)
+                            or ([current[CONF_HUMIDITY_SENSOR]] if current.get(CONF_HUMIDITY_SENSOR) else [])
+                        },
                     ): selector.EntitySelector(
                         selector.EntitySelectorConfig(
-                            domain="sensor", device_class="humidity"
+                            domain="sensor", device_class="humidity", multiple=True
                         )
                     ),
                 }
@@ -208,7 +246,13 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                 return await getattr(self, f"async_step_{next_step}")()
             devices = dict(self.config_entry.options.get(CONF_DEVICES, {}))
             devices[self._device_mac] = self._working
-            return self.async_create_entry(title="", data={CONF_DEVICES: devices})
+            return self.async_create_entry(
+                title="",
+                data={
+                    CONF_DEVICES: devices,
+                    CONF_OUTDOOR_TEMPERATURE_SENSOR: self._outdoor_sensor,
+                },
+            )
         return self.async_show_form(step_id=preset, data_schema=self._preset_schema(preset))
 
     async def async_step_day(self, user_input=None):

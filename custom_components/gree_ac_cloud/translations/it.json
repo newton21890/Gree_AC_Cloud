@@ -23,6 +23,11 @@
   "options": {
     "step": {
       "init": {
+        "title": "Sensore esterno",
+        "description": "Scegli un sensore temperatura esterna opzionale, comune a tutto l'impianto.",
+        "data": { "outdoor_temperature_sensor": "Sensore temperatura esterna" }
+      },
+      "device": {
         "title": "Impostazioni controllo ambiente",
         "description": "Scegli l'unità Gree da configurare.",
         "data": { "device": "Condizionatore" }
@@ -31,8 +36,8 @@
         "title": "Sensori ambiente esterni",
         "description": "Sensori Home Assistant opzionali usati dall'entità climate come temperatura e umidità ambiente.",
         "data": {
-          "temperature_sensor": "Sensore di temperatura",
-          "humidity_sensor": "Sensore di umidità"
+          "temperature_sensors": "Sensori temperatura interna (media)",
+          "humidity_sensors": "Sensori umidità interna (media)"
         }
       },
       "day": {
