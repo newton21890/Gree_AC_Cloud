@@ -3,6 +3,23 @@ DOMAIN = "gree_ac_cloud"
 CONF_SERVER = "server"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
+CONF_DEVICE = "device"
+CONF_TEMPERATURE_SENSOR = "temperature_sensor"
+CONF_HUMIDITY_SENSOR = "humidity_sensor"
+CONF_PRESET_ENABLED = "enabled"
+CONF_PRESET_TARGET = "target_temperature"
+CONF_PRESET_AUTO_OFF = "auto_off_temperature"
+CONF_PRESET_HUMIDITY = "humidity_threshold"
+CONF_PRESET_MIN_TEMP = "min_temperature"
+CONF_PRESET_MAX_TEMP = "max_temperature"
+CONF_PRESET_DRED = "dred"
+CONF_DEVICES = "devices"
+CONF_PRESETS = "presets"
+
+PRESET_DAY = "day"
+PRESET_NIGHT = "night"
+PRESET_AWAY = "away"
+PRESET_NAMES = (PRESET_DAY, PRESET_NIGHT, PRESET_AWAY)
 
 UPDATE_INTERVAL = 15
 STALE_AFTER_SECONDS = UPDATE_INTERVAL * 4  # 60s — mark device unavailable after this many seconds without fresh MQTT data

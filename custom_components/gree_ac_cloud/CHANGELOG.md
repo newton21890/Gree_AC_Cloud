@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.14
+
+### Sensori ambiente HA e preset climatici
+
+- Le opzioni dell'integrazione permettono di associare a ogni condizionatore un sensore di temperatura e uno di umidità già presenti in Home Assistant.
+- La temperatura esterna scelta sostituisce `TemSen` come `current_temperature` dell'entità climate; `TemSen` resta il fallback. L'umidità scelta viene esposta come `current_humidity`.
+- Aggiunti preset configurabili Giorno, Notte e Assente, ciascuno abilitabile separatamente.
+- Ogni preset può definire temperatura target, temperatura di spegnimento automatico, soglie minima/massima ambiente, soglia umidità e livello I-Demand.
+- I preset abilitati compaiono direttamente nell'entità climate e reagiscono agli aggiornamenti in tempo reale dei sensori HA associati.
+- Le soglie sono opzionali: se lasciate vuote non producono alcuna azione automatica.
+
 ## 0.2.13
 
 ### Preferenze per l'accensione successiva

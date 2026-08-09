@@ -9,9 +9,31 @@ from homeassistant.components.climate import (
     HVACMode,
 )
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_HALVES, UnitOfTemperature
+from homeassistant.core import callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_state_change_event
 
-from .const import FAN_MAP, FAN_MAP_REV, HVAC_MAP, HVAC_MAP_REV, MAX_TEMP_C, MIN_TEMP_C
+from .const import (
+    CONF_DEVICES,
+    CONF_HUMIDITY_SENSOR,
+    CONF_PRESET_AUTO_OFF,
+    CONF_PRESET_DRED,
+    CONF_PRESET_ENABLED,
+    CONF_PRESET_HUMIDITY,
+    CONF_PRESET_MAX_TEMP,
+    CONF_PRESET_MIN_TEMP,
+    CONF_PRESET_TARGET,
+    CONF_PRESETS,
+    CONF_TEMPERATURE_SENSOR,
+    DRED_OPTIONS_REV,
+    FAN_MAP,
+    FAN_MAP_REV,
+    HVAC_MAP,
+    HVAC_MAP_REV,
+    MAX_TEMP_C,
+    MIN_TEMP_C,
+    PRESET_NAMES,
+)
 from .entity import GreeDeviceEntity
 
 
@@ -35,6 +57,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.FAN_MODE
         | ClimateEntityFeature.SWING_MODE
+        | ClimateEntityFeature.PRESET_MODE
         | ClimateEntityFeature.TURN_OFF
         | ClimateEntityFeature.TURN_ON
     )
@@ -43,21 +66,159 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
     def __init__(self, coordinator):
         super().__init__(coordinator, coordinator.device, key_suffix="")
         self._attr_unique_id = f"climate_{coordinator.device.mac}"
+        self._preset_mode: str | None = None
+        self._preset_action_lock = False
+
+    @property
+    def _room_options(self) -> dict:
+        entry = self.coordinator.config_entry
+        return entry.options.get(CONF_DEVICES, {}).get(self._device.mac, {})
+
+    @property
+    def _external_temperature_entity(self) -> str | None:
+        return self._room_options.get(CONF_TEMPERATURE_SENSOR)
+
+    @property
+    def _external_humidity_entity(self) -> str | None:
+        return self._room_options.get(CONF_HUMIDITY_SENSOR)
+
+    @staticmethod
+    def _numeric_state(state) -> float | None:
+        if state is None or state.state in ("unknown", "unavailable"):
+            return None
+        try:
+            return float(state.state)
+        except (TypeError, ValueError):
+            return None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        entities = [
+            entity_id
+            for entity_id in (
+                self._external_temperature_entity,
+                self._external_humidity_entity,
+            )
+            if entity_id
+        ]
+        if entities:
+            self.async_on_remove(
+                async_track_state_change_event(
+                    self.hass, entities, self._async_external_sensor_changed
+                )
+            )
+
+    @callback
+    def _async_external_sensor_changed(self, event) -> None:
+        self.async_write_ha_state()
+        if self._preset_mode:
+            self.hass.async_create_task(self._async_evaluate_preset())
 
     # ── temperature ───────────────────────────────────
 
     @property
     def current_temperature(self) -> float | None:
-        """Return only the documented measured-air value.
-
-        `TemSen` is encoded with Gree's +40 offset. The physical probes behind
-        U-Match `InTem` and `OutTem` are not identified by the supplied manuals,
-        so they must not be presented as the actual room temperature.
-        """
+        """Use the configured HA room sensor, then documented TemSen."""
+        external = self._external_temperature_entity
+        if external:
+            value = self._numeric_state(self.hass.states.get(external))
+            if value is not None:
+                return value
         raw = self.coordinator.data.get("TemSen")
         if raw is None or not isinstance(raw, (int, float)):
             return None
         return float(raw - 40)
+
+    @property
+    def current_humidity(self) -> float | None:
+        external = self._external_humidity_entity
+        if not external:
+            return None
+        return self._numeric_state(self.hass.states.get(external))
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "temperature_sensor": self._external_temperature_entity,
+            "humidity_sensor": self._external_humidity_entity,
+            "preset_rules": self._room_options.get(CONF_PRESETS, {}),
+        }
+
+    @property
+    def preset_modes(self) -> list[str]:
+        presets = self._room_options.get(CONF_PRESETS, {})
+        return [
+            preset
+            for preset in PRESET_NAMES
+            if presets.get(preset, {}).get(CONF_PRESET_ENABLED)
+        ]
+
+    @property
+    def preset_mode(self) -> str | None:
+        return self._preset_mode
+
+    async def async_set_preset_mode(self, preset_mode: str) -> None:
+        if preset_mode not in self.preset_modes:
+            raise ValueError(f"Unsupported or disabled preset: {preset_mode}")
+        self._preset_mode = preset_mode
+        await self._async_apply_preset()
+        self.async_write_ha_state()
+
+    def _active_preset(self) -> dict:
+        if not self._preset_mode:
+            return {}
+        return self._room_options.get(CONF_PRESETS, {}).get(self._preset_mode, {})
+
+    async def _async_apply_preset(self) -> None:
+        preset = self._active_preset()
+        if not preset:
+            return
+        target = preset.get(CONF_PRESET_TARGET)
+        if target is not None:
+            await self.async_set_temperature(**{ATTR_TEMPERATURE: target})
+        dred = preset.get(CONF_PRESET_DRED, "No action")
+        if dred in DRED_OPTIONS_REV and self._device.properties.get("Mod") == 1:
+            value = DRED_OPTIONS_REV[dred]
+            if await self.coordinator._mqtt.send_command(
+                self._device.mac, ["DRED"], [value]
+            ):
+                self._device.properties["DRED"] = value
+                if value:
+                    self._device.properties["Quiet"] = 0
+                self._sync_data()
+        await self._async_evaluate_preset()
+
+    async def _async_evaluate_preset(self) -> None:
+        """Apply optional room-sensor stop limits for the active preset."""
+        if self._preset_action_lock:
+            return
+        preset = self._active_preset()
+        if not preset:
+            return
+        temperature = self.current_temperature
+        humidity = self.current_humidity
+        auto_off = preset.get(CONF_PRESET_AUTO_OFF)
+        min_temp = preset.get(CONF_PRESET_MIN_TEMP)
+        max_temp = preset.get(CONF_PRESET_MAX_TEMP)
+        humidity_limit = preset.get(CONF_PRESET_HUMIDITY)
+
+        should_stop = (
+            temperature is not None
+            and (
+                (auto_off is not None and temperature <= auto_off)
+                or (min_temp is not None and temperature < min_temp)
+                or (max_temp is not None and temperature > max_temp)
+            )
+        )
+        if humidity_limit is not None and humidity is not None:
+            should_stop = should_stop or humidity <= humidity_limit
+
+        if should_stop and self._device.properties.get("Pow"):
+            self._preset_action_lock = True
+            try:
+                await self.async_turn_off()
+            finally:
+                self._preset_action_lock = False
 
     @property
     def target_temperature(self) -> float | None:

@@ -117,6 +117,11 @@ async def async_setup_entry(hass: HomeAssistant, entry):
 
     data_forwarder["cb"] = _forward
 
+    async def _async_options_updated(hass, updated_entry):
+        await hass.config_entries.async_reload(updated_entry.entry_id)
+
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+
     try:
         for coord in coordinators:
             coord.update_interval = timedelta(seconds=poll_interval)

@@ -20,6 +20,63 @@
       "already_configured": "Questo account è già configurato"
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Impostazioni controllo ambiente",
+        "description": "Scegli l'unità Gree da configurare.",
+        "data": { "device": "Condizionatore" }
+      },
+      "sensors": {
+        "title": "Sensori ambiente esterni",
+        "description": "Sensori Home Assistant opzionali usati dall'entità climate come temperatura e umidità ambiente.",
+        "data": {
+          "temperature_sensor": "Sensore di temperatura",
+          "humidity_sensor": "Sensore di umidità"
+        }
+      },
+      "day": {
+        "title": "Preset Giorno",
+        "description": "Abilita e configura Giorno. I limiti opzionali spengono l'unità quando vengono raggiunti.",
+        "data": {
+          "enabled": "Abilitato",
+          "target_temperature": "Temperatura target",
+          "auto_off_temperature": "Temperatura di spegnimento automatico",
+          "humidity_threshold": "Soglia umidità per spegnimento",
+          "min_temperature": "Temperatura ambiente minima",
+          "max_temperature": "Temperatura ambiente massima",
+          "dred": "Livello I-Demand"
+        }
+      },
+      "night": {
+        "title": "Preset Notte",
+        "description": "Abilita e configura Notte.",
+        "data": {
+          "enabled": "Abilitato",
+          "target_temperature": "Temperatura target",
+          "auto_off_temperature": "Temperatura di spegnimento automatico",
+          "humidity_threshold": "Soglia umidità per spegnimento",
+          "min_temperature": "Temperatura ambiente minima",
+          "max_temperature": "Temperatura ambiente massima",
+          "dred": "Livello I-Demand"
+        }
+      },
+      "away": {
+        "title": "Preset Assente",
+        "description": "Abilita e configura Assente.",
+        "data": {
+          "enabled": "Abilitato",
+          "target_temperature": "Temperatura target",
+          "auto_off_temperature": "Temperatura di spegnimento automatico",
+          "humidity_threshold": "Soglia umidità per spegnimento",
+          "min_temperature": "Temperatura ambiente minima",
+          "max_temperature": "Temperatura ambiente massima",
+          "dred": "Livello I-Demand"
+        }
+      }
+    },
+    "abort": { "devices_not_ready": "I dispositivi non sono pronti" }
+  },
   "entity": {
     "sensor": {
       "in_tem": { "name": "Sonda unità interna (grezza/non verificata)" },

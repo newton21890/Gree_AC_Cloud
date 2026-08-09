@@ -124,6 +124,20 @@ def test_dred_control_keeps_verified_protocol_mapping() -> None:
     assert "async_set_startup_dred" in select_source
 
 
+def test_external_sensor_and_preset_options_are_exposed() -> None:
+    flow_source = (COMPONENT / "config_flow.py").read_text()
+    climate_source = (COMPONENT / "climate.py").read_text()
+    assert "GreeACCloudOptionsFlow" in flow_source
+    assert "EntitySelectorConfig" in flow_source
+    assert "CONF_TEMPERATURE_SENSOR" in flow_source
+    assert "CONF_HUMIDITY_SENSOR" in flow_source
+    assert "PRESET_DAY" in flow_source
+    assert "ClimateEntityFeature.PRESET_MODE" in climate_source
+    assert "async_track_state_change_event" in climate_source
+    assert "async_set_preset_mode" in climate_source
+    assert "current_humidity" in climate_source
+
+
 def test_device_command_round_trip() -> None:
     module = _load_protocol_module()
     device = module.GreeDevice(

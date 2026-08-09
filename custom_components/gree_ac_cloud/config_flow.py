@@ -5,8 +5,29 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import selector
 
-from .const import CONF_SERVER, DOMAIN, GREE_CLOUD_SERVERS
+from .const import (
+    CONF_DEVICE,
+    CONF_DEVICES,
+    CONF_HUMIDITY_SENSOR,
+    CONF_PRESET_AUTO_OFF,
+    CONF_PRESET_DRED,
+    CONF_PRESET_ENABLED,
+    CONF_PRESET_HUMIDITY,
+    CONF_PRESET_MAX_TEMP,
+    CONF_PRESET_MIN_TEMP,
+    CONF_PRESET_TARGET,
+    CONF_PRESETS,
+    CONF_SERVER,
+    CONF_TEMPERATURE_SENSOR,
+    DOMAIN,
+    DRED_OPTIONS,
+    GREE_CLOUD_SERVERS,
+    PRESET_AWAY,
+    PRESET_DAY,
+    PRESET_NIGHT,
+)
 from .gree_api import api_login
 
 _LOGGER = logging.getLogger(__name__)
@@ -14,7 +35,11 @@ _LOGGER = logging.getLogger(__name__)
 
 class GreeACCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
-    MINOR_VERSION = 1
+    MINOR_VERSION = 2
+
+    @staticmethod
+    def async_get_options_flow(config_entry):
+        return GreeACCloudOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -65,3 +90,132 @@ class GreeACCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=data_schema,
             errors=errors,
         )
+
+
+class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
+    """Configure external room sensors and climate presets per device."""
+
+    def __init__(self):
+        self._device_mac: str | None = None
+
+    def _coordinators(self):
+        runtime = getattr(self.config_entry, "runtime_data", None) or {}
+        return runtime.get("coordinators", [])
+
+    async def async_step_init(self, user_input=None):
+        coordinators = self._coordinators()
+        if not coordinators:
+            return self.async_abort(reason="devices_not_ready")
+        choices = {
+            coordinator.device.mac: coordinator.device.name
+            for coordinator in coordinators
+        }
+        if user_input is not None:
+            self._device_mac = user_input[CONF_DEVICE]
+            return await self.async_step_sensors()
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_DEVICE): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[
+                                selector.SelectOptionDict(value=mac, label=name)
+                                for mac, name in choices.items()
+                            ],
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
+                    )
+                }
+            ),
+        )
+
+    def _device_options(self) -> dict:
+        return dict(
+            self.config_entry.options.get(CONF_DEVICES, {}).get(self._device_mac, {})
+        )
+
+    async def async_step_sensors(self, user_input=None):
+        current = self._device_options()
+        if user_input is not None:
+            current[CONF_TEMPERATURE_SENSOR] = user_input.get(CONF_TEMPERATURE_SENSOR)
+            current[CONF_HUMIDITY_SENSOR] = user_input.get(CONF_HUMIDITY_SENSOR)
+            self._working = current
+            return await self.async_step_day()
+        return self.async_show_form(
+            step_id="sensors",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_TEMPERATURE_SENSOR,
+                        description={"suggested_value": current.get(CONF_TEMPERATURE_SENSOR)},
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain="sensor", device_class="temperature"
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_HUMIDITY_SENSOR,
+                        description={"suggested_value": current.get(CONF_HUMIDITY_SENSOR)},
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain="sensor", device_class="humidity"
+                        )
+                    ),
+                }
+            ),
+        )
+
+    def _preset_schema(self, preset: str) -> vol.Schema:
+        defaults = self._working.get(CONF_PRESETS, {}).get(preset, {})
+        return vol.Schema(
+            {
+                vol.Required(
+                    CONF_PRESET_ENABLED, default=defaults.get(CONF_PRESET_ENABLED, False)
+                ): bool,
+                vol.Required(
+                    CONF_PRESET_TARGET,
+                    default=defaults.get(CONF_PRESET_TARGET, 26.0),
+                ): vol.All(vol.Coerce(float), vol.Range(min=16, max=30)),
+                vol.Optional(
+                    CONF_PRESET_AUTO_OFF,
+                    description={"suggested_value": defaults.get(CONF_PRESET_AUTO_OFF)},
+                ): vol.All(vol.Coerce(float), vol.Range(min=16, max=35)),
+                vol.Optional(
+                    CONF_PRESET_HUMIDITY,
+                    description={"suggested_value": defaults.get(CONF_PRESET_HUMIDITY)},
+                ): vol.All(vol.Coerce(float), vol.Range(min=0, max=100)),
+                vol.Optional(
+                    CONF_PRESET_MIN_TEMP,
+                    description={"suggested_value": defaults.get(CONF_PRESET_MIN_TEMP)},
+                ): vol.All(vol.Coerce(float), vol.Range(min=10, max=35)),
+                vol.Optional(
+                    CONF_PRESET_MAX_TEMP,
+                    description={"suggested_value": defaults.get(CONF_PRESET_MAX_TEMP)},
+                ): vol.All(vol.Coerce(float), vol.Range(min=10, max=35)),
+                vol.Required(
+                    CONF_PRESET_DRED,
+                    default=defaults.get(CONF_PRESET_DRED, "No action"),
+                ): vol.In(["No action", *DRED_OPTIONS.values()]),
+            }
+        )
+
+    async def _preset_step(self, preset: str, next_step: str | None, user_input):
+        if user_input is not None:
+            presets = self._working.setdefault(CONF_PRESETS, {})
+            presets[preset] = dict(user_input)
+            if next_step:
+                return await getattr(self, f"async_step_{next_step}")()
+            devices = dict(self.config_entry.options.get(CONF_DEVICES, {}))
+            devices[self._device_mac] = self._working
+            return self.async_create_entry(title="", data={CONF_DEVICES: devices})
+        return self.async_show_form(step_id=preset, data_schema=self._preset_schema(preset))
+
+    async def async_step_day(self, user_input=None):
+        return await self._preset_step(PRESET_DAY, PRESET_NIGHT, user_input)
+
+    async def async_step_night(self, user_input=None):
+        return await self._preset_step(PRESET_NIGHT, PRESET_AWAY, user_input)
+
+    async def async_step_away(self, user_input=None):
+        return await self._preset_step(PRESET_AWAY, None, user_input)

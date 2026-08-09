@@ -20,6 +20,63 @@
       "already_configured": "This account is already configured"
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Room control settings",
+        "description": "Choose the Gree unit to configure.",
+        "data": { "device": "Air conditioner" }
+      },
+      "sensors": {
+        "title": "External room sensors",
+        "description": "Optional Home Assistant sensors used as the climate entity's room temperature and humidity.",
+        "data": {
+          "temperature_sensor": "Temperature sensor",
+          "humidity_sensor": "Humidity sensor"
+        }
+      },
+      "day": {
+        "title": "Day preset",
+        "description": "Enable and configure the Day preset. Optional limits turn the unit off when reached.",
+        "data": {
+          "enabled": "Enabled",
+          "target_temperature": "Target temperature",
+          "auto_off_temperature": "Automatic switch-off temperature",
+          "humidity_threshold": "Humidity switch-off threshold",
+          "min_temperature": "Minimum room temperature",
+          "max_temperature": "Maximum room temperature",
+          "dred": "I-Demand level"
+        }
+      },
+      "night": {
+        "title": "Night preset",
+        "description": "Enable and configure the Night preset.",
+        "data": {
+          "enabled": "Enabled",
+          "target_temperature": "Target temperature",
+          "auto_off_temperature": "Automatic switch-off temperature",
+          "humidity_threshold": "Humidity switch-off threshold",
+          "min_temperature": "Minimum room temperature",
+          "max_temperature": "Maximum room temperature",
+          "dred": "I-Demand level"
+        }
+      },
+      "away": {
+        "title": "Away preset",
+        "description": "Enable and configure the Away preset.",
+        "data": {
+          "enabled": "Enabled",
+          "target_temperature": "Target temperature",
+          "auto_off_temperature": "Automatic switch-off temperature",
+          "humidity_threshold": "Humidity switch-off threshold",
+          "min_temperature": "Minimum room temperature",
+          "max_temperature": "Maximum room temperature",
+          "dred": "I-Demand level"
+        }
+      }
+    },
+    "abort": { "devices_not_ready": "The devices are not ready" }
+  },
   "entity": {
     "sensor": {
       "in_tem": { "name": "Indoor Unit Air Sensor (Raw/Unverified)" },
