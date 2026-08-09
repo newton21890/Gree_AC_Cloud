@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+
+### Protezione dello spegnimento al riavvio
+
+- Se Home Assistant ripristina un profilo automatico mentre l’unità è spenta, lo stato viene interpretato come override manuale Off e il regolatore non può riaccenderla.
+- Per riabilitare l’automazione è necessario selezionare esplicitamente un profilo, evitando riaccensioni inattese dopo aggiornamenti o riavvii.
+
 ## 0.5.0
 
 ### Profili disattivabili, override visivi, grafici e I-Demand Smart

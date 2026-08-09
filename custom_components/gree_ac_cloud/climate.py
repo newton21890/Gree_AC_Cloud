@@ -177,6 +177,11 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             restored_preset = PRESET_MANUAL
         if restored_preset in self.preset_modes:
             self._preset_mode = restored_preset
+        # An off unit restored with an automatic profile is treated as an
+        # explicit manual-off choice. This prevents startup from powering it on.
+        if self._preset_mode != PRESET_MANUAL and not self.coordinator.data.get("Pow"):
+            self._smart_manual_power = False
+            self._smart_last_action = "manual_off"
         self.async_on_remove(
             async_track_time_interval(self.hass, self._async_smart_interval, timedelta(minutes=2))
         )
