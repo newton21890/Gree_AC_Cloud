@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1
+
+### Override manuale dal controller a parete
+
+- Estesa la priorità manuale anche alle variazioni On/Off ricevute dal controller cablato, dall’app Gree o da altri client, non solo ai comandi Home Assistant.
+- Le variazioni originate internamente dal regolatore Smart vengono distinte dai comandi esterni per evitare falsi override.
+
 ## 0.4.0
 
 ### Ventilazione Smart e priorità manuale

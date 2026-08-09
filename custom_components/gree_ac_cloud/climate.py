@@ -96,6 +96,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         self._smart_holding = False
         self._smart_manual_power: bool | None = None
         self._smart_fan_speed: str | None = None
+        self._last_observed_power = bool(coordinator.data.get("Pow"))
 
     @property
     def _room_options(self) -> dict:
@@ -168,6 +169,17 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         )
         if self._preset_mode:
             self.hass.async_create_task(self._async_evaluate_smart_profile(force=True))
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Recognize power changes made from a wall controller or another client."""
+        power = bool(self.coordinator.data.get("Pow"))
+        if power != self._last_observed_power:
+            self._last_observed_power = power
+            if not self._preset_action_lock and self._smart_profile_enabled:
+                self._smart_manual_power = power
+                self._smart_last_action = "manual_on" if power else "manual_off"
+        super()._handle_coordinator_update()
 
     @callback
     def _async_external_sensor_changed(self, _event) -> None:
@@ -445,6 +457,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         return float(raw) if raw is not None else None
 
     def _sync_data(self):
+        self._last_observed_power = bool(self._device.properties.get("Pow"))
         self.coordinator.async_set_updated_data(dict(self._device.properties))
 
     async def async_set_temperature(self, **kwargs):
