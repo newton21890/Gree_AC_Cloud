@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.17
+
+### Nuovo pannello di controllo semplificato
+
+- Riorganizzata ogni unità in sezioni leggibili: riepilogo ambiente, accensione/modalità, profili, comfort, I-Demand e dettagli tecnici richiudibili.
+- Il riepilogo mostra subito temperatura e umidità medie HA, target, stato, temperatura esterna e profilo attivo.
+- Le sonde grezze e la diagnostica non occupano più la schermata principale e sono raccolte in `Dettagli tecnici`.
+- I profili abilitati compaiono come pulsanti Giorno, Notte e Assente direttamente nella scheda del condizionatore.
+- Il pulsante impostazioni è ora esplicito: `⚙ Configura`, e apre sensori e profili.
+- La navigazione principale è stata ridotta a Controllo, Manuale, Diagnostica e Sistema.
+
 ## 0.2.16
 
 ### Valori medi nel pannello e configurazione profili

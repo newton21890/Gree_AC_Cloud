@@ -145,9 +145,14 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "openSensorSettings" in panel_source
     assert "temperature_sensors" in panel_source
     assert 'state["RoomTemperature"]' in panel_source
-    assert "Media aria interna HA" in panel_source
+    assert "Temperatura ambiente${externalRoomTemp" in panel_source
     assert "Profili climate" in panel_source
     assert "Salva sensori e profili" in panel_source
+    assert "dashboard-summary" in panel_source
+    assert "Profili ambiente" in panel_source
+    assert "Dettagli tecnici e sonde diagnostiche" in panel_source
+    assert "⚙ Configura" in panel_source
+    assert "async function setPreset" in panel_source
 
 
 def test_device_command_round_trip() -> None:

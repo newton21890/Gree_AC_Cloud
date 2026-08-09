@@ -15,6 +15,7 @@ from datetime import datetime
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 
 from .const import (
@@ -277,6 +278,30 @@ class GreePanelDataView(HomeAssistantView):
                 state["RoomTemperatureSensors"] = temperature_ids
                 state["RoomHumiditySensors"] = humidity_ids
                 state["Presets"] = room.get(CONF_PRESETS, {})
+                outdoor_entity = entry.options.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
+                outdoor_state = hass.states.get(outdoor_entity) if outdoor_entity else None
+                try:
+                    state["OutdoorTemperature"] = (
+                        float(outdoor_state.state)
+                        if outdoor_state
+                        and outdoor_state.state not in ("unknown", "unavailable")
+                        else None
+                    )
+                except (TypeError, ValueError):
+                    state["OutdoorTemperature"] = None
+                registry = er.async_get(hass)
+                climate_entity_id = registry.async_get_entity_id(
+                    "climate", DOMAIN, f"climate_{device.mac}"
+                )
+                climate_state = (
+                    hass.states.get(climate_entity_id) if climate_entity_id else None
+                )
+                state["ClimateEntityId"] = climate_entity_id
+                state["ActivePreset"] = (
+                    climate_state.attributes.get("preset_mode")
+                    if climate_state
+                    else None
+                )
                 data.append({
                     "mac": device.mac,
                     "name": device.name,
@@ -1056,6 +1081,26 @@ body.desktop .header-row2 { padding-left: 0; }
 }
 .switch-btn:active { opacity: 0.7; }
 
+/* ── clearer control dashboard ── */
+.dashboard-summary {
+  display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px;
+  margin:12px 0;
+}
+.summary-tile {
+  background:rgba(255,255,255,.035); border:1px solid var(--border);
+  border-radius:12px; padding:12px; text-align:center;
+}
+.summary-tile .summary-value { font-size:22px; font-weight:650; color:var(--text); }
+.summary-tile .summary-label { font-size:10px; color:var(--text2); margin-top:3px; }
+.control-section { border-top:1px solid var(--border); padding:14px 0 2px; }
+.control-section:first-child { border-top:0; }
+.section-title { font-size:12px; text-transform:uppercase; letter-spacing:.7px; color:var(--text2); margin-bottom:10px; }
+.compact-details { border-top:1px solid var(--border); margin-top:12px; padding-top:10px; }
+.compact-details summary { cursor:pointer; color:var(--text2); font-size:12px; }
+.preset-quick { display:flex; gap:6px; flex-wrap:wrap; }
+.state-line { font-size:11px; color:var(--text2); margin-top:7px; }
+@media (max-width: 520px) { .dashboard-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
 /* ── setup message ───────────────────────────── */
 .setup-msg {
   text-align: center;
@@ -1183,17 +1228,17 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
         <option value="60">60s</option>
       </select>
     </label>
-    <button class="refresh-btn" onclick="openSensorSettings()" title="Associa sensori ambiente HA">⚙</button>
+    <button class="refresh-btn" onclick="openSensorSettings()" title="Configura sensori ambiente e profili">⚙ Configura</button>
     <button class="refresh-btn" onclick="refreshNow()" title="Aggiorna ora">↻</button>
   </div>
   <nav class="tab-nav">
-    <button class="tab-btn active" data-tab="devices" onclick="switchTab('devices')">Devices</button>
-    <button class="tab-btn" data-tab="wiki" onclick="switchTab('wiki')">Wiki</button>
-    <button class="tab-btn" data-tab="umatch" onclick="switchTab('umatch')">U-Match</button>
-    <button class="tab-btn" data-tab="logs" onclick="switchTab('logs')">Logs</button>
-    <button class="tab-btn" data-tab="readme" onclick="switchTab('readme')">README</button>
-    <button class="tab-btn" data-tab="changelog" onclick="switchTab('changelog')">Changelog</button>
-    <button class="tab-btn" data-tab="info" onclick="switchTab('info')">🔧 Info</button>
+    <button class="tab-btn active" data-tab="devices" onclick="switchTab('devices')">Controllo</button>
+    <button class="tab-btn" data-tab="wiki" onclick="switchTab('wiki')">Manuale</button>
+    <button class="tab-btn" data-tab="logs" onclick="switchTab('logs')">Diagnostica</button>
+    <button class="tab-btn" data-tab="info" onclick="switchTab('info')">Sistema</button>
+    <button class="tab-btn" data-tab="umatch" onclick="switchTab('umatch')" style="display:none;">U-Match</button>
+    <button class="tab-btn" data-tab="readme" onclick="switchTab('readme')" style="display:none;">README</button>
+    <button class="tab-btn" data-tab="changelog" onclick="switchTab('changelog')" style="display:none;">Changelog</button>
   </nav>
 </div>
 
@@ -1966,6 +2011,10 @@ function renderDevice(d) {
     'Media-Alta: ventilazione sostenuta',
     'Alta: massima potenza ventilazione'
   ];
+  const modeName = modeLabels[Number(mod)] || 'Sconosciuta';
+  const activePreset = s.ActivePreset || null;
+  const enabledPresets = Object.entries(s.Presets || {}).filter(([,p]) => p && p.enabled);
+
   const switchTips = {
     Health: 'Health: ionizzatore / purificazione aria',
     Quiet: 'Quiet: modalità silenziosa, riduce rumore ventola',
@@ -2004,18 +2053,26 @@ function renderDevice(d) {
     </div>
   </div>
 
-  <div class="sensors">
-    <div class="sensor" title="${externalRoomTemp != null ? `Media di ${s.RoomTemperatureSensors?.length || 0} sensori HA selezionati` : roomTemp != null ? 'Fallback TemSen: sensore aria dell’unità interna, codifica +40.' : 'Nessun sensore ambiente disponibile.'}">
-      <div class="value ${pow ? 'green' : ''}">${roomTemp != null ? roomTemp.toFixed(1) : '--'}°</div>
-      <div class="label">${externalRoomTemp != null ? 'Media aria interna HA' : 'Aria interna verificata'}</div>
+  <div class="dashboard-summary">
+    <div class="summary-tile" title="${externalRoomTemp != null ? `Media di ${s.RoomTemperatureSensors?.length || 0} sensori HA selezionati` : 'Fallback sensore unità'}">
+      <div class="summary-value">${roomTemp != null ? roomTemp.toFixed(1) : '--'}°</div>
+      <div class="summary-label">Temperatura ambiente${externalRoomTemp != null ? ' · media HA' : ''}</div>
     </div>
-    <div class="sensor" title="InTem=${escHtml(String(inTem))}, OutTem=${escHtml(String(outTem))}. Le sonde fisiche non sono identificate dai manuali: non sono temperatura stanza/meteo.">
-      <div class="value">${probeIn != null ? probeIn.toFixed(1) : '--'}° / ${probeOut != null ? probeOut.toFixed(1) : '--'}°</div>
-      <div class="label">Sonde diagnostiche</div>
+    <div class="summary-tile" title="Media dei sensori umidità HA selezionati">
+      <div class="summary-value">${inHumi != null ? Number(inHumi).toFixed(1) + '%' : '--'}</div>
+      <div class="summary-label">Umidità ambiente</div>
     </div>
-    <div class="sensor">
-      <div class="value">${inHumi != null ? inHumi + '%' : '--'}</div>
-      <div class="label">Umidità</div>
+    <div class="summary-tile">
+      <div class="summary-value">${tem}°</div><div class="summary-label">Temperatura obiettivo</div>
+    </div>
+    <div class="summary-tile">
+      <div class="summary-value">${pow ? modeName : 'Spento'}</div><div class="summary-label">Stato e modalità</div>
+    </div>
+    <div class="summary-tile">
+      <div class="summary-value">${s.OutdoorTemperature != null ? Number(s.OutdoorTemperature).toFixed(1) + '°' : '--'}</div><div class="summary-label">Temperatura esterna HA</div>
+    </div>
+    <div class="summary-tile">
+      <div class="summary-value">${activePreset ? ({day:'Giorno',night:'Notte',away:'Assente'}[activePreset] || activePreset) : 'Manuale'}</div><div class="summary-label">Profilo attivo</div>
     </div>
   </div>
 
@@ -2026,8 +2083,9 @@ function renderDevice(d) {
   </div>` : ''}
 
   <div class="controls">
+    <section class="control-section"><div class="section-title">Accensione e modalità</div>
     <div class="control-row">
-      <label>Power</label>
+      <label>Accensione</label>
       <div class="btn-group">
         <button class="btn ${!pow ? 'danger active' : ''}" onclick="setPower('${safeMac}',0)" title="Spegne il condizionatore">Off</button>
         <button class="btn ${pow ? 'active' : ''}" onclick="setPower('${safeMac}',1)" title="Accende il condizionatore">On</button>
@@ -2035,14 +2093,21 @@ function renderDevice(d) {
     </div>
 
     <div class="control-row">
-      <label>Mode</label>
+      <label>Modalità</label>
       <div class="btn-group">
         ${[0,1,2,3,4].map(i => `<button class="btn mode-${modeCls[i]} ${mod === i && pow ? 'active' : ''}" onclick="setMode('${safeMac}',${i})" title="${modeTips[i]}">${modeLabels[i]}</button>`).join('')}
       </div>
     </div>
 
+    </section>
+
+    ${enabledPresets.length ? `<section class="control-section"><div class="section-title">Profili ambiente</div><div class="preset-quick">
+      ${enabledPresets.map(([name]) => `<button class="btn ${activePreset === name ? 'active' : ''}" onclick="setPreset('${safeMac}','${name}')">${{day:'Giorno',night:'Notte',away:'Assente'}[name] || name}</button>`).join('')}
+    </div><div class="state-line">I profili applicano target, soglie e I-Demand configurati con ⚙.</div></section>` : `<section class="control-section"><div class="section-title">Profili ambiente</div><div class="state-line">Nessun profilo abilitato. Configurali dal pulsante ⚙ in alto.</div></section>`}
+
+    <section class="control-section"><div class="section-title">Comfort</div>
     <div class="control-row">
-      <label>Temp</label>
+      <label>Temperatura</label>
       <div class="temp-control">
         <button onclick="setTemp('${safeMac}',-0.5)" title="Abbassa la temperatura di 0.5°C">−</button>
         <span class="temp-value">${tem}°</span>
@@ -2078,8 +2143,10 @@ function renderDevice(d) {
       </div>
     </div>
 
-    ${s.DREDEn === 1 && s.DRED !== undefined ? `<div class="control-row">
-      <label>I-Demand / DRED</label>
+    </section>
+
+    ${s.DREDEn === 1 && s.DRED !== undefined ? `<section class="control-section"><div class="section-title">Limite potenza I-Demand</div><div class="control-row">
+      <label>Adesso</label>
       <div class="btn-group">
         ${[['Off',0],['D1',1],['D2',2],['D3',3]].map(([label,value]) =>
           `<button class="btn ${effectiveDred === value ? 'active' : ''}" onclick="setDred('${safeMac}',${value})" title="${value === 0 ? 'Nessun livello DRED' : value === 1 ? 'D1: compressore disabilitato; la ventola interna può continuare' : value === 2 ? 'D2: domanda elettrica limitata a non oltre il 50%' : 'D3: domanda elettrica limitata a non oltre il 75%'}">${label}</button>`
@@ -2094,11 +2161,13 @@ function renderDevice(d) {
         ).join('')}
       </div>
       <span style="color:var(--text-secondary);font-size:11px;">Preferenza persistente: si applica dopo l’accensione in Cool da HA o dal monitor a muro.</span>
-    </div>` : ''}
+    </div></section>` : ''}
 
+    <details class="compact-details"><summary>Dettagli tecnici e sonde diagnostiche</summary>
+      <div class="state-line">Sonde grezze IDU/ODU: ${probeIn != null ? probeIn.toFixed(1) : '--'}° / ${probeOut != null ? probeOut.toFixed(1) : '--'}° · Sensori HA temperatura: ${s.RoomTemperatureSensors?.length || 0} · umidità: ${s.RoomHumiditySensors?.length || 0}</div>
     ${['Errcode','ErrType','RefLeak','MSysStatus','CleanState','CleanTime','FClTime','CleanDataFlag']
       .some(k => s[k] !== undefined && s[k] !== null) ? `<div class="control-row">
-      <label>Diagnostica</label>
+      <label>Stati</label>
       <div class="switches">
         ${[
           ['Errcode','Errore'], ['ErrType','Tipo'], ['RefLeak','Refrigerante'],
@@ -2109,6 +2178,7 @@ function renderDevice(d) {
           .map(([k,l]) => `<span class="switch-btn" title="${k}">${l}: ${escHtml(Array.isArray(s[k]) ? s[k].join(', ') : String(s[k]))}</span>`).join('')}
       </div>
     </div>` : ''}
+    </details>
   </div>
 </div>`;
 }
@@ -2141,6 +2211,23 @@ async function loadData() {
     console.error('Load failed:', e);
     document.getElementById('statusBadge').textContent = 'error';
     document.getElementById('statusBadge').style.background = 'var(--red)';
+  }
+}
+
+async function setPreset(mac, preset) {
+  try {
+    const devices = await apiFetch(PANEL_DATA_URL);
+    const device = devices.find(d => d.mac === mac);
+    const entityId = device && device.state && device.state.ClimateEntityId;
+    if (!entityId) throw new Error('Entità climate non trovata');
+    await apiFetch(HA_BASE + '/api/services/climate/set_preset_mode', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ entity_id: entityId, preset_mode: preset }),
+    });
+    setTimeout(loadData, 1000);
+  } catch (e) {
+    console.error('Preset failed:', e);
   }
 }
 
