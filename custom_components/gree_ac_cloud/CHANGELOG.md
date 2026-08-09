@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.16
+
+### Valori medi nel pannello e configurazione profili
+
+- Il pannello ora mostra in `Media aria interna HA` la media reale dei sensori temperatura selezionati per ciascuna unità e usa la media dei sensori umidità selezionati.
+- Il tooltip indica quanti sensori HA contribuiscono alla media; i valori non disponibili vengono esclusi.
+- Nella finestra ⚙ Sensori ambiente sono ora configurabili anche i profili Giorno, Notte e Assente.
+- Ogni profilo espone abilitazione, target, spegnimento automatico, limiti min/max, soglia umidità e I-Demand.
+- Il salvataggio unico aggiorna sensori e profili e ricarica automaticamente l'integrazione.
+
 ## 0.2.15
 
 ### Selezione sensori nel pannello e medie ambiente

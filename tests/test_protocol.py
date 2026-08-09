@@ -144,6 +144,10 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "GreePanelRoomSensorsView" in panel_source
     assert "openSensorSettings" in panel_source
     assert "temperature_sensors" in panel_source
+    assert 'state["RoomTemperature"]' in panel_source
+    assert "Media aria interna HA" in panel_source
+    assert "Profili climate" in panel_source
+    assert "Salva sensori e profili" in panel_source
 
 
 def test_device_command_round_trip() -> None:

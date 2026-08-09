@@ -23,6 +23,14 @@ from .const import (
     CONF_HUMIDITY_SENSOR,
     CONF_HUMIDITY_SENSORS,
     CONF_OUTDOOR_TEMPERATURE_SENSOR,
+    CONF_PRESET_AUTO_OFF,
+    CONF_PRESET_DRED,
+    CONF_PRESET_ENABLED,
+    CONF_PRESET_HUMIDITY,
+    CONF_PRESET_MAX_TEMP,
+    CONF_PRESET_MIN_TEMP,
+    CONF_PRESET_TARGET,
+    CONF_PRESETS,
     CONF_TEMPERATURE_SENSOR,
     CONF_TEMPERATURE_SENSORS,
     DOMAIN,
@@ -237,6 +245,38 @@ class GreePanelDataView(HomeAssistantView):
                 )
                 state["IdemandActive"] = idemand_active
                 state["StartupDRED"] = coord.startup_dred
+                room = entry.options.get(CONF_DEVICES, {}).get(device.mac, {})
+
+                def _average(entity_ids):
+                    values = []
+                    for entity_id in entity_ids:
+                        sensor_state = hass.states.get(entity_id)
+                        if sensor_state is None or sensor_state.state in (
+                            "unknown",
+                            "unavailable",
+                        ):
+                            continue
+                        try:
+                            values.append(float(sensor_state.state))
+                        except (TypeError, ValueError):
+                            continue
+                    return round(sum(values) / len(values), 2) if values else None
+
+                temperature_ids = room.get(CONF_TEMPERATURE_SENSORS) or (
+                    [room[CONF_TEMPERATURE_SENSOR]]
+                    if room.get(CONF_TEMPERATURE_SENSOR)
+                    else []
+                )
+                humidity_ids = room.get(CONF_HUMIDITY_SENSORS) or (
+                    [room[CONF_HUMIDITY_SENSOR]]
+                    if room.get(CONF_HUMIDITY_SENSOR)
+                    else []
+                )
+                state["RoomTemperature"] = _average(temperature_ids)
+                state["RoomHumidity"] = _average(humidity_ids)
+                state["RoomTemperatureSensors"] = temperature_ids
+                state["RoomHumiditySensors"] = humidity_ids
+                state["Presets"] = room.get(CONF_PRESETS, {})
                 data.append({
                     "mac": device.mac,
                     "name": device.name,
@@ -291,6 +331,7 @@ class GreePanelRoomSensorsView(HomeAssistantView):
                         "humidity_sensors": room.get(CONF_HUMIDITY_SENSORS)
                         or ([room[CONF_HUMIDITY_SENSOR]] if room.get(CONF_HUMIDITY_SENSOR) else []),
                         "outdoor_temperature_sensor": outdoor,
+                        "presets": room.get(CONF_PRESETS, {}),
                     }
                 )
         return self.json({"devices": devices, "sensors": sensors})
@@ -308,6 +349,7 @@ class GreePanelRoomSensorsView(HomeAssistantView):
         temperatures = body.get("temperature_sensors", [])
         humidities = body.get("humidity_sensors", [])
         outdoor = body.get("outdoor_temperature_sensor") or None
+        presets = body.get("presets")
         if not entry_id or not _valid_mac(mac):
             return self.json({"error": "invalid device"}, status=400)
         if not isinstance(temperatures, list) or not isinstance(humidities, list):
@@ -328,6 +370,29 @@ class GreePanelRoomSensorsView(HomeAssistantView):
         room = dict(devices.get(mac, {}))
         room[CONF_TEMPERATURE_SENSORS] = temperatures
         room[CONF_HUMIDITY_SENSORS] = humidities
+        if presets is not None:
+            if not isinstance(presets, dict):
+                return self.json({"error": "invalid presets"}, status=400)
+            clean_presets = {}
+            for name in ("day", "night", "away"):
+                preset = presets.get(name, {})
+                if not isinstance(preset, dict):
+                    return self.json({"error": "invalid preset"}, status=400)
+                clean_presets[name] = {
+                    CONF_PRESET_ENABLED: bool(preset.get(CONF_PRESET_ENABLED)),
+                    CONF_PRESET_TARGET: float(preset.get(CONF_PRESET_TARGET, 26)),
+                    CONF_PRESET_DRED: preset.get(CONF_PRESET_DRED, "No action"),
+                }
+                for key in (
+                    CONF_PRESET_AUTO_OFF,
+                    CONF_PRESET_HUMIDITY,
+                    CONF_PRESET_MIN_TEMP,
+                    CONF_PRESET_MAX_TEMP,
+                ):
+                    value = preset.get(key)
+                    if value not in (None, ""):
+                        clean_presets[name][key] = float(value)
+            room[CONF_PRESETS] = clean_presets
         room.pop(CONF_TEMPERATURE_SENSOR, None)
         room.pop(CONF_HUMIDITY_SENSOR, None)
         devices[mac] = room
@@ -1629,7 +1694,7 @@ async function apiFetch(url, opts = {}) {
   return resp.json();
 }
 
-function sensorOptions(sensors, selected, multiple = false) {
+function sensorOptions(sensors, selected) {
   const chosen = new Set(selected || []);
   return sensors.map(s => `<option value="${escHtml(s.entity_id)}" ${chosen.has(s.entity_id) ? 'selected' : ''}>${escHtml(s.name)} — ${escHtml(s.state)} ${escHtml(s.unit || '')}</option>`).join('');
 }
@@ -1646,12 +1711,29 @@ async function openSensorSettings() {
     const outdoor = data.devices.find(d => d.outdoor_temperature_sensor)?.outdoor_temperature_sensor || '';
     let html = `<div class="control-row"><label>Sensore temperatura esterna comune</label><select id="outdoorSensor"><option value="">Nessuno</option>${sensorOptions(temperatures, [outdoor])}</select></div>`;
     for (const d of data.devices) {
+      const presets = d.presets || {};
+      const presetHtml = ['day','night','away'].map(name => {
+        const p = presets[name] || {};
+        const label = {day:'Giorno',night:'Notte',away:'Assente'}[name];
+        const field = (key, value, placeholder) => `<input id="${key}-${name}-${escHtml(d.mac)}" type="number" step="0.5" value="${value ?? ''}" placeholder="${placeholder}" style="width:105px;">`;
+        return `<div class="control-row" style="align-items:center;"><label>${label}</label>
+          <input id="enabled-${name}-${escHtml(d.mac)}" type="checkbox" ${p.enabled ? 'checked' : ''}> Abilita
+          ${field('target', p.target_temperature ?? 26, 'Target °C')}
+          ${field('off', p.auto_off_temperature, 'Off °C')}
+          ${field('min', p.min_temperature, 'Min °C')}
+          ${field('max', p.max_temperature, 'Max °C')}
+          ${field('humidity', p.humidity_threshold, 'UR %')}
+          <select id="dred-${name}-${escHtml(d.mac)}">${['No action','Off','D1','D2','D3'].map(v => `<option ${p.dred === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        </div>`;
+      }).join('');
       html += `<div class="wiki" style="margin-top:14px;"><h3>${escHtml(d.name)} <code>${escHtml(d.mac)}</code></h3>
         <label>Temperatura interna — selezione multipla, viene calcolata la media</label>
         <select id="temp-${escHtml(d.mac)}" multiple size="6" style="width:100%;margin:6px 0 12px;">${sensorOptions(temperatures, d.temperature_sensors)}</select>
         <label>Umidità interna — selezione multipla, viene calcolata la media</label>
         <select id="hum-${escHtml(d.mac)}" multiple size="5" style="width:100%;margin:6px 0 12px;">${sensorOptions(humidities, d.humidity_sensors)}</select>
-        <button class="btn active" onclick="saveRoomSensors('${escHtml(d.entry_id)}','${escHtml(d.mac)}')">Salva sensori di questa unità</button>
+        <h4>Profili climate</h4><p style="font-size:11px;color:var(--text-secondary);">Target, spegnimento automatico, limiti min/max, soglia umidità e I-Demand. Lascia vuote le soglie non desiderate.</p>
+        ${presetHtml}
+        <button class="btn active" onclick="saveRoomSensors('${escHtml(d.entry_id)}','${escHtml(d.mac)}')">Salva sensori e profili</button>
         <span id="sensor-status-${escHtml(d.mac)}" style="margin-left:8px;font-size:11px;"></span></div>`;
     }
     content.innerHTML = html;
@@ -1669,6 +1751,22 @@ async function saveRoomSensors(entryId, mac) {
   const status = document.getElementById(`sensor-status-${mac}`);
   status.textContent = 'Salvataggio…';
   try {
+    const num = (id) => {
+      const value = document.getElementById(id).value;
+      return value === '' ? null : Number(value);
+    };
+    const presets = {};
+    for (const name of ['day','night','away']) {
+      presets[name] = {
+        enabled: document.getElementById(`enabled-${name}-${mac}`).checked,
+        target_temperature: num(`target-${name}-${mac}`),
+        auto_off_temperature: num(`off-${name}-${mac}`),
+        min_temperature: num(`min-${name}-${mac}`),
+        max_temperature: num(`max-${name}-${mac}`),
+        humidity_threshold: num(`humidity-${name}-${mac}`),
+        dred: document.getElementById(`dred-${name}-${mac}`).value,
+      };
+    }
     await apiFetch(PANEL_ROOM_SENSORS_URL, {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
@@ -1678,6 +1776,7 @@ async function saveRoomSensors(entryId, mac) {
         outdoor_temperature_sensor: document.getElementById('outdoorSensor').value || null,
         temperature_sensors: selected(`temp-${mac}`),
         humidity_sensors: selected(`hum-${mac}`),
+        presets,
       }),
     });
     status.textContent = 'Salvato. L’integrazione si ricarica…';
@@ -1813,10 +1912,13 @@ function renderDevice(d) {
   const inTem = s.InTem;
   const outTem = s.OutTem;
   const measuredAir = s.TemSen;
-  const roomTemp = measuredAir != null ? Number(measuredAir) - 40 : null;
+  const externalRoomTemp = s.RoomTemperature;
+  const roomTemp = externalRoomTemp != null
+    ? Number(externalRoomTemp)
+    : (measuredAir != null ? Number(measuredAir) - 40 : null);
   const probeIn = inTem != null ? Number(parseTemp(inTem)) : null;
   const probeOut = outTem != null ? Number(parseTemp(outTem)) : null;
-  const inHumi = s.InHumi;
+  const inHumi = s.RoomHumidity != null ? Number(s.RoomHumidity) : s.InHumi;
   const fan = s.WdSpd;
   const swingV = s.SwUpDn;
   const swingH = s.SwingLfRig;
@@ -1903,9 +2005,9 @@ function renderDevice(d) {
   </div>
 
   <div class="sensors">
-    <div class="sensor" title="${roomTemp != null ? 'TemSen: sensore aria dell’unità interna, codifica +40.' : 'TemSen non fornito: non è disponibile una temperatura ambiente verificata.'}">
+    <div class="sensor" title="${externalRoomTemp != null ? `Media di ${s.RoomTemperatureSensors?.length || 0} sensori HA selezionati` : roomTemp != null ? 'Fallback TemSen: sensore aria dell’unità interna, codifica +40.' : 'Nessun sensore ambiente disponibile.'}">
       <div class="value ${pow ? 'green' : ''}">${roomTemp != null ? roomTemp.toFixed(1) : '--'}°</div>
-      <div class="label">Aria interna verificata</div>
+      <div class="label">${externalRoomTemp != null ? 'Media aria interna HA' : 'Aria interna verificata'}</div>
     </div>
     <div class="sensor" title="InTem=${escHtml(String(inTem))}, OutTem=${escHtml(String(outTem))}. Le sonde fisiche non sono identificate dai manuali: non sono temperatura stanza/meteo.">
       <div class="value">${probeIn != null ? probeIn.toFixed(1) : '--'}° / ${probeOut != null ? probeOut.toFixed(1) : '--'}°</div>
