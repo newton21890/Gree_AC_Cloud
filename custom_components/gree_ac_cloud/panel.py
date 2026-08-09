@@ -24,12 +24,18 @@ from .const import (
     CONF_HUMIDITY_SENSOR,
     CONF_HUMIDITY_SENSORS,
     CONF_OUTDOOR_TEMPERATURE_SENSOR,
+    CONF_PRESET_ADAPTIVE,
     CONF_PRESET_AUTO_OFF,
+    CONF_PRESET_DEADBAND,
     CONF_PRESET_DRED,
     CONF_PRESET_ENABLED,
+    CONF_PRESET_FAN,
     CONF_PRESET_HUMIDITY,
     CONF_PRESET_MAX_TEMP,
     CONF_PRESET_MIN_TEMP,
+    CONF_PRESET_MODE,
+    CONF_PRESET_QUIET,
+    CONF_PRESET_SMART,
     CONF_PRESET_TARGET,
     CONF_PRESETS,
     CONF_TEMPERATURE_SENSOR,
@@ -407,12 +413,18 @@ class GreePanelRoomSensorsView(HomeAssistantView):
                     CONF_PRESET_ENABLED: bool(preset.get(CONF_PRESET_ENABLED)),
                     CONF_PRESET_TARGET: float(preset.get(CONF_PRESET_TARGET, 26)),
                     CONF_PRESET_DRED: preset.get(CONF_PRESET_DRED, "No action"),
+                    CONF_PRESET_SMART: bool(preset.get(CONF_PRESET_SMART, True)),
+                    CONF_PRESET_MODE: preset.get(CONF_PRESET_MODE, "auto"),
+                    CONF_PRESET_ADAPTIVE: bool(preset.get(CONF_PRESET_ADAPTIVE, True)),
+                    CONF_PRESET_FAN: preset.get(CONF_PRESET_FAN, "Auto"),
+                    CONF_PRESET_QUIET: bool(preset.get(CONF_PRESET_QUIET, False)),
                 }
                 for key in (
                     CONF_PRESET_AUTO_OFF,
                     CONF_PRESET_HUMIDITY,
                     CONF_PRESET_MIN_TEMP,
                     CONF_PRESET_MAX_TEMP,
+                    CONF_PRESET_DEADBAND,
                 ):
                     value = preset.get(key)
                     if value not in (None, ""):
@@ -1318,7 +1330,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .config-common label,.config-field label { color:var(--text2); font-size:10px; font-weight:700; letter-spacing:.035em; text-transform:uppercase; }
 .config-select,.config-input { width:100%; min-height:38px; padding:7px 10px; border:1px solid var(--border); border-radius:8px; background:#151d29; color:var(--text); font:inherit; font-size:11px; }
 .config-select[multiple] { min-height:118px; padding:5px; }
-.config-select option { padding:5px 7px; }
+.config-select option { padding:5px 7px; background:#f8fafc; color:#111827; }
+.card-header select option,.interval-label select option { background:#f8fafc; color:#111827; }
 .config-device { margin-top:14px; overflow:hidden; border:1px solid var(--border); border-radius:12px; background:#111722; }
 .config-device-head { display:flex; align-items:center; justify-content:space-between; gap:15px; padding:13px 15px; border-bottom:1px solid var(--border); background:#121a25; }
 .config-device-head h3 { margin:0; font-size:13px; }
@@ -1329,7 +1342,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .config-help { color:var(--text2); font-size:9px; }
 .config-section-title { margin:18px 0 9px; color:#b9c8da; font-size:9px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
 .preset-table { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
-.preset-head,.preset-row { display:grid; grid-template-columns:105px 62px repeat(5,minmax(82px,1fr)) 92px; gap:1px; min-width:780px; align-items:center; }
+.preset-head,.preset-row { display:grid; grid-template-columns:100px 55px 65px 92px 70px 75px 75px 82px 88px 86px 60px; gap:1px; min-width:900px; align-items:center; }
 .preset-head { color:#718097; background:#0d131c; font-size:8px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
 .preset-head span { padding:9px 8px; }
 .preset-row { border-top:1px solid var(--border); background:#121923; }
@@ -1973,19 +1986,27 @@ async function openSensorSettings() {
         const p = presets[name] || {};
         const label = {day:'Giorno',night:'Notte',away:'Assente'}[name];
         const field = (key, value, title, min, max) => `<input class="config-input" id="${key}-${name}-${safeMac}" aria-label="${title} ${label}" title="${title}" type="number" step="0.5" min="${min}" max="${max}" value="${value ?? ''}" placeholder="—">`;
+        const smartMode = p.smart_mode || 'auto';
+        const fanMode = p.fan_speed || 'Auto';
         return `<div class="preset-row"><div class="preset-name">${label}</div><div class="preset-enable"><input id="enabled-${name}-${safeMac}" aria-label="Abilita profilo ${label}" type="checkbox" ${p.enabled ? 'checked' : ''}></div>
-          ${field('target', p.target_temperature ?? 26, 'Target °C', 16, 30)}
-          ${field('off', p.auto_off_temperature, 'Spegnimento °C', 16, 35)}
+          <div class="preset-enable" title="Regolazione automatica continua"><input id="smart-${name}-${safeMac}" aria-label="Profilo smart ${label}" type="checkbox" ${p.smart_enabled !== false ? 'checked' : ''}></div>
+          <select class="config-select" id="mode-${name}-${safeMac}" aria-label="Strategia ${label}">${[['auto','Auto'],['cool','Freddo'],['heat','Caldo'],['dry','Deumidifica']].map(([v,l]) => `<option value="${v}" ${smartMode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+          ${field('target', p.target_temperature ?? 26, 'Comfort °C', 16, 30)}
+          ${field('deadband', p.deadband ?? 0.5, 'Isteresi °C', 0.2, 2)}
           ${field('min', p.min_temperature, 'Soglia minima °C', 10, 30)}
           ${field('max', p.max_temperature, 'Soglia massima °C', 16, 35)}
           ${field('humidity', p.humidity_threshold, 'Umidità massima %', 0, 100)}
-          <select class="config-select" id="dred-${name}-${safeMac}" aria-label="I-Demand profilo ${label}">${['No action','Off','D1','D2','D3'].map(value => `<option ${p.dred === value ? 'selected' : ''}>${value === 'No action' ? 'Invariato' : value}</option>`).join('')}</select>
+          <select class="config-select" id="fan-${name}-${safeMac}" aria-label="Ventola profilo ${label}">${['Auto','Low','Med-Low','Medium','Med-High','High'].map(value => `<option ${fanMode === value ? 'selected' : ''}>${value}</option>`).join('')}</select>
+          <div class="preset-enable" title="Compensazione con temperatura esterna"><input id="adaptive-${name}-${safeMac}" aria-label="Adattivo esterno ${label}" type="checkbox" ${p.outdoor_compensation !== false ? 'checked' : ''}></div>
+          <input id="off-${name}-${safeMac}" type="hidden" value="">
+          <input id="dred-${name}-${safeMac}" type="hidden" value="${escHtml(p.dred || 'No action')}">
+          <input id="quiet-${name}-${safeMac}" type="hidden" value="${name === 'night' ? '1' : '0'}">
         </div>`;
       }).join('');
       html += `<section class="config-device" data-entry-id="${escHtml(d.entry_id)}" data-config-mac="${safeMac}"><header class="config-device-head"><h3>${escHtml(d.name)}</h3><code>${safeMac}</code></header><div class="config-device-body">
         <div class="config-sensor-grid"><div class="config-field"><label for="temp-${safeMac}">Temperatura ambiente</label><select class="config-select" id="temp-${safeMac}" multiple size="5">${sensorOptions(temperatures, d.temperature_sensors)}</select><span class="config-help">⌘/Ctrl + clic per selezionare più sensori.</span></div>
         <div class="config-field"><label for="hum-${safeMac}">Umidità ambiente</label><select class="config-select" id="hum-${safeMac}" multiple size="5">${sensorOptions(humidities, d.humidity_sensors)}</select><span class="config-help">I valori validi vengono mediati automaticamente.</span></div></div>
-        <div class="config-section-title">Profili automatici</div><div class="preset-table"><div class="preset-head"><span>Profilo</span><span>Attivo</span><span>Target</span><span>Off</span><span>Min</span><span>Max</span><span>Umidità</span><span>I-Demand</span></div>${presetHtml}</div>
+        <div class="config-section-title">Profili automatici</div><div class="preset-table"><div class="preset-head"><span>Profilo</span><span>On</span><span>Smart</span><span>Strategia</span><span>Comfort</span><span>Isteresi</span><span>Min</span><span>Max</span><span>Umidità</span><span>Ventola</span><span>Esterno</span></div>${presetHtml}</div>
         <span id="sensor-status-${safeMac}" class="config-help"></span></div></section>`;
     }
     content.classList.remove('config-loading');
@@ -2036,11 +2057,17 @@ async function saveRoomSensors(entryId, mac, closeAfter = false) {
     for (const name of ['day','night','away']) {
       presets[name] = {
         enabled: document.getElementById(`enabled-${name}-${mac}`).checked,
-        target_temperature: num(`target-${name}-${mac}`),
+        smart_enabled: document.getElementById(`smart-${name}-${mac}`).checked,
+        smart_mode: document.getElementById(`mode-${name}-${mac}`).value,
+        target_temperature: num(`target-${name}-${mac}`) ?? 26,
+        deadband: num(`deadband-${name}-${mac}`) ?? 0.5,
         auto_off_temperature: num(`off-${name}-${mac}`),
         min_temperature: num(`min-${name}-${mac}`),
         max_temperature: num(`max-${name}-${mac}`),
         humidity_threshold: num(`humidity-${name}-${mac}`),
+        outdoor_compensation: document.getElementById(`adaptive-${name}-${mac}`).checked,
+        fan_speed: document.getElementById(`fan-${name}-${mac}`).value,
+        quiet: document.getElementById(`quiet-${name}-${mac}`).value === '1',
         dred: document.getElementById(`dred-${name}-${mac}`).value,
       };
     }

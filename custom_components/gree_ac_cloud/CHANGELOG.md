@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0
+
+### Profili climatici Smart
+
+- I profili Giorno, Notte e Assente diventano regolatori attivi: leggono continuamente le medie dei sensori ambiente e decidono se raffrescare, riscaldare, deumidificare o spegnere.
+- Aggiunte strategia Auto/Freddo/Caldo/Deumidifica, isteresi configurabile e intervallo minimo di 3 minuti tra i comandi per evitare cicli rapidi.
+- Le soglie minima e massima diventano limiti di sicurezza: sotto la minima viene richiesto calore, sopra la massima raffrescamento.
+- La soglia umidità attiva Dry quando necessario invece di spegnere erroneamente l’unità.
+- La compensazione esterna modifica dolcemente il target durante caldo o freddo estremi, riducendo shock termico e domanda del compressore.
+- Ogni profilo può configurare ventola e modalità silenziosa; il profilo Notte propone Quiet come impostazione predefinita.
+- Il profilo attivo viene ripristinato dopo il riavvio di Home Assistant e rivalutato ogni due minuti e a ogni variazione dei sensori.
+- Esposti sull’entità climate target smart effettivo e ultima decisione del regolatore per consentire diagnosi e automazioni.
+- Corretta anche la leggibilità delle opzioni native nelle select su sfondo scuro.
+
 ## 0.2.21
 
 ### Correzioni pannello e nuova configurazione

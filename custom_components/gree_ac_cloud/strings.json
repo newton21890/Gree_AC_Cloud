@@ -25,12 +25,16 @@
       "init": {
         "title": "Outdoor sensor",
         "description": "Choose one optional outdoor temperature sensor shared by the whole system.",
-        "data": { "outdoor_temperature_sensor": "Outdoor temperature sensor" }
+        "data": {
+          "outdoor_temperature_sensor": "Outdoor temperature sensor"
+        }
       },
       "device": {
         "title": "Room control settings",
         "description": "Choose the Gree unit to configure.",
-        "data": { "device": "Air conditioner" }
+        "data": {
+          "device": "Air conditioner"
+        }
       },
       "sensors": {
         "title": "External room sensors",
@@ -45,6 +49,12 @@
         "description": "Enable and configure the Day preset. Optional limits turn the unit off when reached.",
         "data": {
           "enabled": "Enabled",
+          "smart_enabled": "Continuous smart regulation",
+          "smart_mode": "Climate strategy",
+          "deadband": "Comfort hysteresis (°C)",
+          "outdoor_compensation": "Outdoor temperature compensation",
+          "fan_speed": "Fan speed",
+          "quiet": "Quiet mode",
           "target_temperature": "Target temperature",
           "auto_off_temperature": "Automatic switch-off temperature",
           "humidity_threshold": "Humidity switch-off threshold",
@@ -58,6 +68,12 @@
         "description": "Enable and configure the Night preset.",
         "data": {
           "enabled": "Enabled",
+          "smart_enabled": "Continuous smart regulation",
+          "smart_mode": "Climate strategy",
+          "deadband": "Comfort hysteresis (°C)",
+          "outdoor_compensation": "Outdoor temperature compensation",
+          "fan_speed": "Fan speed",
+          "quiet": "Quiet mode",
           "target_temperature": "Target temperature",
           "auto_off_temperature": "Automatic switch-off temperature",
           "humidity_threshold": "Humidity switch-off threshold",
@@ -71,6 +87,12 @@
         "description": "Enable and configure the Away preset.",
         "data": {
           "enabled": "Enabled",
+          "smart_enabled": "Continuous smart regulation",
+          "smart_mode": "Climate strategy",
+          "deadband": "Comfort hysteresis (°C)",
+          "outdoor_compensation": "Outdoor temperature compensation",
+          "fan_speed": "Fan speed",
+          "quiet": "Quiet mode",
           "target_temperature": "Target temperature",
           "auto_off_temperature": "Automatic switch-off temperature",
           "humidity_threshold": "Humidity switch-off threshold",
@@ -80,44 +102,102 @@
         }
       }
     },
-    "abort": { "devices_not_ready": "The devices are not ready" }
+    "abort": {
+      "devices_not_ready": "The devices are not ready"
+    }
   },
   "entity": {
     "sensor": {
-      "in_tem": { "name": "Indoor Unit Air Sensor (Raw/Unverified)" },
-      "out_tem": { "name": "Outdoor Unit Sensor (Raw/Unverified)" },
-      "in_humi": { "name": "Indoor Humidity" },
-      "tem_sen": { "name": "Indoor Air Temperature" },
-      "set_deci_tem": { "name": "Target Temperature (Decimal)" },
-      "errcode": { "name": "Error Code" },
-      "err_type": { "name": "Error Type" },
-      "m_sys_status": { "name": "System Status" },
-      "clean_state": { "name": "Auto Clean Status" },
-      "clean_time": { "name": "Filter Runtime" },
-      "f_cl_time": { "name": "Filter Cleaning Interval" },
-      "power": { "name": "Estimated Power" },
-      "energy": { "name": "Estimated Energy" }
+      "in_tem": {
+        "name": "Indoor Unit Air Sensor (Raw/Unverified)"
+      },
+      "out_tem": {
+        "name": "Outdoor Unit Sensor (Raw/Unverified)"
+      },
+      "in_humi": {
+        "name": "Indoor Humidity"
+      },
+      "tem_sen": {
+        "name": "Indoor Air Temperature"
+      },
+      "set_deci_tem": {
+        "name": "Target Temperature (Decimal)"
+      },
+      "errcode": {
+        "name": "Error Code"
+      },
+      "err_type": {
+        "name": "Error Type"
+      },
+      "m_sys_status": {
+        "name": "System Status"
+      },
+      "clean_state": {
+        "name": "Auto Clean Status"
+      },
+      "clean_time": {
+        "name": "Filter Runtime"
+      },
+      "f_cl_time": {
+        "name": "Filter Cleaning Interval"
+      },
+      "power": {
+        "name": "Estimated Power"
+      },
+      "energy": {
+        "name": "Estimated Energy"
+      }
     },
     "switch": {
-      "health": { "name": "Health/Ionizer" },
-      "quiet": { "name": "Quiet Mode" },
-      "tur": { "name": "Turbo Mode" },
-      "st_ht": { "name": "Strong Heat" },
-      "blo": { "name": "X-Fan / Coil Dry" },
-      "sv_st": { "name": "Energy Saving" },
-      "tem_rec": { "name": "Temperature Recovery" },
-      "slp_mod": { "name": "Sleep Mode" },
-      "air": { "name": "Fresh Air" },
-      "lig": { "name": "Light" }
+      "health": {
+        "name": "Health/Ionizer"
+      },
+      "quiet": {
+        "name": "Quiet Mode"
+      },
+      "tur": {
+        "name": "Turbo Mode"
+      },
+      "st_ht": {
+        "name": "Strong Heat"
+      },
+      "blo": {
+        "name": "X-Fan / Coil Dry"
+      },
+      "sv_st": {
+        "name": "Energy Saving"
+      },
+      "tem_rec": {
+        "name": "Temperature Recovery"
+      },
+      "slp_mod": {
+        "name": "Sleep Mode"
+      },
+      "air": {
+        "name": "Fresh Air"
+      },
+      "lig": {
+        "name": "Light"
+      }
     },
     "binary_sensor": {
-      "err": { "name": "Error Status" },
-      "filter": { "name": "Filter Status" },
-      "ref_leak": { "name": "Refrigerant Warning" }
+      "err": {
+        "name": "Error Status"
+      },
+      "filter": {
+        "name": "Filter Status"
+      },
+      "ref_leak": {
+        "name": "Refrigerant Warning"
+      }
     },
     "select": {
-      "dred_level": { "name": "I-Demand / DRED Level" },
-      "startup_dred_level": { "name": "I-Demand at Startup" }
+      "dred_level": {
+        "name": "I-Demand / DRED Level"
+      },
+      "startup_dred_level": {
+        "name": "I-Demand at Startup"
+      }
     }
   }
 }

@@ -1,3 +1,6 @@
+import time
+from datetime import timedelta
+
 from homeassistant.components.climate import (
     FAN_AUTO,
     SWING_BOTH,
@@ -11,19 +14,29 @@ from homeassistant.components.climate import (
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_HALVES, UnitOfTemperature
 from homeassistant.core import callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_interval,
+)
+from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_DEVICES,
     CONF_HUMIDITY_SENSOR,
     CONF_HUMIDITY_SENSORS,
     CONF_OUTDOOR_TEMPERATURE_SENSOR,
-    CONF_PRESET_AUTO_OFF,
+    CONF_PRESET_ADAPTIVE,
+    CONF_PRESET_DEADBAND,
     CONF_PRESET_DRED,
     CONF_PRESET_ENABLED,
+    CONF_PRESET_FAN,
     CONF_PRESET_HUMIDITY,
     CONF_PRESET_MAX_TEMP,
     CONF_PRESET_MIN_TEMP,
+    CONF_PRESET_MODE,
+    CONF_PRESET_QUIET,
+    CONF_PRESET_SMART,
     CONF_PRESET_TARGET,
     CONF_PRESETS,
     CONF_TEMPERATURE_SENSOR,
@@ -36,18 +49,21 @@ from .const import (
     MAX_TEMP_C,
     MIN_TEMP_C,
     PRESET_NAMES,
+    SMART_COMMAND_COOLDOWN_SECONDS,
+    SMART_MODE_AUTO,
+    SMART_MODE_COOL,
+    SMART_MODE_DRY,
+    SMART_MODE_HEAT,
 )
 from .entity import GreeDeviceEntity
 
 
 async def async_setup_entry(hass, entry, async_add_entities: AddEntitiesCallback):
     coordinators = entry.runtime_data["coordinators"]
-    async_add_entities(
-        GreeACClimateEntity(coord) for coord in coordinators
-    )
+    async_add_entities(GreeACClimateEntity(coord) for coord in coordinators)
 
 
-class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
+class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = 0.5
     _attr_precision = PRECISION_HALVES
@@ -71,6 +87,10 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
         self._attr_unique_id = f"climate_{coordinator.device.mac}"
         self._preset_mode: str | None = None
         self._preset_action_lock = False
+        self._smart_last_action = "inactive"
+        self._smart_effective_target: float | None = None
+        self._smart_last_command_at = 0.0
+        self._smart_holding = False
 
     @property
     def _room_options(self) -> dict:
@@ -95,9 +115,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
 
     @property
     def _outdoor_temperature_entity(self) -> str | None:
-        return self.coordinator.config_entry.options.get(
-            CONF_OUTDOOR_TEMPERATURE_SENSOR
-        )
+        return self.coordinator.config_entry.options.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
 
     def _average_entities(self, entity_ids: list[str]) -> float | None:
         values = [
@@ -134,12 +152,25 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
                     self.hass, entities, self._async_external_sensor_changed
                 )
             )
+        previous = await self.async_get_last_state()
+        if previous and previous.attributes.get("preset_mode") in self.preset_modes:
+            self._preset_mode = previous.attributes["preset_mode"]
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._async_smart_interval, timedelta(minutes=2))
+        )
+        if self._preset_mode:
+            self.hass.async_create_task(self._async_evaluate_smart_profile(force=True))
 
     @callback
-    def _async_external_sensor_changed(self, event) -> None:
+    def _async_external_sensor_changed(self, _event) -> None:
         self.async_write_ha_state()
         if self._preset_mode:
-            self.hass.async_create_task(self._async_evaluate_preset())
+            self.hass.async_create_task(self._async_evaluate_smart_profile())
+
+    @callback
+    def _async_smart_interval(self, _now) -> None:
+        if self._preset_mode:
+            self.hass.async_create_task(self._async_evaluate_smart_profile())
 
     # ── temperature ───────────────────────────────────
 
@@ -172,15 +203,16 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
             if self._outdoor_temperature_entity
             else None,
             "preset_rules": self._room_options.get(CONF_PRESETS, {}),
+            "smart_profile_active": self._smart_profile_enabled if self._preset_mode else False,
+            "smart_effective_target": self._smart_effective_target,
+            "smart_last_action": self._smart_last_action,
         }
 
     @property
     def preset_modes(self) -> list[str]:
         presets = self._room_options.get(CONF_PRESETS, {})
         return [
-            preset
-            for preset in PRESET_NAMES
-            if presets.get(preset, {}).get(CONF_PRESET_ENABLED)
+            preset for preset in PRESET_NAMES if presets.get(preset, {}).get(CONF_PRESET_ENABLED)
         ]
 
     @property
@@ -199,56 +231,134 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
             return {}
         return self._room_options.get(CONF_PRESETS, {}).get(self._preset_mode, {})
 
+    @property
+    def _smart_profile_enabled(self) -> bool:
+        return bool(self._active_preset().get(CONF_PRESET_SMART, True))
+
+    def _effective_smart_target(self, preset: dict) -> float:
+        target = float(preset.get(CONF_PRESET_TARGET, 26))
+        if not preset.get(CONF_PRESET_ADAPTIVE, True):
+            return target
+        outdoor_state = (
+            self.hass.states.get(self._outdoor_temperature_entity)
+            if self._outdoor_temperature_entity
+            else None
+        )
+        outdoor = self._numeric_state(outdoor_state)
+        if (
+            outdoor_state is not None
+            and (dt_util.utcnow() - outdoor_state.last_updated).total_seconds() > 10800
+        ):
+            outdoor = None
+        mode = preset.get(CONF_PRESET_MODE, SMART_MODE_AUTO)
+        if outdoor is not None:
+            if mode in (SMART_MODE_AUTO, SMART_MODE_COOL) and outdoor > 30:
+                target += min(2.0, (outdoor - 30) * 0.15)
+            elif mode in (SMART_MODE_AUTO, SMART_MODE_HEAT) and outdoor < 8:
+                target -= min(1.5, (8 - outdoor) * 0.10)
+        return round(max(MIN_TEMP_C, min(MAX_TEMP_C, target)) * 2) / 2
+
     async def _async_apply_preset(self) -> None:
         preset = self._active_preset()
         if not preset:
             return
-        target = preset.get(CONF_PRESET_TARGET)
-        if target is not None:
-            await self.async_set_temperature(**{ATTR_TEMPERATURE: target})
+        self._smart_effective_target = self._effective_smart_target(preset)
+        fan = preset.get(CONF_PRESET_FAN)
+        if fan in FAN_MAP:
+            await self.async_set_fan_mode(fan)
+        quiet = preset.get(CONF_PRESET_QUIET)
+        if quiet is not None and "Quiet" in self.coordinator.data:
+            await self._send(["Quiet"], [1 if quiet else 0])
         dred = preset.get(CONF_PRESET_DRED, "No action")
         if dred in DRED_OPTIONS_REV and self._device.properties.get("Mod") == 1:
-            value = DRED_OPTIONS_REV[dred]
-            if await self.coordinator._mqtt.send_command(
-                self._device.mac, ["DRED"], [value]
-            ):
-                self._device.properties["DRED"] = value
-                if value:
-                    self._device.properties["Quiet"] = 0
-                self._sync_data()
-        await self._async_evaluate_preset()
+            await self._send(["DRED"], [DRED_OPTIONS_REV[dred]])
+        await self._async_evaluate_smart_profile(force=True)
 
-    async def _async_evaluate_preset(self) -> None:
-        """Apply optional room-sensor stop limits for the active preset."""
+    async def _async_evaluate_smart_profile(self, force: bool = False) -> None:
+        """Regulate room climate with hysteresis and external sensor feedback."""
         if self._preset_action_lock:
             return
         preset = self._active_preset()
         if not preset:
             return
-        temperature = self.current_temperature
+        current = self.current_temperature
         humidity = self.current_humidity
-        auto_off = preset.get(CONF_PRESET_AUTO_OFF)
-        min_temp = preset.get(CONF_PRESET_MIN_TEMP)
-        max_temp = preset.get(CONF_PRESET_MAX_TEMP)
+        if current is None:
+            self._smart_last_action = "waiting_room_temperature"
+            self.async_write_ha_state()
+            return
+        target = self._effective_smart_target(preset)
+        self._smart_effective_target = target
+        deadband = max(0.2, min(2.0, float(preset.get(CONF_PRESET_DEADBAND, 0.5))))
+        selected_mode = preset.get(CONF_PRESET_MODE, SMART_MODE_AUTO)
+        minimum = preset.get(CONF_PRESET_MIN_TEMP)
+        maximum = preset.get(CONF_PRESET_MAX_TEMP)
         humidity_limit = preset.get(CONF_PRESET_HUMIDITY)
+        desired_mode: HVACMode | None = None
 
-        should_stop = (
-            temperature is not None
-            and (
-                (auto_off is not None and temperature <= auto_off)
-                or (min_temp is not None and temperature < min_temp)
-                or (max_temp is not None and temperature > max_temp)
+        if minimum is not None and current < float(minimum):
+            desired_mode = HVACMode.HEAT
+        elif maximum is not None and current > float(maximum):
+            desired_mode = HVACMode.COOL
+        elif selected_mode == SMART_MODE_COOL:
+            desired_mode = HVACMode.COOL if current > target + deadband else None
+        elif selected_mode == SMART_MODE_HEAT:
+            desired_mode = HVACMode.HEAT if current < target - deadband else None
+        elif selected_mode == SMART_MODE_DRY:
+            desired_mode = (
+                HVACMode.DRY
+                if humidity_limit is not None
+                and humidity is not None
+                and humidity > float(humidity_limit)
+                else None
             )
-        )
-        if humidity_limit is not None and humidity is not None:
-            should_stop = should_stop or humidity <= humidity_limit
+        else:
+            if (
+                humidity_limit is not None
+                and humidity is not None
+                and humidity > float(humidity_limit)
+                and current >= target - deadband
+            ):
+                desired_mode = HVACMode.DRY
+            elif current > target + deadband:
+                desired_mode = HVACMode.COOL
+            elif current < target - deadband:
+                desired_mode = HVACMode.HEAT
 
-        if should_stop and self._device.properties.get("Pow"):
-            self._preset_action_lock = True
-            try:
-                await self.async_turn_off()
-            finally:
-                self._preset_action_lock = False
+        if not self._smart_profile_enabled:
+            if self.target_temperature != target:
+                await self.async_set_temperature(**{ATTR_TEMPERATURE: target})
+            self._smart_last_action = "fixed_target"
+            self.async_write_ha_state()
+            return
+
+        now = time.monotonic()
+        can_command = force or now - self._smart_last_command_at >= SMART_COMMAND_COOLDOWN_SECONDS
+        is_on = bool(self.coordinator.data.get("Pow"))
+        if desired_mode is None:
+            self._smart_last_action = "comfort_hold"
+            if is_on and can_command:
+                self._preset_action_lock = True
+                try:
+                    await self.async_turn_off()
+                    self._smart_last_command_at = now
+                    self._smart_last_action = "comfort_reached_off"
+                    self._smart_holding = True
+                finally:
+                    self._preset_action_lock = False
+        else:
+            self._smart_last_action = f"request_{desired_mode.value}"
+            if can_command and (not is_on or self.hvac_mode != desired_mode):
+                self._preset_action_lock = True
+                try:
+                    await self.async_set_hvac_mode(desired_mode)
+                    self._smart_last_command_at = now
+                    self._smart_holding = False
+                finally:
+                    self._preset_action_lock = False
+            if can_command and self.target_temperature != target:
+                await self.async_set_temperature(**{ATTR_TEMPERATURE: target})
+        self.async_write_ha_state()
 
     @property
     def target_temperature(self) -> float | None:
@@ -347,9 +457,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
         v = 1 if swing_mode in (SWING_VERTICAL, SWING_BOTH) else 0
         h = 1 if swing_mode in (SWING_HORIZONTAL, SWING_BOTH) else 0
         mqtt = self.coordinator._mqtt
-        if await mqtt.send_command(
-            self._device.mac, ["SwUpDn", "SwingLfRig"], [v, h]
-        ):
+        if await mqtt.send_command(self._device.mac, ["SwUpDn", "SwingLfRig"], [v, h]):
             self._device.properties["SwUpDn"] = v
             self._device.properties["SwingLfRig"] = h
             self._sync_data()

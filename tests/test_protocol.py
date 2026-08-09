@@ -137,6 +137,9 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "ClimateEntityFeature.PRESET_MODE" in climate_source
     assert "async_track_state_change_event" in climate_source
     assert "async_set_preset_mode" in climate_source
+    assert "_async_evaluate_smart_profile" in climate_source
+    assert "SMART_COMMAND_COOLDOWN_SECONDS" in climate_source
+    assert "smart_effective_target" in climate_source
     assert "current_humidity" in climate_source
     assert "_average_entities" in climate_source
     assert "sum(values) / len(values)" in climate_source
@@ -164,6 +167,9 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "value.name" in panel_source
     assert "config-dialog" in panel_source
     assert "saveAllRoomSensors" in panel_source
+    assert "smart_enabled" in panel_source
+    assert "outdoor_compensation" in panel_source
+    assert "Isteresi" in panel_source
 
 
 def test_device_command_round_trip() -> None:

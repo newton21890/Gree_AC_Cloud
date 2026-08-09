@@ -25,12 +25,16 @@
       "init": {
         "title": "Sensore esterno",
         "description": "Scegli un sensore temperatura esterna opzionale, comune a tutto l'impianto.",
-        "data": { "outdoor_temperature_sensor": "Sensore temperatura esterna" }
+        "data": {
+          "outdoor_temperature_sensor": "Sensore temperatura esterna"
+        }
       },
       "device": {
         "title": "Impostazioni controllo ambiente",
         "description": "Scegli l'unità Gree da configurare.",
-        "data": { "device": "Condizionatore" }
+        "data": {
+          "device": "Condizionatore"
+        }
       },
       "sensors": {
         "title": "Sensori ambiente esterni",
@@ -45,6 +49,12 @@
         "description": "Abilita e configura Giorno. I limiti opzionali spengono l'unità quando vengono raggiunti.",
         "data": {
           "enabled": "Abilitato",
+          "smart_enabled": "Regolazione smart continua",
+          "smart_mode": "Strategia climatica",
+          "deadband": "Isteresi comfort (°C)",
+          "outdoor_compensation": "Compensazione temperatura esterna",
+          "fan_speed": "Velocità ventilatore",
+          "quiet": "Modalità silenziosa",
           "target_temperature": "Temperatura target",
           "auto_off_temperature": "Temperatura di spegnimento automatico",
           "humidity_threshold": "Soglia umidità per spegnimento",
@@ -58,6 +68,12 @@
         "description": "Abilita e configura Notte.",
         "data": {
           "enabled": "Abilitato",
+          "smart_enabled": "Regolazione smart continua",
+          "smart_mode": "Strategia climatica",
+          "deadband": "Isteresi comfort (°C)",
+          "outdoor_compensation": "Compensazione temperatura esterna",
+          "fan_speed": "Velocità ventilatore",
+          "quiet": "Modalità silenziosa",
           "target_temperature": "Temperatura target",
           "auto_off_temperature": "Temperatura di spegnimento automatico",
           "humidity_threshold": "Soglia umidità per spegnimento",
@@ -71,6 +87,12 @@
         "description": "Abilita e configura Assente.",
         "data": {
           "enabled": "Abilitato",
+          "smart_enabled": "Regolazione smart continua",
+          "smart_mode": "Strategia climatica",
+          "deadband": "Isteresi comfort (°C)",
+          "outdoor_compensation": "Compensazione temperatura esterna",
+          "fan_speed": "Velocità ventilatore",
+          "quiet": "Modalità silenziosa",
           "target_temperature": "Temperatura target",
           "auto_off_temperature": "Temperatura di spegnimento automatico",
           "humidity_threshold": "Soglia umidità per spegnimento",
@@ -80,44 +102,102 @@
         }
       }
     },
-    "abort": { "devices_not_ready": "I dispositivi non sono pronti" }
+    "abort": {
+      "devices_not_ready": "I dispositivi non sono pronti"
+    }
   },
   "entity": {
     "sensor": {
-      "in_tem": { "name": "Sonda unità interna (grezza/non verificata)" },
-      "out_tem": { "name": "Sonda unità esterna (grezza/non verificata)" },
-      "in_humi": { "name": "Umidità interna" },
-      "tem_sen": { "name": "Temperatura aria unità interna" },
-      "set_deci_tem": { "name": "Temperatura target (decimale)" },
-      "errcode": { "name": "Codice errore" },
-      "err_type": { "name": "Tipo errore" },
-      "m_sys_status": { "name": "Stato sistema" },
-      "clean_state": { "name": "Stato pulizia automatica" },
-      "clean_time": { "name": "Tempo utilizzo filtro" },
-      "f_cl_time": { "name": "Intervallo pulizia filtro" },
-      "power": { "name": "Potenza stimata" },
-      "energy": { "name": "Energia stimata" }
+      "in_tem": {
+        "name": "Sonda unità interna (grezza/non verificata)"
+      },
+      "out_tem": {
+        "name": "Sonda unità esterna (grezza/non verificata)"
+      },
+      "in_humi": {
+        "name": "Umidità interna"
+      },
+      "tem_sen": {
+        "name": "Temperatura aria unità interna"
+      },
+      "set_deci_tem": {
+        "name": "Temperatura target (decimale)"
+      },
+      "errcode": {
+        "name": "Codice errore"
+      },
+      "err_type": {
+        "name": "Tipo errore"
+      },
+      "m_sys_status": {
+        "name": "Stato sistema"
+      },
+      "clean_state": {
+        "name": "Stato pulizia automatica"
+      },
+      "clean_time": {
+        "name": "Tempo utilizzo filtro"
+      },
+      "f_cl_time": {
+        "name": "Intervallo pulizia filtro"
+      },
+      "power": {
+        "name": "Potenza stimata"
+      },
+      "energy": {
+        "name": "Energia stimata"
+      }
     },
     "switch": {
-      "health": { "name": "Ionizzatore" },
-      "quiet": { "name": "Modalità silenziosa" },
-      "tur": { "name": "Modalità turbo" },
-      "st_ht": { "name": "Riscaldamento intenso" },
-      "blo": { "name": "X-Fan / Asciugatura batteria" },
-      "sv_st": { "name": "Risparmio energetico" },
-      "tem_rec": { "name": "Recupero temperatura" },
-      "slp_mod": { "name": "Modalità notte" },
-      "air": { "name": "Ricambio aria" },
-      "lig": { "name": "Luce" }
+      "health": {
+        "name": "Ionizzatore"
+      },
+      "quiet": {
+        "name": "Modalità silenziosa"
+      },
+      "tur": {
+        "name": "Modalità turbo"
+      },
+      "st_ht": {
+        "name": "Riscaldamento intenso"
+      },
+      "blo": {
+        "name": "X-Fan / Asciugatura batteria"
+      },
+      "sv_st": {
+        "name": "Risparmio energetico"
+      },
+      "tem_rec": {
+        "name": "Recupero temperatura"
+      },
+      "slp_mod": {
+        "name": "Modalità notte"
+      },
+      "air": {
+        "name": "Ricambio aria"
+      },
+      "lig": {
+        "name": "Luce"
+      }
     },
     "binary_sensor": {
-      "err": { "name": "Stato errore" },
-      "filter": { "name": "Stato filtro" },
-      "ref_leak": { "name": "Avviso refrigerante" }
+      "err": {
+        "name": "Stato errore"
+      },
+      "filter": {
+        "name": "Stato filtro"
+      },
+      "ref_leak": {
+        "name": "Avviso refrigerante"
+      }
     },
     "select": {
-      "dred_level": { "name": "Livello I-Demand / DRED" },
-      "startup_dred_level": { "name": "I-Demand all'accensione" }
+      "dred_level": {
+        "name": "Livello I-Demand / DRED"
+      },
+      "startup_dred_level": {
+        "name": "I-Demand all'accensione"
+      }
     }
   }
 }

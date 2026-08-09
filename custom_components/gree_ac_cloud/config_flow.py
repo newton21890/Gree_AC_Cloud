@@ -13,12 +13,18 @@ from .const import (
     CONF_HUMIDITY_SENSOR,
     CONF_HUMIDITY_SENSORS,
     CONF_OUTDOOR_TEMPERATURE_SENSOR,
+    CONF_PRESET_ADAPTIVE,
     CONF_PRESET_AUTO_OFF,
+    CONF_PRESET_DEADBAND,
     CONF_PRESET_DRED,
     CONF_PRESET_ENABLED,
+    CONF_PRESET_FAN,
     CONF_PRESET_HUMIDITY,
     CONF_PRESET_MAX_TEMP,
     CONF_PRESET_MIN_TEMP,
+    CONF_PRESET_MODE,
+    CONF_PRESET_QUIET,
+    CONF_PRESET_SMART,
     CONF_PRESET_TARGET,
     CONF_PRESETS,
     CONF_SERVER,
@@ -30,6 +36,7 @@ from .const import (
     PRESET_AWAY,
     PRESET_DAY,
     PRESET_NIGHT,
+    SMART_MODES,
 )
 from .gree_api import api_login
 
@@ -44,18 +51,14 @@ class GreeACCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(config_entry):
         return GreeACCloudOptionsFlow()
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         errors = {}
 
         if user_input is not None:
             await self.async_set_unique_id(user_input[CONF_USERNAME].strip().lower())
             self._abort_if_unique_id_configured()
 
-            server = GREE_CLOUD_SERVERS.get(
-                user_input[CONF_SERVER], "eugrih.gree.com"
-            )
+            server = GREE_CLOUD_SERVERS.get(user_input[CONF_SERVER], "eugrih.gree.com")
             try:
                 uid, _token = await self.hass.async_add_executor_job(
                     api_login,
@@ -81,9 +84,7 @@ class GreeACCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         data_schema = vol.Schema(
             {
-                vol.Required(
-                    CONF_SERVER, default="Europe"
-                ): vol.In(list(GREE_CLOUD_SERVERS)),
+                vol.Required(CONF_SERVER, default="Europe"): vol.In(list(GREE_CLOUD_SERVERS)),
                 vol.Required(CONF_USERNAME): str,
                 vol.Required(CONF_PASSWORD): str,
             }
@@ -122,9 +123,7 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                         CONF_OUTDOOR_TEMPERATURE_SENSOR,
                         description={"suggested_value": current_outdoor},
                     ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor", device_class="temperature"
-                        )
+                        selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
                     )
                 }
             ),
@@ -132,10 +131,7 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_device(self, user_input=None):
         coordinators = self._coordinators()
-        choices = {
-            coordinator.device.mac: coordinator.device.name
-            for coordinator in coordinators
-        }
+        choices = {coordinator.device.mac: coordinator.device.name for coordinator in coordinators}
         if user_input is not None:
             self._device_mac = user_input[CONF_DEVICE]
             return await self.async_step_sensors()
@@ -157,19 +153,13 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
         )
 
     def _device_options(self) -> dict:
-        return dict(
-            self.config_entry.options.get(CONF_DEVICES, {}).get(self._device_mac, {})
-        )
+        return dict(self.config_entry.options.get(CONF_DEVICES, {}).get(self._device_mac, {}))
 
     async def async_step_sensors(self, user_input=None):
         current = self._device_options()
         if user_input is not None:
-            current[CONF_TEMPERATURE_SENSORS] = user_input.get(
-                CONF_TEMPERATURE_SENSORS, []
-            )
-            current[CONF_HUMIDITY_SENSORS] = user_input.get(
-                CONF_HUMIDITY_SENSORS, []
-            )
+            current[CONF_TEMPERATURE_SENSORS] = user_input.get(CONF_TEMPERATURE_SENSORS, [])
+            current[CONF_HUMIDITY_SENSORS] = user_input.get(CONF_HUMIDITY_SENSORS, [])
             current.pop(CONF_TEMPERATURE_SENSOR, None)
             current.pop(CONF_HUMIDITY_SENSOR, None)
             self._working = current
@@ -182,7 +172,11 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                         CONF_TEMPERATURE_SENSORS,
                         description={
                             "suggested_value": current.get(CONF_TEMPERATURE_SENSORS)
-                            or ([current[CONF_TEMPERATURE_SENSOR]] if current.get(CONF_TEMPERATURE_SENSOR) else [])
+                            or (
+                                [current[CONF_TEMPERATURE_SENSOR]]
+                                if current.get(CONF_TEMPERATURE_SENSOR)
+                                else []
+                            )
                         },
                     ): selector.EntitySelector(
                         selector.EntitySelectorConfig(
@@ -193,7 +187,11 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                         CONF_HUMIDITY_SENSORS,
                         description={
                             "suggested_value": current.get(CONF_HUMIDITY_SENSORS)
-                            or ([current[CONF_HUMIDITY_SENSOR]] if current.get(CONF_HUMIDITY_SENSOR) else [])
+                            or (
+                                [current[CONF_HUMIDITY_SENSOR]]
+                                if current.get(CONF_HUMIDITY_SENSOR)
+                                else []
+                            )
                         },
                     ): selector.EntitySelector(
                         selector.EntitySelectorConfig(
@@ -212,9 +210,33 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                     CONF_PRESET_ENABLED, default=defaults.get(CONF_PRESET_ENABLED, False)
                 ): bool,
                 vol.Required(
+                    CONF_PRESET_SMART,
+                    default=defaults.get(CONF_PRESET_SMART, True),
+                ): bool,
+                vol.Required(
+                    CONF_PRESET_MODE,
+                    default=defaults.get(CONF_PRESET_MODE, "auto"),
+                ): vol.In(SMART_MODES),
+                vol.Required(
                     CONF_PRESET_TARGET,
                     default=defaults.get(CONF_PRESET_TARGET, 26.0),
                 ): vol.All(vol.Coerce(float), vol.Range(min=16, max=30)),
+                vol.Required(
+                    CONF_PRESET_DEADBAND,
+                    default=defaults.get(CONF_PRESET_DEADBAND, 0.5),
+                ): vol.All(vol.Coerce(float), vol.Range(min=0.2, max=2.0)),
+                vol.Required(
+                    CONF_PRESET_ADAPTIVE,
+                    default=defaults.get(CONF_PRESET_ADAPTIVE, True),
+                ): bool,
+                vol.Required(
+                    CONF_PRESET_FAN,
+                    default=defaults.get(CONF_PRESET_FAN, "Auto"),
+                ): vol.In(["Auto", "Low", "Med-Low", "Medium", "Med-High", "High"]),
+                vol.Required(
+                    CONF_PRESET_QUIET,
+                    default=defaults.get(CONF_PRESET_QUIET, preset == PRESET_NIGHT),
+                ): bool,
                 vol.Optional(
                     CONF_PRESET_AUTO_OFF,
                     description={"suggested_value": defaults.get(CONF_PRESET_AUTO_OFF)},
