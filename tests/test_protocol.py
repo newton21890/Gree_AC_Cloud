@@ -47,6 +47,8 @@ def test_panel_keeps_log_capture_and_d1_normalization() -> None:
     assert "I-Demand attivo" in source
     assert "Stato effettivo:" in source
     assert '"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"' in source
+    assert 'state["StartupDRED"]' in source
+    assert "setStartupDred" in source
 
 
 def test_insecure_tls_is_not_used_by_component() -> None:
@@ -116,6 +118,10 @@ def test_dred_control_keeps_verified_protocol_mapping() -> None:
     assert "RegistryEntryDisabler.INTEGRATION" in select_source
     assert "registry.async_update_entity(entity_id, disabled_by=None)" in select_source
     assert '_attr_translation_key = "dred_level"' in select_source
+    assert 'class GreeStartupDemandResponseSelect' in select_source
+    assert '_attr_translation_key = "startup_dred_level"' in select_source
+    assert 'STARTUP_DRED_NO_ACTION = "No action"' in const_source
+    assert "async_set_startup_dred" in select_source
 
 
 def test_device_command_round_trip() -> None:

@@ -66,6 +66,8 @@ DRED_OPTIONS = {
     3: "D3",
 }
 DRED_OPTIONS_REV = {value: key for key, value in DRED_OPTIONS.items()}
+STARTUP_DRED_NO_ACTION = "No action"
+STARTUP_DRED_OPTIONS = [STARTUP_DRED_NO_ACTION, *DRED_OPTIONS_REV]
 
 FAN_MAP = {
     0: "Auto", 1: "Bassa", 2: "Media-Bassa", 3: "Media",

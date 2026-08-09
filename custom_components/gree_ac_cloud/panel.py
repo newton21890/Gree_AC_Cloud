@@ -228,6 +228,7 @@ class GreePanelDataView(HomeAssistantView):
                     1 if raw_dred == 0 and idemand_active else raw_dred
                 )
                 state["IdemandActive"] = idemand_active
+                state["StartupDRED"] = coord.startup_dred
                 data.append({
                     "mac": device.mac,
                     "name": device.name,
@@ -262,9 +263,10 @@ class GreePanelCommandView(HomeAssistantView):
         mac = body.get("mac")
         options = body.get("options", [])
         values = body.get("values", [])
+        has_startup_dred = "startup_dred" in body
 
-        if not mac or not options or not values:
-            return self.json({"error": "missing mac, options, or values"}, status=400)
+        if not mac or (not has_startup_dred and (not options or not values)):
+            return self.json({"error": "missing command data"}, status=400)
 
         for entry in hass.config_entries.async_entries(DOMAIN):
             runtime = entry.runtime_data if hasattr(entry, "runtime_data") else {}
@@ -275,6 +277,20 @@ class GreePanelCommandView(HomeAssistantView):
                     if coord.device.mac == mac:
                         if not _valid_mac(mac):
                             return self.json({"error": "invalid mac"}, status=400)
+                        if has_startup_dred:
+                            startup_dred = body.get("startup_dred")
+                            if isinstance(startup_dred, bool) or startup_dred not in (
+                                None,
+                                0,
+                                1,
+                                2,
+                                3,
+                            ):
+                                return self.json(
+                                    {"error": "invalid startup DRED"}, status=400
+                                )
+                            await coord.async_set_startup_dred(startup_dred)
+                            return self.json({"ok": True})
                         if (
                             not isinstance(options, list)
                             or not isinstance(values, list)
@@ -294,6 +310,11 @@ class GreePanelCommandView(HomeAssistantView):
                             for opt, val in zip(options, values):
                                 coord.device.properties[opt] = val
                             coord.async_set_updated_data(dict(coord.device.properties))
+                            if any(
+                                opt == "Pow" and val == 1
+                                for opt, val in zip(options, values)
+                            ):
+                                await coord.async_apply_startup_settings()
                         return self.json({"ok": ok})
 
         return self.json({"error": "device not found"}, status=404)
@@ -1641,6 +1662,7 @@ function renderDevice(d) {
   const effectiveDred = s.DREDEffective != null
     ? Number(s.DREDEffective)
     : (Number(s.DRED || 0) === 0 && iDemandActive ? 1 : Number(s.DRED || 0));
+  const startupDred = s.StartupDRED == null ? 'none' : String(s.StartupDRED);
   const safeMac = escHtml(String(d.mac || ''));
   const modelKey = getModelKey(d.mac);
   const model = MODELS[modelKey] || null;
@@ -1800,6 +1822,13 @@ function renderDevice(d) {
         ${iDemandActive ? '<span class="switch-btn on" title="Flag I-Demand separato riportato dal dispositivo">I-Demand attivo</span>' : ''}
       </div>
       <span style="color:${effectiveDred > 0 ? 'var(--green)' : 'var(--text-secondary)'};font-size:11px;font-weight:${effectiveDred > 0 ? '600' : '400'};">Stato effettivo: ${effectiveDred > 0 ? `D${effectiveDred} attivo${iDemandActive ? ' (I-Demand)' : ''}` : 'Off'} · D1: compressore fermo · D2: max 50% · D3: max 75%.</span>
+      <label style="margin-top:8px;">Alla prossima accensione</label>
+      <div class="btn-group">
+        ${[['Nessuna','none'],['Off','0'],['D1','1'],['D2','2'],['D3','3']].map(([label,value]) =>
+          `<button class="btn ${startupDred === value ? 'active' : ''}" onclick="setStartupDred('${safeMac}','${value}')" title="${value === 'none' ? 'Non modifica I-Demand all’accensione' : `Applica ${label} a ogni accensione in Cool, anche dal comando a muro`}">${label}</button>`
+        ).join('')}
+      </div>
+      <span style="color:var(--text-secondary);font-size:11px;">Preferenza persistente: si applica dopo l’accensione in Cool da HA o dal monitor a muro.</span>
     </div>` : ''}
 
     ${['Errcode','ErrType','RefLeak','MSysStatus','CleanState','CleanTime','FClTime','CleanDataFlag']
@@ -1880,12 +1909,25 @@ async function setFan(mac, val) {
 async function setDred(mac, val) {
   if (![0,1,2,3].includes(val)) return;
   const label = val === 0 ? 'Off' : `D${val}`;
-  const warning = val === 1
-    ? 'D1 non è ancora stato verificato sul comando a filo. Continuare?'
-    : `${label} modifica il limite I-Demand e disattiva Quiet. Continuare?`;
-  if (!window.confirm(warning)) return;
+  if (!window.confirm(`${label} modifica il limite I-Demand e, se attivo, disattiva Quiet. Continuare?`)) return;
   await sendCommand(mac, ['DRED'], [val]);
   setTimeout(loadData, 1500);
+}
+
+async function setStartupDred(mac, val) {
+  try {
+    await apiFetch(PANEL_CMD_URL, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        mac,
+        startup_dred: val === 'none' ? null : Number(val),
+      }),
+    });
+  } catch (e) {
+    console.error('Startup DRED setting failed:', e);
+  }
+  setTimeout(loadData, 300);
 }
 
 async function setSwing(mac, mode) {

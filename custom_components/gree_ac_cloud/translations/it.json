@@ -54,7 +54,8 @@
       "ref_leak": { "name": "Avviso refrigerante" }
     },
     "select": {
-      "dred_level": { "name": "Livello I-Demand / DRED" }
+      "dred_level": { "name": "Livello I-Demand / DRED" },
+      "startup_dred_level": { "name": "I-Demand all'accensione" }
     }
   }
 }

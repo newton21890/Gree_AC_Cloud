@@ -112,7 +112,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     def _forward(mac, data):
         for coord in coordinators:
             if coord.device.mac == mac:
-                coord.async_set_updated_data(coord._build_data())
+                coord.async_process_device_update()
                 break
 
     data_forwarder["cb"] = _forward

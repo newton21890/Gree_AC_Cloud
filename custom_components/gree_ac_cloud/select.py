@@ -4,7 +4,13 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, DRED_OPTIONS, DRED_OPTIONS_REV
+from .const import (
+    DOMAIN,
+    DRED_OPTIONS,
+    DRED_OPTIONS_REV,
+    STARTUP_DRED_NO_ACTION,
+    STARTUP_DRED_OPTIONS,
+)
 from .entity import GreeDeviceEntity
 
 
@@ -29,7 +35,14 @@ async def async_setup_entry(hass, entry, async_add_entities: AddEntitiesCallback
             registry.async_update_entity(entity_id, disabled_by=None)
 
     async_add_entities(
-        GreeDemandResponseSelect(coordinator) for coordinator in coordinators
+        [
+            entity
+            for coordinator in coordinators
+            for entity in (
+                GreeDemandResponseSelect(coordinator),
+                GreeStartupDemandResponseSelect(coordinator),
+            )
+        ]
     )
 
 
@@ -109,3 +122,49 @@ class GreeDemandResponseSelect(GreeDeviceEntity, SelectEntity):
             self.coordinator.async_set_updated_data(
                 dict(self.coordinator.device.properties)
             )
+
+
+class GreeStartupDemandResponseSelect(GreeDeviceEntity, SelectEntity):
+    """Choose the I-Demand level to apply on the next and future starts."""
+
+    _attr_translation_key = "startup_dred_level"
+    _attr_icon = "mdi:power-settings"
+    _attr_options = STARTUP_DRED_OPTIONS
+    _attr_entity_registry_enabled_default = True
+
+    def __init__(self, coordinator):
+        super().__init__(coordinator, coordinator.device, key_suffix="startup_dred_level")
+        self._attr_unique_id = f"{coordinator.device.mac}_startup_dred_level"
+
+    @property
+    def available(self) -> bool:
+        """The preference can also be configured while the unit is off."""
+        data = self.coordinator.data
+        return super().available and data.get("DREDEn") == 1 and "DRED" in data
+
+    @property
+    def current_option(self) -> str:
+        value = self.coordinator.startup_dred
+        return STARTUP_DRED_NO_ACTION if value is None else DRED_OPTIONS[value]
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "applies_on": "next and subsequent power-on transitions",
+            "trigger_sources": ["Home Assistant", "wired wall controller"],
+            "cool_mode_required": True,
+            "persistent": True,
+            "note": (
+                "No action preserves the device state. Off explicitly clears DRED; "
+                "D1, D2 or D3 are applied after startup in Cool mode."
+            ),
+        }
+
+    async def async_select_option(self, option: str) -> None:
+        if option == STARTUP_DRED_NO_ACTION:
+            value = None
+        elif option in DRED_OPTIONS_REV:
+            value = DRED_OPTIONS_REV[option]
+        else:
+            raise ValueError(f"Unsupported startup DRED option: {option}")
+        await self.coordinator.async_set_startup_dred(value)

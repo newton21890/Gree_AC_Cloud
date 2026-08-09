@@ -9,7 +9,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, ENERGY_MODELS, STALE_AFTER_SECONDS, STORAGE_VERSION, UPDATE_INTERVAL
+from .const import (
+    DOMAIN,
+    DRED_OPTIONS,
+    ENERGY_MODELS,
+    STALE_AFTER_SECONDS,
+    STORAGE_VERSION,
+    UPDATE_INTERVAL,
+)
 from .gree_api import GreeDevice, discover_devices
 
 if TYPE_CHECKING:
@@ -87,12 +94,78 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         self._last_energy_time: float = time.monotonic()
         self._energy_save_counter = 0
         self._energy_store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.energy.{device.mac}")
+        self._startup_store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.startup.{device.mac}")
+        self._startup_settings: dict[str, Any] = {"dred": None}
+        self._last_power = device.properties.get("Pow")
+        self._startup_apply_lock = False
 
     async def async_init(self):
         data = await self._energy_store.async_load()
         if data:
             self._total_energy_kwh = data.get("total_kwh", 0.0)
+        startup_data = await self._startup_store.async_load()
+        if startup_data:
+            dred = startup_data.get("dred")
+            if dred in (0, 1, 2, 3):
+                self._startup_settings["dred"] = dred
+        self._last_power = self.device.properties.get("Pow")
         self._last_energy_time = time.monotonic()
+
+    @property
+    def startup_dred(self) -> int | None:
+        """Return the configured DRED level to apply at the next power-on."""
+        return self._startup_settings.get("dred")
+
+    async def async_set_startup_dred(self, value: int | None) -> None:
+        """Persist the DRED action for future power-on transitions."""
+        if value not in (None, 0, 1, 2, 3):
+            raise ValueError(f"Unsupported startup DRED value: {value}")
+        self._startup_settings["dred"] = value
+        await self._startup_store.async_save(dict(self._startup_settings))
+        self.async_update_listeners()
+
+    async def async_apply_startup_settings(self) -> bool:
+        """Apply configured settings after either HA or wall-controller start."""
+        dred = self.startup_dred
+        data = self.device.properties
+        if (
+            dred is None
+            or not data.get("Pow")
+            or data.get("Mod") != 1
+            or data.get("DREDEn") != 1
+            or self._startup_apply_lock
+        ):
+            return False
+
+        self._startup_apply_lock = True
+        # Mark locally initiated starts as already observed, so the subsequent
+        # MQTT echo does not apply the same startup preference a second time.
+        self._last_power = data.get("Pow")
+        try:
+            ok = await self._mqtt.send_command(self.device.mac, ["DRED"], [dred])
+            if ok:
+                data["DRED"] = dred
+                if dred:
+                    data["Quiet"] = 0
+                self.async_set_updated_data(self._build_data())
+                label = DRED_OPTIONS[dred]
+                _LOGGER.info(
+                    "%s: applied startup I-Demand setting %s",
+                    self.device.name,
+                    label,
+                )
+            return ok
+        finally:
+            self._startup_apply_lock = False
+
+    def async_process_device_update(self) -> None:
+        """Publish fresh data and detect starts originating outside HA."""
+        current_power = self.device.properties.get("Pow")
+        power_on = self._last_power == 0 and current_power == 1
+        self._last_power = current_power
+        self.async_set_updated_data(self._build_data())
+        if power_on and self.startup_dred is not None:
+            self.hass.async_create_task(self.async_apply_startup_settings())
 
     async def async_save_energy(self):
         await self._energy_store.async_save({

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.13
+
+### Preferenze per l'accensione successiva
+
+- Aggiunto il selettore HA persistente `I-Demand all'accensione` con `No action`, `Off`, `D1`, `D2` e `D3` per ogni unità compatibile.
+- La preferenza viene applicata a ogni nuova accensione in modalità Cool, sia quando parte da Home Assistant sia quando parte dal monitor/comando a muro.
+- `No action` conserva il comportamento del dispositivo; `Off` azzera esplicitamente DRED, mentre D1/D2/D3 applicano il relativo limite.
+- La preferenza resta memorizzata dopo riavvii e aggiornamenti di Home Assistant ed è disponibile anche a condizionatore spento.
+- Aggiunti gli stessi controlli al pannello personalizzato dell'integrazione.
+
 ## 0.2.12
 
 ### Controlli I-Demand in Home Assistant

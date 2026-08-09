@@ -54,7 +54,8 @@
       "ref_leak": { "name": "Refrigerant Warning" }
     },
     "select": {
-      "dred_level": { "name": "I-Demand / DRED Level" }
+      "dred_level": { "name": "I-Demand / DRED Level" },
+      "startup_dred_level": { "name": "I-Demand at Startup" }
     }
   }
 }

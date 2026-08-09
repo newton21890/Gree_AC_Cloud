@@ -84,6 +84,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
             for option, value in zip(options, values):
                 self._device.properties[option] = value
             self._sync_data()
+            if "Pow" in options:
+                await self.coordinator.async_apply_startup_settings()
 
     # ── hvac mode ─────────────────────────────────────
 
@@ -106,12 +108,15 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity):
             for option, value in zip(options, values):
                 self._device.properties[option] = value
             self._sync_data()
+            if hvac_mode == HVACMode.COOL:
+                await self.coordinator.async_apply_startup_settings()
 
     async def async_turn_on(self):
         mqtt = self.coordinator._mqtt
         if await mqtt.send_command(self._device.mac, ["Pow"], [1]):
             self._device.properties["Pow"] = 1
             self._sync_data()
+            await self.coordinator.async_apply_startup_settings()
 
     async def async_turn_off(self):
         mqtt = self.coordinator._mqtt
