@@ -1223,9 +1223,10 @@ body.desktop .header {
   background:#0c111a; display:flex; flex-direction:column; align-items:stretch; gap:0;
 }
 .header-top { padding:6px 8px 24px; margin:0; gap:10px; }
-.header .icon-ac { width:32px; height:32px; padding:7px; border-radius:9px; color:#06262d; background:var(--primary); }
+.header .icon-ac { width:32px; height:32px; padding:0; border-radius:9px; color:#06262d; background:var(--primary); display:grid; place-items:center; line-height:0; }
+.header .icon-ac svg { display:block; width:18px; height:18px; margin:auto; }
 .header h1 { font-size:16px; font-weight:800; }
-.header .status-badge { margin:0; padding:0; background:none !important; color:var(--text); font-size:10px; font-weight:800; }
+.header .status-badge { margin:0; padding:0; background:none !important; color:var(--text2); font-size:9px; font-weight:500; line-height:1.2; }
 .tab-nav { order:2; display:grid; gap:4px; overflow:visible; }
 .tab-nav::before { content:'NAVIGAZIONE'; padding:4px 12px 5px; color:#57657a; font-size:9px; font-weight:900; letter-spacing:.15em; }
 .tab-btn { display:flex; align-items:center; gap:11px; justify-content:flex-start; width:100%; min-height:42px; border:1px solid transparent; border-radius:9px; padding:0 12px; color:#8c99ae; font-size:12px; font-weight:600; }
@@ -1238,6 +1239,7 @@ body.desktop .header-controls { order:3; margin:0; margin-top:auto; padding:14px
 .sidebar-connection { display:flex; align-items:center; gap:9px; min-height:38px; padding:0 10px; border-radius:8px; background:#0f1722; }
 .connection-dot { width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 0 3px rgba(52,211,153,.12); }
 .sidebar-connection div { min-width:0; display:grid; line-height:1.2; }
+.sidebar-connection strong { color:var(--text); font-size:10px; font-weight:700; }
 .sidebar-connection small { color:var(--text2); font-size:9px; }
 .interval-label { justify-content:space-between; min-height:36px; padding-left:10px; font-size:10px; }
 .interval-label select { min-width:65px; min-height:32px; padding:0 8px; border:1px solid var(--border); border-radius:7px; background:#111722; }
@@ -1298,7 +1300,48 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-details .btn { font-size:9px; }
 .server-info { margin:0; padding:8px 24px; border-top:1px solid var(--border); color:var(--text2); }
 .setup-msg { border:1px solid var(--border); border-radius:13px; background:#111722; }
-#sensorSettings .card { padding:18px; }
+/* ── configuration dialog ────────────────────── */
+.config-modal { display:none; position:fixed; inset:0; z-index:1000; padding:24px; overflow:auto; background:rgba(3,7,13,.82); backdrop-filter:blur(8px); }
+.config-dialog { width:min(980px,100%); margin:20px auto; overflow:hidden; border:1px solid #304056; border-radius:16px; background:#0f151f; box-shadow:0 30px 100px rgba(0,0,0,.65); }
+.config-header { position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:18px 20px; border-bottom:1px solid var(--border); background:#111925; }
+.config-heading { display:flex; align-items:center; gap:12px; }
+.config-heading-icon { width:38px; height:38px; flex:0 0 38px; display:grid; place-items:center; border:1px solid #245f6c; border-radius:10px; color:var(--primary); background:#12323b; }
+.config-heading-icon svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.config-header h2 { margin:0; font-size:17px; letter-spacing:-.02em; }
+.config-header p { margin:2px 0 0; color:var(--text2); font-size:10px; }
+.config-close { width:36px; height:36px; border:1px solid var(--border); border-radius:9px; background:#151d29; color:var(--text2); font-size:19px; cursor:pointer; }
+.config-close:hover { color:var(--text); border-color:#45566e; }
+.config-body { padding:20px; }
+.config-intro { margin:0 0 16px; padding:12px 14px; border:1px solid #203b46; border-radius:10px; color:#9fb4bc; background:#101f27; font-size:11px; }
+.config-loading { min-height:160px; display:grid; place-items:center; color:var(--text2); }
+.config-common { display:grid; grid-template-columns:230px minmax(0,1fr); align-items:center; gap:14px; padding:15px; border:1px solid var(--border); border-radius:11px; background:#111722; }
+.config-common label,.config-field label { color:var(--text2); font-size:10px; font-weight:700; letter-spacing:.035em; text-transform:uppercase; }
+.config-select,.config-input { width:100%; min-height:38px; padding:7px 10px; border:1px solid var(--border); border-radius:8px; background:#151d29; color:var(--text); font:inherit; font-size:11px; }
+.config-select[multiple] { min-height:118px; padding:5px; }
+.config-select option { padding:5px 7px; }
+.config-device { margin-top:14px; overflow:hidden; border:1px solid var(--border); border-radius:12px; background:#111722; }
+.config-device-head { display:flex; align-items:center; justify-content:space-between; gap:15px; padding:13px 15px; border-bottom:1px solid var(--border); background:#121a25; }
+.config-device-head h3 { margin:0; font-size:13px; }
+.config-device-head code { color:var(--text2); font-size:9px; }
+.config-device-body { padding:15px; }
+.config-sensor-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.config-field { display:grid; gap:6px; min-width:0; }
+.config-help { color:var(--text2); font-size:9px; }
+.config-section-title { margin:18px 0 9px; color:#b9c8da; font-size:9px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
+.preset-table { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
+.preset-head,.preset-row { display:grid; grid-template-columns:105px 62px repeat(5,minmax(82px,1fr)) 92px; gap:1px; min-width:780px; align-items:center; }
+.preset-head { color:#718097; background:#0d131c; font-size:8px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
+.preset-head span { padding:9px 8px; }
+.preset-row { border-top:1px solid var(--border); background:#121923; }
+.preset-name { padding:9px 10px; font-size:11px; font-weight:800; }
+.preset-enable { display:flex; justify-content:center; }
+.preset-row .config-input,.preset-row .config-select { min-height:34px; border-radius:0; border-width:0 0 0 1px; background:#151d29; text-align:center; }
+.config-footer { position:sticky; bottom:0; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 20px; border-top:1px solid var(--border); background:#111925; }
+.config-status { color:var(--text2); font-size:10px; }
+.config-actions { display:flex; gap:8px; }
+.config-btn { min-height:38px; padding:0 15px; border:1px solid var(--border); border-radius:9px; background:#151d29; color:var(--text); font:inherit; font-size:11px; font-weight:800; cursor:pointer; }
+.config-btn.primary { color:#aef6ff; border-color:#256575; background:#123943; }
+.config-btn:hover { border-color:#486078; }
 @media (max-width:1100px) {
   .app-shell { grid-template-columns:76px minmax(0,1fr); }
   .header,
@@ -1318,6 +1361,15 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .ops-overview { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
 @media (max-width:720px) {
+  .config-modal { padding:0; }
+  .config-dialog { min-height:100vh; margin:0; border:0; border-radius:0; }
+  .config-body { padding:14px; }
+  .config-common,.config-sensor-grid { grid-template-columns:1fr; }
+  .config-header { padding:14px; }
+  .config-footer { padding:12px 14px; }
+  .config-status { display:none; }
+  .config-actions { width:100%; }
+  .config-btn { flex:1; }
   .app-shell { display:block; }
   .header,
   body.desktop .header { position:sticky; width:100%; height:auto; margin:0; padding:10px 14px; border-right:0; border-bottom:1px solid var(--border); display:grid; grid-template-columns:auto 1fr; align-items:center; gap:8px; }
@@ -1361,7 +1413,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
     <h1>Gree Control</h1>
   </div>
   <div class="header-controls">
-    <div class="sidebar-connection"><span class="connection-dot"></span><div><strong id="statusBadge">Caricamento</strong><small>Gree Cloud</small></div></div>
+    <div class="sidebar-connection"><span class="connection-dot"></span><div><strong>Gree Cloud</strong><small id="statusBadge" class="status-badge">Caricamento</small></div></div>
     <label class="interval-label">
       <span>Intervallo dati</span>
       <select id="intervalSelect" onchange="setPollInterval(this.value)" title="Intervallo di polling">
@@ -1841,11 +1893,20 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 </div>
 </div>
 
-<div id="sensorSettings" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1000;overflow:auto;padding:20px;">
-  <div class="card" style="max-width:850px;margin:20px auto;">
-    <div class="card-header"><h2>⚙ Sensori ambiente Home Assistant</h2><button class="btn" onclick="closeSensorSettings()">Chiudi</button></div>
-    <p style="color:var(--text-secondary);font-size:12px;">Seleziona un sensore esterno comune all’impianto e uno o più sensori interni per ciascun condizionatore. I valori interni validi vengono mediati automaticamente.</p>
-    <div id="sensorSettingsContent">Caricamento…</div>
+<div id="sensorSettings" class="config-modal" role="dialog" aria-modal="true" aria-labelledby="configTitle" onclick="if(event.target===this)closeSensorSettings()">
+  <div class="config-dialog">
+    <header class="config-header">
+      <div class="config-heading"><span class="config-heading-icon"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.95 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.58 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.95a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.05 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.13.61.6 1.08 1.2 1.04H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></span><div><h2 id="configTitle">Configurazione impianto</h2><p>Sensori Home Assistant e profili ambiente</p></div></div>
+      <button class="config-close" onclick="closeSensorSettings()" aria-label="Chiudi configurazione">×</button>
+    </header>
+    <div class="config-body">
+      <p class="config-intro">Associa i sensori dell’abitazione alle unità Gree. Selezionando più sensori, il pannello calcola automaticamente la media dei soli valori disponibili.</p>
+      <div id="sensorSettingsContent" class="config-loading">Caricamento configurazione…</div>
+    </div>
+    <footer class="config-footer">
+      <span class="config-status" id="sensorSettingsGlobalStatus">Le modifiche vengono applicate ricaricando l’integrazione.</span>
+      <div class="config-actions"><button class="config-btn" onclick="closeSensorSettings()">Annulla</button><button class="config-btn primary" id="saveAllSensorSettings">Salva configurazione</button></div>
+    </footer>
   </div>
 </div>
 
@@ -1897,40 +1958,39 @@ async function openSensorSettings() {
   const modal = document.getElementById('sensorSettings');
   const content = document.getElementById('sensorSettingsContent');
   modal.style.display = 'block';
-  content.textContent = 'Caricamento…';
+  content.className = 'config-loading';
+  content.textContent = 'Caricamento configurazione…';
   try {
     const data = await apiFetch(PANEL_ROOM_SENSORS_URL);
     const temperatures = data.sensors.filter(s => s.device_class === 'temperature');
     const humidities = data.sensors.filter(s => s.device_class === 'humidity');
     const outdoor = data.devices.find(d => d.outdoor_temperature_sensor)?.outdoor_temperature_sensor || '';
-    let html = `<div class="control-row"><label>Sensore temperatura esterna comune</label><select id="outdoorSensor"><option value="">Nessuno</option>${sensorOptions(temperatures, [outdoor])}</select></div>`;
+    let html = `<div class="config-common"><label for="outdoorSensor">Temperatura esterna comune</label><select class="config-select" id="outdoorSensor"><option value="">Nessun sensore esterno</option>${sensorOptions(temperatures, [outdoor])}</select></div>`;
     for (const d of data.devices) {
       const presets = d.presets || {};
+      const safeMac = escHtml(d.mac);
       const presetHtml = ['day','night','away'].map(name => {
         const p = presets[name] || {};
         const label = {day:'Giorno',night:'Notte',away:'Assente'}[name];
-        const field = (key, value, placeholder) => `<input id="${key}-${name}-${escHtml(d.mac)}" type="number" step="0.5" value="${value ?? ''}" placeholder="${placeholder}" style="width:105px;">`;
-        return `<div class="control-row" style="align-items:center;"><label>${label}</label>
-          <input id="enabled-${name}-${escHtml(d.mac)}" type="checkbox" ${p.enabled ? 'checked' : ''}> Abilita
-          ${field('target', p.target_temperature ?? 26, 'Target °C')}
-          ${field('off', p.auto_off_temperature, 'Off °C')}
-          ${field('min', p.min_temperature, 'Min °C')}
-          ${field('max', p.max_temperature, 'Max °C')}
-          ${field('humidity', p.humidity_threshold, 'UR %')}
-          <select id="dred-${name}-${escHtml(d.mac)}">${['No action','Off','D1','D2','D3'].map(v => `<option ${p.dred === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        const field = (key, value, title, min, max) => `<input class="config-input" id="${key}-${name}-${safeMac}" aria-label="${title} ${label}" title="${title}" type="number" step="0.5" min="${min}" max="${max}" value="${value ?? ''}" placeholder="—">`;
+        return `<div class="preset-row"><div class="preset-name">${label}</div><div class="preset-enable"><input id="enabled-${name}-${safeMac}" aria-label="Abilita profilo ${label}" type="checkbox" ${p.enabled ? 'checked' : ''}></div>
+          ${field('target', p.target_temperature ?? 26, 'Target °C', 16, 30)}
+          ${field('off', p.auto_off_temperature, 'Spegnimento °C', 16, 35)}
+          ${field('min', p.min_temperature, 'Soglia minima °C', 10, 30)}
+          ${field('max', p.max_temperature, 'Soglia massima °C', 16, 35)}
+          ${field('humidity', p.humidity_threshold, 'Umidità massima %', 0, 100)}
+          <select class="config-select" id="dred-${name}-${safeMac}" aria-label="I-Demand profilo ${label}">${['No action','Off','D1','D2','D3'].map(value => `<option ${p.dred === value ? 'selected' : ''}>${value === 'No action' ? 'Invariato' : value}</option>`).join('')}</select>
         </div>`;
       }).join('');
-      html += `<div class="wiki" style="margin-top:14px;"><h3>${escHtml(d.name)} <code>${escHtml(d.mac)}</code></h3>
-        <label>Temperatura interna — selezione multipla, viene calcolata la media</label>
-        <select id="temp-${escHtml(d.mac)}" multiple size="6" style="width:100%;margin:6px 0 12px;">${sensorOptions(temperatures, d.temperature_sensors)}</select>
-        <label>Umidità interna — selezione multipla, viene calcolata la media</label>
-        <select id="hum-${escHtml(d.mac)}" multiple size="5" style="width:100%;margin:6px 0 12px;">${sensorOptions(humidities, d.humidity_sensors)}</select>
-        <h4>Profili climate</h4><p style="font-size:11px;color:var(--text-secondary);">Target, spegnimento automatico, limiti min/max, soglia umidità e I-Demand. Lascia vuote le soglie non desiderate.</p>
-        ${presetHtml}
-        <button class="btn active" onclick="saveRoomSensors('${escHtml(d.entry_id)}','${escHtml(d.mac)}')">Salva sensori e profili</button>
-        <span id="sensor-status-${escHtml(d.mac)}" style="margin-left:8px;font-size:11px;"></span></div>`;
+      html += `<section class="config-device" data-entry-id="${escHtml(d.entry_id)}" data-config-mac="${safeMac}"><header class="config-device-head"><h3>${escHtml(d.name)}</h3><code>${safeMac}</code></header><div class="config-device-body">
+        <div class="config-sensor-grid"><div class="config-field"><label for="temp-${safeMac}">Temperatura ambiente</label><select class="config-select" id="temp-${safeMac}" multiple size="5">${sensorOptions(temperatures, d.temperature_sensors)}</select><span class="config-help">⌘/Ctrl + clic per selezionare più sensori.</span></div>
+        <div class="config-field"><label for="hum-${safeMac}">Umidità ambiente</label><select class="config-select" id="hum-${safeMac}" multiple size="5">${sensorOptions(humidities, d.humidity_sensors)}</select><span class="config-help">I valori validi vengono mediati automaticamente.</span></div></div>
+        <div class="config-section-title">Profili automatici</div><div class="preset-table"><div class="preset-head"><span>Profilo</span><span>Attivo</span><span>Target</span><span>Off</span><span>Min</span><span>Max</span><span>Umidità</span><span>I-Demand</span></div>${presetHtml}</div>
+        <span id="sensor-status-${safeMac}" class="config-help"></span></div></section>`;
     }
+    content.classList.remove('config-loading');
     content.innerHTML = html;
+    document.getElementById('saveAllSensorSettings').onclick = saveAllRoomSensors;
   } catch (e) {
     content.innerHTML = `<p style="color:var(--red);">Errore: ${escHtml(e.message)}</p>`;
   }
@@ -1940,7 +2000,30 @@ function closeSensorSettings() {
   document.getElementById('sensorSettings').style.display = 'none';
 }
 
-async function saveRoomSensors(entryId, mac) {
+async function saveAllRoomSensors() {
+  const button = document.getElementById('saveAllSensorSettings');
+  const globalStatus = document.getElementById('sensorSettingsGlobalStatus');
+  const devices = Array.from(document.querySelectorAll('[data-config-mac]'));
+  if (!devices.length) return;
+  button.disabled = true;
+  button.textContent = 'Salvataggio…';
+  globalStatus.textContent = `Salvataggio di ${devices.length} unità…`;
+  try {
+    for (const device of devices) {
+      await saveRoomSensors(device.dataset.entryId, device.dataset.configMac, false);
+    }
+    globalStatus.textContent = 'Configurazione salvata. L’integrazione si sta ricaricando…';
+    button.textContent = 'Salvato ✓';
+    setTimeout(closeSensorSettings, 1400);
+  } catch (e) {
+    globalStatus.textContent = 'Errore: ' + e.message;
+    button.textContent = 'Riprova';
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function saveRoomSensors(entryId, mac, closeAfter = false) {
   const selected = id => Array.from(document.getElementById(id).selectedOptions).map(o => o.value);
   const status = document.getElementById(`sensor-status-${mac}`);
   status.textContent = 'Salvataggio…';
@@ -1973,9 +2056,11 @@ async function saveRoomSensors(entryId, mac) {
         presets,
       }),
     });
-    status.textContent = 'Salvato. L’integrazione si ricarica…';
+    status.textContent = 'Salvato ✓';
+    if (closeAfter) setTimeout(closeSensorSettings, 900);
   } catch (e) {
     status.textContent = 'Errore: ' + e.message;
+    throw e;
   }
 }
 
@@ -2394,7 +2479,7 @@ function renderOperationsDevice(d) {
         <span class="mac-label">${safeMac}</span>
         <select onchange="setModel('${safeMac}',this.value)" title="Modello per la stima energetica">
           <option value="">Modello non impostato</option>
-          ${Object.entries(MODELS).map(([key, value]) => `<option value="${key}" ${modelKey === key ? 'selected' : ''}>${value.label}</option>`).join('')}
+          ${Object.entries(MODELS).map(([key, value]) => `<option value="${key}" ${modelKey === key ? 'selected' : ''}>${value.name}</option>`).join('')}
         </select>
       </div>
     </header>

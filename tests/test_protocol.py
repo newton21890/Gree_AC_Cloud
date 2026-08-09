@@ -146,8 +146,8 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "temperature_sensors" in panel_source
     assert 'state["RoomTemperature"]' in panel_source
     assert "Temperatura ambiente${externalRoomTemp" in panel_source
-    assert "Profili climate" in panel_source
-    assert "Salva sensori e profili" in panel_source
+    assert "Profili automatici" in panel_source
+    assert "Salva configurazione" in panel_source
     assert "dashboard-summary" in panel_source
     assert "Profili ambiente" in panel_source
     assert "Dettagli tecnici e sonde diagnostiche" in panel_source
@@ -161,6 +161,9 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "sidebar-connection" in panel_source
     assert "nav-icon" in panel_source
     assert "Aggiorna ora" in panel_source
+    assert "value.name" in panel_source
+    assert "config-dialog" in panel_source
+    assert "saveAllRoomSensors" in panel_source
 
 
 def test_device_command_round_trip() -> None:

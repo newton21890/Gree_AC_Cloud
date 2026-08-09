@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.21
+
+### Correzioni pannello e nuova configurazione
+
+- Corretti i nomi `undefined` nella selezione dei modelli: il pannello usa ora il campo `name` realmente presente nel catalogo.
+- Centrata geometricamente l’icona del marchio nel quadrato Gree Control.
+- Lo stato `2 devices online` non appare più come testo principale evidenziato: `Gree Cloud` è la voce primaria e lo stato è un dettaglio secondario.
+- Riprogettata completamente la configurazione nello stesso design Operations del pannello, con intestazione, sensore esterno, schede per unità e tabella profili.
+- Aggiunto un unico comando `Salva configurazione` per applicare in sequenza sensori e profili di tutte le unità.
+- Migliorata la configurazione responsive, che diventa a schermo intero sugli smartphone.
+
 ## 0.2.20
 
 ### Posizionamento fisso dell’intestazione laterale
