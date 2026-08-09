@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.2
+
+### Correzione override, profili rapidi e pagina Grafici
+
+- Rimosso il falso override Off assegnato automaticamente a ogni unità spenta durante il riavvio.
+- Un override viene ora ripristinato solo se deriva davvero da un comando manuale esplicito; selezionare nuovamente un profilo lo azzera immediatamente.
+- Distinti gli echi MQTT dei comandi Smart dalle variazioni provenienti dal controller o da altri client.
+- Cambio profilo accelerato raggruppando accensione, modalità, target, ventola, Quiet e I-Demand in un unico comando cloud.
+- Corrette le etichette localizzate `Smart (profilo)` e `Invariato` che potevano impedire l’applicazione effettiva di ventola e I-Demand.
+- Aggiunta nella navigazione la pagina dedicata **Grafici**, con una scheda dettagliata per ogni unità; il grafico compatto resta anche nella pagina Controllo.
+- Il pulsante del profilo mostra subito lo stato di applicazione e aggiorna la UI senza l’attesa fissa precedente.
+
 ## 0.5.1
 
 ### Protezione dello spegnimento al riavvio

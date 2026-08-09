@@ -40,6 +40,7 @@ PRESET_FAN_ALIASES = {
     "Medium": "Media",
     "Med-High": "Media-Alta",
     "High": "Alta",
+    "Smart (profilo)": "Smart",
 }
 SMART_MODE_AUTO = "auto"
 SMART_MODE_COOL = "cool"
@@ -123,6 +124,7 @@ STARTUP_DRED_NO_ACTION = "No action"
 PRESET_DRED_SMART = "Smart"
 STARTUP_DRED_OPTIONS = [STARTUP_DRED_NO_ACTION, *DRED_OPTIONS_REV]
 PRESET_DRED_OPTIONS = [STARTUP_DRED_NO_ACTION, PRESET_DRED_SMART, *DRED_OPTIONS_REV]
+PRESET_DRED_ALIASES = {"Invariato": STARTUP_DRED_NO_ACTION}
 
 FAN_MAP = {
     0: "Auto", 1: "Bassa", 2: "Media-Bassa", 3: "Media",

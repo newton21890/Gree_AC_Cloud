@@ -47,6 +47,7 @@ from .const import (
     GREE_CLOUD_SERVERS,
     GREE_MQTT_HOSTS,
     GREE_MQTT_PORTS,
+    PRESET_DRED_ALIASES,
     PRESET_FAN_ALIASES,
     STORAGE_KEY_MODELS,
     STORAGE_VERSION,
@@ -452,7 +453,11 @@ class GreePanelRoomSensorsView(HomeAssistantView):
                 clean_presets[name] = {
                     CONF_PRESET_ENABLED: bool(preset.get(CONF_PRESET_ENABLED)),
                     CONF_PRESET_TARGET: float(preset.get(CONF_PRESET_TARGET, 26)),
-                    CONF_PRESET_DRED: preset.get(CONF_PRESET_DRED, "No action"),
+                    CONF_PRESET_DRED: (
+                        PRESET_DRED_ALIASES.get(preset.get(CONF_PRESET_DRED))
+                        or preset.get(CONF_PRESET_DRED)
+                        or "No action"
+                    ),
                     CONF_PRESET_SMART: bool(preset.get(CONF_PRESET_SMART, True)),
                     CONF_PRESET_MODE: preset.get(CONF_PRESET_MODE, "auto"),
                     CONF_PRESET_ADAPTIVE: bool(preset.get(CONF_PRESET_ADAPTIVE, True)),
@@ -1354,6 +1359,14 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-chart svg { width:100%; height:105px; display:block; }
 .ops-chart-legend { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; font-size:9px; color:var(--text2); }
 .ops-chart-legend i { width:8px; height:8px; display:inline-block; border-radius:50%; margin-right:3px; }
+.charts-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.chart-detail-card { padding:16px; border:1px solid var(--border); border-radius:12px; background:#111722; }
+.chart-detail-card h3 { margin:0 0 4px; font-size:15px; }
+.chart-detail-card p { margin:0 0 12px; color:var(--text2); font-size:10px; }
+.chart-detail-card .ops-chart { margin:0; }
+.chart-values { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; margin-top:10px; }
+.chart-values div { padding:7px; border-radius:7px; background:#0d131d; text-align:center; font-size:9px; color:var(--text2); }
+.chart-values b { display:block; margin-top:2px; color:var(--text); font-size:12px; }
 .ops-empty { margin-top:10px; color:var(--text2); font-size:10px; }
 .ops-telemetry-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:11px; }
 .ops-health { color:var(--green); font-size:9px; }
@@ -1462,6 +1475,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .ops-overview { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .ops-kpi:last-child { display:none; }
   .ops-unit-layout { grid-template-columns:1fr; }
+  .charts-grid { grid-template-columns:1fr; }
+  .chart-values { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .ops-reading,.ops-controls { border-right:0; border-bottom:1px solid var(--border); }
   .ops-modes { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .card-header { padding:12px; }
@@ -1499,6 +1514,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   </div>
   <nav class="tab-nav" aria-label="Navigazione principale">
     <button class="tab-btn active" data-tab="devices" onclick="switchTab('devices')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span><span class="nav-label">Controllo</span></button>
+    <button class="tab-btn" data-tab="charts" onclick="switchTab('charts')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="m5 16 4-5 4 3 6-8"/></svg></span><span class="nav-label">Grafici</span></button>
     <button class="tab-btn" data-tab="wiki" onclick="switchTab('wiki')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A3.5 3.5 0 0 1 7.5 2H11v17H7.5A3.5 3.5 0 0 0 4 22Z"/><path d="M20 5.5A3.5 3.5 0 0 0 16.5 2H13v17h3.5A3.5 3.5 0 0 1 20 22Z"/></svg></span><span class="nav-label">Manuale</span></button>
     <button class="tab-btn" data-tab="logs" onclick="switchTab('logs')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V3"/><path d="M2 19h20"/></svg></span><span class="nav-label">Diagnostica</span></button>
     <button class="tab-btn" data-tab="info" onclick="switchTab('info')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><path d="M12 7h.01"/></svg></span><span class="nav-label">Sistema</span></button>
@@ -1521,6 +1537,10 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
       Settings → Devices &amp; services → Add integration</p>
     </div>
     <div class="devices" id="devices"></div>
+  </div>
+  <div id="tab-charts" style="display:none;">
+    <div class="ops-page-head"><div><h2>Andamento climatico</h2><p>Confronto dettagliato dei valori raccolti durante la sessione del pannello.</p></div></div>
+    <div id="chartsContent" class="charts-grid"></div>
   </div>
   <div id="tab-wiki" style="display:none;">
     <div class="wiki">
@@ -2561,6 +2581,16 @@ function renderEnvironmentChart(mac, state) {
   return `<div class="ops-chart"><div class="ops-chart-legend"><span><i style="background:#22d3ee"></i>Interna</span><span><i style="background:#facc15"></i>Target</span><span><i style="background:#fb7185"></i>Esterna</span><span><i style="background:#60a5fa"></i>Umi. interna</span><span><i style="background:#a78bfa"></i>Umi. esterna</span></div><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 50H100 M0 25H100 M0 75H100" stroke="#273244" stroke-width=".4"/>${draw('room',minT,maxT,'#22d3ee')}${draw('target',minT,maxT,'#facc15')}${draw('outdoor',minT,maxT,'#fb7185')}${draw('humidity',0,100,'#60a5fa')}${draw('outdoorHumidity',0,100,'#a78bfa')}</svg></div>`;
 }
 
+function renderChartsPage(data) {
+  const content = document.getElementById('chartsContent');
+  if (!content) return;
+  content.innerHTML = data.map(d => {
+    const s = d.state || {};
+    const value = (number, suffix) => Number.isFinite(Number(number)) ? Number(number).toFixed(1) + suffix : '--';
+    return `<article class="chart-detail-card"><h3>${escHtml(__DEVICE_NAMES__[d.mac] || d.name || d.mac)}</h3><p>Profilo ${escHtml(s.ActivePreset || 'manuale')} · ${s.Pow ? 'unità accesa' : 'unità spenta'} · ${escHtml(s.smart_last_action || 'nessuna decisione')}</p>${renderEnvironmentChart(d.mac,s)}<div class="chart-values"><div>Interna<b>${value(s.RoomTemperature,'°')}</b></div><div>Target<b>${value(s.smart_effective_target ?? (s.SetDeciTem != null ? s.SetDeciTem/10 : s.SetTem),'°')}</b></div><div>Esterna<b>${value(s.OutdoorTemperature,'°')}</b></div><div>Umi. interna<b>${value(s.RoomHumidity,'%')}</b></div><div>Umi. esterna<b>${value(s.OutdoorHumidity,'%')}</b></div></div></article>`;
+  }).join('');
+}
+
 function renderOperationsDevice(d) {
   const s = d.state || {};
   const pow = Number(s.Pow || 0) === 1;
@@ -2739,6 +2769,8 @@ async function loadData() {
     document.getElementById('opsOverview').innerHTML = renderOperationsOverview(data);
     document.getElementById('opsUpdateText').textContent = `${data.length} unità · ${data.filter(d => d.connected).length} online · aggiornato ${new Date().toLocaleTimeString('it-IT')}`;
     container.innerHTML = data.map(d => renderOperationsDevice(d)).join('');
+    window._lastPanelData = data;
+    renderChartsPage(data);
 
     const info = document.getElementById('serverInfo');
     info.textContent = 'Gree AC Cloud v__VERSION__ | ' + (data[0]?.cloud_host || 'eugrih.gree.com') + ' | ' + (data[0]?.server || 'Europe');
@@ -2760,6 +2792,8 @@ async function loadData() {
 }
 
 async function setPreset(mac, preset) {
+  const button = document.querySelector(`[data-mac="${mac}"] .ops-presets button[onclick*="'${preset}'"]`);
+  if (button) { button.disabled = true; button.textContent = 'APPLICO…'; }
   try {
     const devices = await apiFetch(PANEL_DATA_URL);
     const device = devices.find(d => d.mac === mac);
@@ -2770,9 +2804,11 @@ async function setPreset(mac, preset) {
       headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ entity_id: entityId, preset_mode: preset }),
     });
-    setTimeout(loadData, 1000);
+    await loadData();
   } catch (e) {
     console.error('Preset failed:', e);
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
@@ -2970,13 +3006,14 @@ function onLogAutoRefreshChange() {
 
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  const tabs = ['devices','wiki','umatch','logs','readme','changelog','info'];
+  const tabs = ['devices','charts','wiki','umatch','logs','readme','changelog','info'];
   tabs.forEach(t => {
     const el = document.getElementById('tab-' + t);
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
   const badge = document.getElementById('statusBadge');
-  badge.style.display = tab === 'devices' ? 'inline' : 'none';
+  badge.style.display = ['devices','charts'].includes(tab) ? 'inline' : 'none';
+  if (tab === 'charts' && window._lastPanelData) renderChartsPage(window._lastPanelData);
   if (tab === 'logs') {
     loadLogs();
     onLogAutoRefreshChange();
