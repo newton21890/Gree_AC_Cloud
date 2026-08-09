@@ -1942,23 +1942,50 @@ const __README_CONTENT__ = __README_JSON__;
 const __CHANGELOG_CONTENT__ = __CHANGELOG_JSON__;
 const __DEVICE_NAMES__ = __DEVICE_NAMES_JSON__;
 
-function authHeaders(extra = {}) {
-  const headers = Object.assign({}, extra);
-  let token = null;
-  try { token = window.parent.localStorage.getItem('hassTokens'); } catch (e) {}
-  if (token) {
+function getAccessToken() {
+  // Desktop browsers normally expose the parent HA storage. In the Companion
+  // app the iframe may instead get its own same-origin storage partition.
+  const stores = [];
+  try { stores.push(window.localStorage); } catch (e) {}
+  try { if (window.parent !== window) stores.push(window.parent.localStorage); } catch (e) {}
+  try { if (window.top !== window.parent) stores.push(window.top.localStorage); } catch (e) {}
+  for (const store of stores) {
     try {
-      const parsed = JSON.parse(token);
-      if (parsed.access_token) headers.Authorization = 'Bearer ' + parsed.access_token;
+      const raw = store.getItem('hassTokens');
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && parsed.access_token) return parsed.access_token;
     } catch (e) {}
   }
+
+  // Fallback for HA frontends where auth is kept on the root application
+  // object rather than being readable from iframe localStorage.
+  for (const frame of [window.parent, window.top]) {
+    try {
+      const app = frame.document.querySelector('home-assistant');
+      const auth = app && app.hass && app.hass.auth;
+      const token = auth && (auth.accessToken || (auth.data && auth.data.access_token));
+      if (token) return token;
+    } catch (e) {}
+  }
+  return null;
+}
+
+function authHeaders(extra = {}) {
+  const headers = Object.assign({}, extra);
+  const token = getAccessToken();
+  if (token) headers.Authorization = 'Bearer ' + token;
   return headers;
 }
 
 async function apiFetch(url, opts = {}) {
   opts.headers = authHeaders(opts.headers || {});
+  opts.credentials = 'same-origin';
   const resp = await fetch(url, opts);
-  if (!resp.ok) throw new Error(resp.statusText);
+  if (!resp.ok) {
+    const error = new Error(resp.status === 401 ? 'Autenticazione Home Assistant non disponibile nel pannello' : (resp.statusText || `HTTP ${resp.status}`));
+    error.status = resp.status;
+    throw error;
+  }
   return resp.json();
 }
 
@@ -2616,7 +2643,15 @@ async function loadData() {
     info.textContent = 'Gree AC Cloud v__VERSION__ | ' + (data[0]?.cloud_host || 'eugrih.gree.com') + ' | ' + (data[0]?.server || 'Europe');
   } catch (e) {
     console.error('Load failed:', e);
-    document.getElementById('statusBadge').textContent = 'error';
+    const setupMsg = document.getElementById('setupMsg');
+    const title = setupMsg && setupMsg.querySelector('h2');
+    const detail = setupMsg && setupMsg.querySelector('p');
+    if (setupMsg) setupMsg.style.display = 'block';
+    if (title) title.textContent = e.status === 401 ? 'Sessione non disponibile' : 'Impossibile caricare i dispositivi';
+    if (detail) detail.textContent = e.status === 401
+      ? 'Riapri il pannello da Home Assistant oppure aggiorna la sessione dell’app.'
+      : 'Verifica la connessione a Home Assistant e riprova.';
+    document.getElementById('statusBadge').textContent = e.status === 401 ? 'auth error' : 'error';
     document.getElementById('statusBadge').style.background = 'var(--red)';
     const connectionDot = document.querySelector('.connection-dot');
     if (connectionDot) connectionDot.style.background = 'var(--red)';

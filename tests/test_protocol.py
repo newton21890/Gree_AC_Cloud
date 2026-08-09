@@ -170,6 +170,11 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "smart_enabled" in panel_source
     assert "outdoor_compensation" in panel_source
     assert "Isteresi" in panel_source
+    assert "function getAccessToken()" in panel_source
+    assert "window.localStorage" in panel_source
+    assert "window.parent.localStorage" in panel_source
+    assert "opts.credentials = 'same-origin'" in panel_source
+    assert "Sessione non disponibile" in panel_source
 
 
 def test_device_command_round_trip() -> None:

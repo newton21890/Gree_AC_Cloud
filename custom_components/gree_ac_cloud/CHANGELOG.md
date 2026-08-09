@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2
+
+### Accesso al pannello da smartphone
+
+- Corretta l’autenticazione delle API del pannello negli iframe della Companion App e nei browser mobili con storage separato.
+- Il pannello cerca ora la sessione sia nel proprio contesto sia nel frontend Home Assistant e include le credenziali same-origin nelle richieste.
+- Un problema di sessione o rete viene mostrato esplicitamente e non viene più confuso con l’assenza di dispositivi configurati.
+
 ## 0.3.1
 
 ### Attivazione iniziale dei profili Smart
