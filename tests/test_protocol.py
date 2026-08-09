@@ -151,13 +151,16 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "dashboard-summary" in panel_source
     assert "Profili ambiente" in panel_source
     assert "Dettagli tecnici e sonde diagnostiche" in panel_source
-    assert "⚙ Configura" in panel_source
+    assert "sidebar-action-label\">Configura" in panel_source
     assert "async function setPreset" in panel_source
     assert "Gree Control operations interface" in panel_source
     assert "Controllo climatizzazione" in panel_source
     assert "ops-overview" in panel_source
     assert "renderOperationsDevice" in panel_source
     assert "APRI CONTROLLI AVANZATI" in panel_source
+    assert "sidebar-connection" in panel_source
+    assert "nav-icon" in panel_source
+    assert "Aggiorna ora" in panel_source
 
 
 def test_device_command_round_trip() -> None:

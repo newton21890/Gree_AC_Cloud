@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.19
+
+### Coerenza grafica della barra laterale
+
+- Sostituiti i caratteri Unicode della navigazione con un set SVG coerente per dimensione, tratto e allineamento.
+- Uniformati spaziature, peso del testo, stato attivo e area cliccabile delle quattro voci principali.
+- Ridisegnata l’area inferiore con stato cloud, intervallo dati e due azioni visivamente coerenti.
+- Migliorati la modalità compatta per tablet e il passaggio alla navigazione orizzontale su smartphone.
+- Aggiunti stati focus visibili e un indicatore connessione che segue lo stato reale delle unità.
+
 ## 0.2.18
 
 ### Nuova interfaccia Gree Control

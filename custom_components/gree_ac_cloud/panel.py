@@ -1224,20 +1224,24 @@ body { background:var(--bg); color:var(--text); font-size:14px; padding:0; }
 .header-top { padding:6px 8px 24px; margin:0; gap:10px; }
 .header .icon-ac { width:32px; height:32px; padding:7px; border-radius:9px; color:#06262d; background:var(--primary); }
 .header h1 { font-size:16px; font-weight:800; }
-.header .status-badge { display:none; }
-.tab-nav { order:2; display:grid; gap:3px; overflow:visible; }
-.tab-nav::before { content:'WORKSPACE'; padding:4px 10px 3px; color:#57657a; font-size:9px; font-weight:900; letter-spacing:.15em; }
-.tab-btn { justify-content:flex-start; min-height:42px; border:1px solid transparent; border-radius:9px; padding:0 10px; color:#8c99ae; font-size:12px; }
-.tab-btn::before { width:18px; font-size:14px; text-align:center; }
-.tab-btn[data-tab="devices"]::before { content:'▦'; }
-.tab-btn[data-tab="wiki"]::before { content:'?'; }
-.tab-btn[data-tab="logs"]::before { content:'◫'; }
-.tab-btn[data-tab="info"]::before { content:'⚙'; }
-.tab-btn.active { color:#d9fbff; background:#152733; border-color:#1d4753; box-shadow:none; }
-.header-controls { order:3; margin-top:auto; padding:14px 8px 0; border-top:1px solid var(--border); display:grid; gap:7px; }
-.interval-label { justify-content:space-between; font-size:10px; }
-.interval-label select { min-height:31px; border:1px solid var(--border); border-radius:7px; background:#111722; }
-.refresh-btn { width:100%; min-height:38px; border:1px solid var(--border); border-radius:9px; background:#111722; color:var(--text); font-size:11px; }
+.header .status-badge { margin:0; padding:0; background:none !important; color:var(--text); font-size:10px; font-weight:800; }
+.tab-nav { order:2; display:grid; gap:4px; overflow:visible; }
+.tab-nav::before { content:'NAVIGAZIONE'; padding:4px 12px 5px; color:#57657a; font-size:9px; font-weight:900; letter-spacing:.15em; }
+.tab-btn { display:flex; align-items:center; gap:11px; justify-content:flex-start; width:100%; min-height:42px; border:1px solid transparent; border-radius:9px; padding:0 12px; color:#8c99ae; font-size:12px; font-weight:600; }
+.nav-icon,.sidebar-action-icon { width:17px; height:17px; flex:0 0 17px; display:grid; place-items:center; }
+.nav-icon svg,.sidebar-action-icon svg { width:100%; height:100%; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.nav-icon svg rect { fill:none; }
+.tab-btn.active { color:#d9fbff; background:#152733; border-color:#1d4753; box-shadow:inset 3px 0 0 var(--primary); }
+.header-controls { order:3; margin-top:auto; padding:14px 8px 0; border-top:1px solid var(--border); display:grid; gap:8px; }
+.sidebar-connection { display:flex; align-items:center; gap:9px; min-height:38px; padding:0 10px; border-radius:8px; background:#0f1722; }
+.connection-dot { width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 0 3px rgba(52,211,153,.12); }
+.sidebar-connection div { min-width:0; display:grid; line-height:1.2; }
+.sidebar-connection small { color:var(--text2); font-size:9px; }
+.interval-label { justify-content:space-between; min-height:36px; padding-left:10px; font-size:10px; }
+.interval-label select { min-width:65px; min-height:32px; padding:0 8px; border:1px solid var(--border); border-radius:7px; background:#111722; }
+.refresh-btn { display:flex; align-items:center; justify-content:flex-start; gap:10px; width:100%; min-height:40px; padding:0 11px; border:1px solid var(--border); border-radius:9px; background:#111722; color:var(--text); font-size:11px; font-weight:700; }
+.refresh-btn:hover { color:#d9fbff; border-color:#315167; background:#15212f; }
+.refresh-action { color:#aef6ff; border-color:#215563; background:#11313a; }
 button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
 #content { width:100%; max-width:none; min-width:0; margin:0; padding:20px 24px 46px; }
 .ops-page-head { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:18px; }
@@ -1296,13 +1300,14 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 @media (max-width:1100px) {
   .app-shell { grid-template-columns:76px minmax(0,1fr); }
   .header { padding:16px 10px; }
-  .header h1,.tab-btn { font-size:0; }
+  .header h1,.nav-label,.sidebar-action-label { display:none; }
   .header-top { justify-content:center; padding-inline:0; }
   .tab-btn { justify-content:center; padding:0; }
-  .tab-btn::before { font-size:16px; }
-  .tab-nav::before,.interval-label { display:none; }
-  .refresh-btn { font-size:0; padding:0; }
-  .refresh-btn::first-letter { font-size:15px; }
+  .nav-icon { width:18px; height:18px; flex-basis:18px; }
+  .tab-nav::before,.interval-label,.sidebar-connection div { display:none; }
+  .sidebar-connection { justify-content:center; padding:0; }
+  .refresh-btn { justify-content:center; padding:0; }
+  .sidebar-action-icon { width:18px; height:18px; flex-basis:18px; }
   .ops-unit-layout { grid-template-columns:210px minmax(390px,1fr); }
   .ops-telemetry { grid-column:1/-1; border-top:1px solid var(--border); }
   .ops-reading { border-right:1px solid var(--border); }
@@ -1317,12 +1322,14 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .header .icon-ac { width:30px; height:30px; }
   .tab-nav { grid-column:1/-1; display:flex; order:3; }
   .tab-nav::before { display:none; }
-  .tab-btn { flex:1; font-size:10px; justify-content:center; min-height:36px; }
-  .tab-btn::before { font-size:12px; }
+  .tab-btn { flex:1; justify-content:center; min-height:38px; padding:0 8px; }
+  .nav-label { display:inline; font-size:10px; }
+  .nav-icon { width:14px; height:14px; flex-basis:14px; }
+  .tab-btn.active { box-shadow:inset 0 -2px 0 var(--primary); }
   .header-controls { position:absolute; top:9px; right:13px; display:flex; margin:0; padding:0; border:0; }
   .interval-label,.header-controls .refresh-btn:first-of-type { display:none; }
   .refresh-btn { width:36px; min-height:34px; }
-  .header-controls .refresh-btn:last-child::after { content:'↻'; font-size:15px; }
+  .sidebar-action-icon { display:grid; }
   #content { padding:14px; }
   .ops-page-head h2 { font-size:20px; }
   .ops-overview { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -1347,27 +1354,27 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   <div class="header-top">
     <span class="icon-ac"><svg viewBox="0 0 24 24"><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg></span>
     <h1>Gree Control</h1>
-    <span class="status-badge" id="statusBadge">loading...</span>
   </div>
   <div class="header-controls">
+    <div class="sidebar-connection"><span class="connection-dot"></span><div><strong id="statusBadge">Caricamento</strong><small>Gree Cloud</small></div></div>
     <label class="interval-label">
-      Poll:
+      <span>Intervallo dati</span>
       <select id="intervalSelect" onchange="setPollInterval(this.value)" title="Intervallo di polling">
-        <option value="5">5s</option>
-        <option value="10">10s</option>
-        <option value="15" selected>15s</option>
-        <option value="30">30s</option>
-        <option value="60">60s</option>
+        <option value="5">5 s</option>
+        <option value="10">10 s</option>
+        <option value="15" selected>15 s</option>
+        <option value="30">30 s</option>
+        <option value="60">60 s</option>
       </select>
     </label>
-    <button class="refresh-btn" onclick="openSensorSettings()" title="Configura sensori ambiente e profili">⚙ Configura</button>
-    <button class="refresh-btn" onclick="refreshNow()" title="Aggiorna ora">↻</button>
+    <button class="refresh-btn" onclick="openSensorSettings()" title="Configura sensori ambiente e profili"><span class="sidebar-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.95 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.58 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.95a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.05 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.13.61.6 1.08 1.2 1.04H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></span><span class="sidebar-action-label">Configura</span></button>
+    <button class="refresh-btn refresh-action" onclick="refreshNow()" title="Aggiorna ora"><span class="sidebar-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 6v5h-5"/><path d="M19 11a7 7 0 1 0 1 4"/></svg></span><span class="sidebar-action-label">Aggiorna ora</span></button>
   </div>
-  <nav class="tab-nav">
-    <button class="tab-btn active" data-tab="devices" onclick="switchTab('devices')">Controllo</button>
-    <button class="tab-btn" data-tab="wiki" onclick="switchTab('wiki')">Manuale</button>
-    <button class="tab-btn" data-tab="logs" onclick="switchTab('logs')">Diagnostica</button>
-    <button class="tab-btn" data-tab="info" onclick="switchTab('info')">Sistema</button>
+  <nav class="tab-nav" aria-label="Navigazione principale">
+    <button class="tab-btn active" data-tab="devices" onclick="switchTab('devices')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span><span class="nav-label">Controllo</span></button>
+    <button class="tab-btn" data-tab="wiki" onclick="switchTab('wiki')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A3.5 3.5 0 0 1 7.5 2H11v17H7.5A3.5 3.5 0 0 0 4 22Z"/><path d="M20 5.5A3.5 3.5 0 0 0 16.5 2H13v17h3.5A3.5 3.5 0 0 1 20 22Z"/></svg></span><span class="nav-label">Manuale</span></button>
+    <button class="tab-btn" data-tab="logs" onclick="switchTab('logs')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V3"/><path d="M2 19h20"/></svg></span><span class="nav-label">Diagnostica</span></button>
+    <button class="tab-btn" data-tab="info" onclick="switchTab('info')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><path d="M12 7h.01"/></svg></span><span class="nav-label">Sistema</span></button>
     <button class="tab-btn" data-tab="umatch" onclick="switchTab('umatch')" style="display:none;">U-Match</button>
     <button class="tab-btn" data-tab="readme" onclick="switchTab('readme')" style="display:none;">README</button>
     <button class="tab-btn" data-tab="changelog" onclick="switchTab('changelog')" style="display:none;">Changelog</button>
@@ -2481,6 +2488,8 @@ async function loadData() {
     const allConnected = data.every(d => d.connected);
     badge.textContent = allConnected ? `${data.length} device${data.length > 1 ? 's' : ''} online` : `${data.filter(d => d.connected).length}/${data.length} online`;
     badge.style.background = allConnected ? 'var(--green)' : 'var(--yellow)';
+    const connectionDot = document.querySelector('.connection-dot');
+    if (connectionDot) connectionDot.style.background = allConnected ? 'var(--green)' : 'var(--yellow)';
 
     document.getElementById('opsOverview').innerHTML = renderOperationsOverview(data);
     document.getElementById('opsUpdateText').textContent = `${data.length} unità · ${data.filter(d => d.connected).length} online · aggiornato ${new Date().toLocaleTimeString('it-IT')}`;
@@ -2492,6 +2501,8 @@ async function loadData() {
     console.error('Load failed:', e);
     document.getElementById('statusBadge').textContent = 'error';
     document.getElementById('statusBadge').style.background = 'var(--red)';
+    const connectionDot = document.querySelector('.connection-dot');
+    if (connectionDot) connectionDot.style.background = 'var(--red)';
   }
 }
 
