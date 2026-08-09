@@ -1207,14 +1207,146 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
   .md-content { font-size: 13px; }
   .md-content h1 { font-size: 20px; }
 }
+/* ── Gree Control operations interface ───────── */
+:root {
+  --primary:#22d3ee; --primary-glow:rgba(34,211,238,.18);
+  --green:#34d399; --red:#fb7185; --yellow:#fb923c;
+  --bg:#090d14; --card-bg:#111722; --card-border:#263142;
+  --text:#f1f5f9; --text2:#8290a5; --border:#263142;
+}
+body { background:var(--bg); color:var(--text); font-size:14px; padding:0; }
+.app-shell { min-height:100vh; display:grid; grid-template-columns:220px minmax(0,1fr); }
+.header {
+  position:sticky; top:0; z-index:20; height:100vh; padding:18px 14px;
+  border:0; border-right:1px solid var(--border); border-radius:0;
+  background:#0c111a; display:flex; flex-direction:column; align-items:stretch;
+}
+.header-top { padding:6px 8px 24px; margin:0; gap:10px; }
+.header .icon-ac { width:32px; height:32px; padding:7px; border-radius:9px; color:#06262d; background:var(--primary); }
+.header h1 { font-size:16px; font-weight:800; }
+.header .status-badge { display:none; }
+.tab-nav { order:2; display:grid; gap:3px; overflow:visible; }
+.tab-nav::before { content:'WORKSPACE'; padding:4px 10px 3px; color:#57657a; font-size:9px; font-weight:900; letter-spacing:.15em; }
+.tab-btn { justify-content:flex-start; min-height:42px; border:1px solid transparent; border-radius:9px; padding:0 10px; color:#8c99ae; font-size:12px; }
+.tab-btn::before { width:18px; font-size:14px; text-align:center; }
+.tab-btn[data-tab="devices"]::before { content:'▦'; }
+.tab-btn[data-tab="wiki"]::before { content:'?'; }
+.tab-btn[data-tab="logs"]::before { content:'◫'; }
+.tab-btn[data-tab="info"]::before { content:'⚙'; }
+.tab-btn.active { color:#d9fbff; background:#152733; border-color:#1d4753; box-shadow:none; }
+.header-controls { order:3; margin-top:auto; padding:14px 8px 0; border-top:1px solid var(--border); display:grid; gap:7px; }
+.interval-label { justify-content:space-between; font-size:10px; }
+.interval-label select { min-height:31px; border:1px solid var(--border); border-radius:7px; background:#111722; }
+.refresh-btn { width:100%; min-height:38px; border:1px solid var(--border); border-radius:9px; background:#111722; color:var(--text); font-size:11px; }
+button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+#content { width:100%; max-width:none; min-width:0; margin:0; padding:20px 24px 46px; }
+.ops-page-head { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:18px; }
+.ops-page-head h2 { margin:0; font-size:24px; letter-spacing:-.035em; }
+.ops-page-head p { margin:4px 0 0; color:var(--text2); font-size:12px; }
+.ops-overview { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
+.ops-kpi { min-width:0; padding:13px; border:1px solid var(--border); border-radius:11px; background:#111722; }
+.ops-kpi span { display:block; color:var(--text2); font-size:9px; letter-spacing:.07em; white-space:nowrap; }
+.ops-kpi b { display:block; margin-top:4px; font-size:21px; overflow:hidden; text-overflow:ellipsis; }
+.ops-kpi small { display:block; margin-top:2px; color:var(--green); font-size:9px; }
+.devices { display:grid; gap:12px; }
+.card { padding:0; overflow:hidden; border:1px solid var(--border); border-radius:13px; background:#111722; box-shadow:none; }
+.card.on { border-color:#2c3b4f; box-shadow:none; }
+.card-header { padding:14px 16px; border-bottom:1px solid var(--border); background:#101620; }
+.header-row1 h2 { font-size:14px; }
+.header-row1 .conn-badge { color:var(--green); background:#11322a; border-radius:8px; font-size:9px; }
+.header-row2 select { max-width:180px; background:#151d29; border-color:var(--border); }
+.card-body { padding:0; }
+.ops-unit-layout { display:grid; grid-template-columns:240px minmax(410px,1fr) 265px; }
+.ops-reading,.ops-controls,.ops-telemetry { min-width:0; padding:16px; }
+.ops-reading,.ops-controls { border-right:1px solid var(--border); }
+.ops-reading-label,.ops-section-label { color:var(--text2); font-size:9px; letter-spacing:.09em; text-transform:uppercase; }
+.ops-room-temp { margin:15px 0 10px; font-size:45px; line-height:1; font-weight:700; letter-spacing:-.06em; }
+.ops-reading-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px; }
+.ops-mini { padding:10px; border:1px solid #202b3a; border-radius:8px; background:#0e151f; }
+.ops-mini b { display:block; font-size:14px; }
+.ops-mini span { color:var(--text2); font-size:9px; }
+.ops-power-row { display:flex; justify-content:space-between; align-items:center; min-height:38px; }
+.ops-state { color:var(--green); font-size:10px; font-weight:800; }
+.ops-power { width:38px; height:38px; border:1px solid #256978; border-radius:9px; background:#143942; color:var(--primary); font-size:17px; cursor:pointer; }
+.card:not(.on) .ops-power { color:#798597; border-color:var(--border); background:#171d27; }
+.ops-target { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:15px 0 12px; }
+.temp-control { margin-left:0; }
+.temp-control .temp-value { min-width:55px; font-size:24px; }
+.temp-control .temp-btn { width:34px; height:34px; border-color:var(--border); border-radius:8px; background:#151d29; }
+.ops-modes { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:5px; }
+.ops-modes .btn { min-height:47px; padding:5px 2px; border-color:var(--border); border-radius:8px; background:#151d29; color:#8490a1; font-size:9px; }
+.ops-modes .btn.active { color:#aef6ff; border-color:#28778a; background:#11353e; box-shadow:none; }
+.ops-presets { display:flex; gap:5px; margin-top:10px; }
+.ops-presets .btn { flex:1; min-height:32px; border-radius:7px; font-size:9px; }
+.ops-presets .btn.active { color:#10151c; border-color:var(--yellow); background:var(--yellow); box-shadow:none; }
+.ops-empty { margin-top:10px; color:var(--text2); font-size:10px; }
+.ops-telemetry-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:11px; }
+.ops-health { color:var(--green); font-size:9px; }
+.ops-data-row { display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid #222c3b; color:var(--text2); font-size:10px; }
+.ops-data-row b { color:var(--text); text-align:right; }
+.ops-details { margin-top:12px; padding-top:10px; border-top:0; }
+.ops-details summary { min-height:32px; padding:8px; border:1px solid var(--border); border-radius:7px; text-align:center; cursor:pointer; color:#98a7bc; font-size:9px; }
+.ops-details .control-row { display:grid; grid-template-columns:1fr; align-items:start; margin-top:10px; }
+.ops-details .control-row label { width:auto; }
+.ops-details .btn-group { max-width:none; }
+.ops-details .btn { font-size:9px; }
+.server-info { margin:0; padding:8px 24px; border-top:1px solid var(--border); color:var(--text2); }
+.setup-msg { border:1px solid var(--border); border-radius:13px; background:#111722; }
+#sensorSettings .card { padding:18px; }
+@media (max-width:1100px) {
+  .app-shell { grid-template-columns:76px minmax(0,1fr); }
+  .header { padding:16px 10px; }
+  .header h1,.tab-btn { font-size:0; }
+  .header-top { justify-content:center; padding-inline:0; }
+  .tab-btn { justify-content:center; padding:0; }
+  .tab-btn::before { font-size:16px; }
+  .tab-nav::before,.interval-label { display:none; }
+  .refresh-btn { font-size:0; padding:0; }
+  .refresh-btn::first-letter { font-size:15px; }
+  .ops-unit-layout { grid-template-columns:210px minmax(390px,1fr); }
+  .ops-telemetry { grid-column:1/-1; border-top:1px solid var(--border); }
+  .ops-reading { border-right:1px solid var(--border); }
+  .ops-controls { border-right:0; }
+  .ops-overview { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (max-width:720px) {
+  .app-shell { display:block; }
+  .header { position:sticky; width:auto; height:auto; padding:10px 14px; border-right:0; border-bottom:1px solid var(--border); display:grid; grid-template-columns:auto 1fr; gap:8px; }
+  .header-top { justify-content:flex-start; padding:0; }
+  .header h1 { display:block; font-size:14px; }
+  .header .icon-ac { width:30px; height:30px; }
+  .tab-nav { grid-column:1/-1; display:flex; order:3; }
+  .tab-nav::before { display:none; }
+  .tab-btn { flex:1; font-size:10px; justify-content:center; min-height:36px; }
+  .tab-btn::before { font-size:12px; }
+  .header-controls { position:absolute; top:9px; right:13px; display:flex; margin:0; padding:0; border:0; }
+  .interval-label,.header-controls .refresh-btn:first-of-type { display:none; }
+  .refresh-btn { width:36px; min-height:34px; }
+  .header-controls .refresh-btn:last-child::after { content:'↻'; font-size:15px; }
+  #content { padding:14px; }
+  .ops-page-head h2 { font-size:20px; }
+  .ops-overview { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .ops-kpi:last-child { display:none; }
+  .ops-unit-layout { grid-template-columns:1fr; }
+  .ops-reading,.ops-controls { border-right:0; border-bottom:1px solid var(--border); }
+  .ops-modes { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .card-header { padding:12px; }
+  .header-row2 { flex-wrap:wrap; }
+}
+@media (max-width:420px) {
+  .ops-overview { grid-template-columns:1fr 1fr; }
+  .ops-kpi b { font-size:18px; }
+  .ops-page-head p { font-size:10px; }
+}
 </style>
 </head>
 <body>
+<div class="app-shell">
 
 <div class="header">
   <div class="header-top">
     <span class="icon-ac"><svg viewBox="0 0 24 24"><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg></span>
-    <h1>Gree AC Cloud</h1>
+    <h1>Gree Control</h1>
     <span class="status-badge" id="statusBadge">loading...</span>
   </div>
   <div class="header-controls">
@@ -1244,6 +1376,10 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
 
 <div id="content">
   <div id="tab-devices">
+    <div class="ops-page-head">
+      <div><h2>Controllo climatizzazione</h2><p id="opsUpdateText">Caricamento unità e telemetria…</p></div>
+    </div>
+    <div class="ops-overview" id="opsOverview"></div>
     <div class="setup-msg" id="setupMsg">
       <span class="icon-ac"><svg viewBox="0 0 24 24"><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg></span>
       <h2>No devices found</h2>
@@ -1690,6 +1826,7 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
   <div id="tab-info" style="display:none;">
     <div id="infoContent"></div>
   </div>
+</div>
 </div>
 
 <div id="sensorSettings" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1000;overflow:auto;padding:20px;">
@@ -2183,6 +2320,146 @@ function renderDevice(d) {
 </div>`;
 }
 
+function renderOperationsDevice(d) {
+  const s = d.state || {};
+  const pow = Number(s.Pow || 0) === 1;
+  const mod = Number(s.Mod || 0);
+  const target = s.SetDeciTem != null ? (Number(s.SetDeciTem) / 10).toFixed(1) : (s.SetTem || '--');
+  const measuredAir = s.TemSen;
+  const roomTemp = s.RoomTemperature != null
+    ? Number(s.RoomTemperature)
+    : (measuredAir != null ? Number(measuredAir) - 40 : null);
+  const humidity = s.RoomHumidity != null ? Number(s.RoomHumidity) : (s.InHumi != null ? Number(s.InHumi) : null);
+  const probeIn = s.InTem != null ? Number(parseTemp(s.InTem)) : null;
+  const probeOut = s.OutTem != null ? Number(parseTemp(s.OutTem)) : null;
+  const safeMac = escHtml(String(d.mac || ''));
+  const modelKey = getModelKey(d.mac);
+  const model = MODELS[modelKey] || null;
+  const estPower = s.estimated_power_w != null
+    ? Number(s.estimated_power_w) / 1000
+    : estimatePower(s, model);
+  const energy = s.estimated_energy_kwh != null
+    ? Number(s.estimated_energy_kwh).toFixed(2)
+    : ((_kwhTracker[d.mac] && _kwhTracker[d.mac].kwh)
+      ? _kwhTracker[d.mac].kwh.toFixed(2) : '0.00');
+  const modeNames = ['Automatico', 'Raffrescamento', 'Riscaldamento', 'Ventilazione', 'Deumidificazione'];
+  const modeShort = ['AUTO', 'FREDDO', 'CALDO', 'VENTOLA', 'DRY'];
+  const modeIcons = ['◎', '❄', '☀', '≋', '◇'];
+  const modeClasses = ['auto', 'cool', 'heat', 'fan', 'dry'];
+  const modeName = modeNames[mod] || 'Sconosciuta';
+  const activePreset = s.ActivePreset || null;
+  const enabledPresets = Object.entries(s.Presets || {}).filter(([, preset]) => preset && preset.enabled);
+  const iDemandActive = s.IdemandActive === true || Number(s.Idemand || 0) === 1;
+  const effectiveDred = s.DREDEffective != null
+    ? Number(s.DREDEffective)
+    : (Number(s.DRED || 0) === 0 && iDemandActive ? 1 : Number(s.DRED || 0));
+  const startupDred = s.StartupDRED == null ? 'none' : String(s.StartupDRED);
+  const errorCode = Number(s.Errcode || 0);
+  const deviceName = __DEVICE_NAMES__[d.mac] || d.name || 'Gree AC';
+  const presetLabels = { day: 'GIORNO', night: 'NOTTE', away: 'ASSENTE' };
+  const fanLabels = ['Auto', 'Bassa', 'Medio-bassa', 'Media', 'Medio-alta', 'Alta'];
+
+  if (pow && modelKey && estPower > 0) {
+    if (!_kwhTracker[d.mac]) _kwhTracker[d.mac] = { lastRender: Date.now(), kwh: 0 };
+    const tracker = _kwhTracker[d.mac];
+    const elapsed = (Date.now() - tracker.lastRender) / 3600000;
+    if (elapsed > 0.001) tracker.kwh += estPower * elapsed;
+    tracker.lastRender = Date.now();
+  } else if (!pow && _kwhTracker[d.mac]) {
+    _kwhTracker[d.mac].kwh = 0;
+  }
+
+  return `<article class="card${pow ? ' on' : ''}" data-mac="${safeMac}">
+    <header class="card-header">
+      <div class="header-row1">
+        <div class="name-group">
+          <span class="icon-ac"><svg viewBox="0 0 24 24"><path d="M4 5h16v3H4zm2 5h12v2H6zm2 4h8v2H8z"/></svg></span>
+          <h2 onclick="renameDevice('${safeMac}')" title="Clicca per rinominare">${escHtml(deviceName)}</h2>
+          <span class="conn-badge ${d.connected ? '' : 'off'}">${d.connected ? 'ONLINE' : 'OFFLINE'}</span>
+        </div>
+      </div>
+      <div class="header-row2">
+        <span class="mac-label">${safeMac}</span>
+        <select onchange="setModel('${safeMac}',this.value)" title="Modello per la stima energetica">
+          <option value="">Modello non impostato</option>
+          ${Object.entries(MODELS).map(([key, value]) => `<option value="${key}" ${modelKey === key ? 'selected' : ''}>${value.label}</option>`).join('')}
+        </select>
+      </div>
+    </header>
+    <div class="card-body ops-unit-layout">
+      <section class="ops-reading">
+        <div class="ops-reading-label">Temperatura ambiente</div>
+        <div class="ops-room-temp">${roomTemp != null && Number.isFinite(roomTemp) ? roomTemp.toFixed(1) : '--'}°</div>
+        <div class="ops-state">${pow ? '● ACCESO' : '○ SPENTO'} · ${escHtml(modeName.toUpperCase())}</div>
+        <div class="ops-reading-grid">
+          <div class="ops-mini"><b>${humidity != null && Number.isFinite(humidity) ? humidity.toFixed(1) + '%' : '--'}</b><span>UMIDITÀ</span></div>
+          <div class="ops-mini"><b>${s.OutdoorTemperature != null ? Number(s.OutdoorTemperature).toFixed(1) + '°' : '--'}</b><span>ESTERNO HA</span></div>
+          <div class="ops-mini"><b>${s.RoomTemperatureSensors?.length || 0}</b><span>SONDE TEMP. HA</span></div>
+          <div class="ops-mini"><b>${s.RoomHumiditySensors?.length || 0}</b><span>SONDE UMIDITÀ HA</span></div>
+        </div>
+      </section>
+      <section class="ops-controls">
+        <div class="ops-power-row">
+          <div><div class="ops-section-label">Stato unità</div><span class="ops-state">${pow ? 'DISPOSITIVO ATTIVO' : 'DISPOSITIVO SPENTO'}</span></div>
+          <button class="ops-power" onclick="setPower('${safeMac}',${pow ? 0 : 1})" aria-label="${pow ? 'Spegni' : 'Accendi'} ${escHtml(deviceName)}" title="${pow ? 'Spegni' : 'Accendi'}">⏻</button>
+        </div>
+        <div class="ops-target">
+          <div><div class="ops-section-label">Temperatura obiettivo</div><span class="state-line">Intervallo 16–30 °C</span></div>
+          <div class="temp-control">
+            <button class="temp-btn" onclick="setTemp('${safeMac}',-0.5)" aria-label="Riduci temperatura">−</button>
+            <span class="temp-value">${target}</span><span class="temp-unit">°C</span>
+            <button class="temp-btn" onclick="setTemp('${safeMac}',0.5)" aria-label="Aumenta temperatura">+</button>
+          </div>
+        </div>
+        <div class="ops-section-label" style="margin-bottom:7px">Modalità</div>
+        <div class="ops-modes">
+          ${[0,1,2,3,4].map(value => `<button class="btn mode-${modeClasses[value]} ${mod === value && pow ? 'active' : ''}" onclick="setMode('${safeMac}',${value})" title="${modeNames[value]}"><span style="display:block;font-size:15px">${modeIcons[value]}</span>${modeShort[value]}</button>`).join('')}
+        </div>
+        <div class="ops-section-label" style="margin-top:12px">Profili ambiente</div>
+        ${enabledPresets.length ? `<div class="ops-presets">${enabledPresets.map(([name]) => `<button class="btn ${activePreset === name ? 'active' : ''}" onclick="setPreset('${safeMac}','${escHtml(name)}')">${presetLabels[name] || escHtml(name).toUpperCase()}</button>`).join('')}</div>` : '<div class="ops-empty">Nessun profilo abilitato. Configuralo dal menu impostazioni.</div>'}
+      </section>
+      <section class="ops-telemetry">
+        <div class="ops-telemetry-head"><span class="ops-section-label">Telemetria</span><span class="ops-health">${errorCode === 0 ? '● NESSUN ERRORE' : '● ERRORE ' + errorCode}</span></div>
+        <div class="ops-data-row"><span>Potenza stimata</span><b>${modelKey || s.estimated_power_w != null ? estPower.toFixed(2) + ' kW' : '--'}</b></div>
+        <div class="ops-data-row"><span>Energia sessione</span><b>${modelKey || s.estimated_energy_kwh != null ? energy + ' kWh' : '--'}</b></div>
+        <div class="ops-data-row"><span>Ventilatore</span><b>${fanLabels[Number(s.WdSpd)] || s.WdSpd || '--'}</b></div>
+        <div class="ops-data-row"><span>Profilo</span><b>${activePreset ? (presetLabels[activePreset] || escHtml(activePreset).toUpperCase()) : 'MANUALE'}</b></div>
+        <div class="ops-data-row"><span>I-Demand</span><b>${s.DREDEn === 1 ? (effectiveDred === 0 ? 'OFF' : (effectiveDred === 1 ? '100%' : effectiveDred === 2 ? '50%' : '75%')) : 'N/D'}</b></div>
+        <div class="ops-data-row"><span>Sonde IDU / ODU</span><b>${probeIn != null ? probeIn.toFixed(1) + '°' : '--'} / ${probeOut != null ? probeOut.toFixed(1) + '°' : '--'}</b></div>
+        <details class="ops-details"><summary>APRI CONTROLLI AVANZATI ↓</summary>
+          <div class="control-row"><label>Ventilatore</label><div class="btn-group">${[0,1,2,3,4,5].map(value => `<button class="btn ${Number(s.WdSpd) === value ? 'active' : ''}" onclick="setFan('${safeMac}',${value})">${fanLabels[value]}</button>`).join('')}</div></div>
+          <div class="control-row"><label>Oscillazione</label><div class="btn-group"><button class="btn ${!s.SwUpDn && !s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','off')">Off</button><button class="btn ${s.SwUpDn && !s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','v')">Verticale</button><button class="btn ${!s.SwUpDn && s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','h')">Orizzontale</button><button class="btn ${s.SwUpDn && s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','both')">Entrambi</button></div></div>
+          <div class="control-row"><label>Funzioni</label><div class="btn-group">${[['Quiet','Silenzioso'],['Tur','Turbo'],['Health','Purifica'],['Blo','X-Fan'],['SvSt','Eco'],['StHt','Strong Heat'],['StCold','Strong Cool'],['HtSp','Heat Support'],['Air','Aria'],['FreshAir','Aria fresca'],['AutoClean','Auto Clean'],['XFA','XFA']].filter(([key]) => s[key] !== undefined).map(([key,label]) => `<button class="btn ${s[key] ? 'active' : ''}" onclick="toggleSwitch('${safeMac}','${key}')">${label}</button>`).join('')}</div></div>
+          ${s.DREDEn === 1 && s.DRED !== undefined ? `<div class="control-row"><label>I-Demand attuale</label><div class="btn-group">${[[0,'Off'],[1,'100%'],[2,'50%'],[3,'75%']].map(([value,label]) => `<button class="btn ${effectiveDred === value ? 'active' : ''}" onclick="setDred('${safeMac}',${value})">${label}</button>`).join('')}</div></div><div class="control-row"><label>All’avvio in Cool</label><div class="btn-group">${[['none','Nessuno'],['1','100%'],['2','50%'],['3','75%']].map(([value,label]) => `<button class="btn ${startupDred === value ? 'active' : ''}" onclick="setStartupDred('${safeMac}','${value}')">${label}</button>`).join('')}</div></div>` : ''}
+          <div class="state-line">Codice errore: ${errorCode}${s.ErrType !== undefined ? ' · tipo ' + escHtml(String(s.ErrType)) : ''} · perdita refrigerante: ${Number(s.RefLeak || 0) ? 'ATTENZIONE' : 'OK'} · stato sistema: ${escHtml(String(s.MSysStatus ?? '--'))}</div>
+          <div class="state-line">InTem: ${escHtml(String(s.InTem ?? '--'))} · OutTem: ${escHtml(String(s.OutTem ?? '--'))} · pulizia: ${escHtml(String(s.CleanState ?? '--'))} · filtro: ${escHtml(String(s.FClTime ?? '--'))}</div>
+        </details>
+      </section>
+    </div>
+  </article>`;
+}
+
+function renderOperationsOverview(data) {
+  const states = data.map(device => device.state || {});
+  const valid = values => values.filter(value => Number.isFinite(value));
+  const average = values => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  const roomTemps = valid(states.map(state => state.RoomTemperature != null ? Number(state.RoomTemperature) : (state.TemSen != null ? Number(state.TemSen) - 40 : NaN)));
+  const humidity = valid(states.map(state => state.RoomHumidity != null ? Number(state.RoomHumidity) : (state.InHumi != null ? Number(state.InHumi) : NaN)));
+  const outdoor = valid(states.map(state => state.OutdoorTemperature != null ? Number(state.OutdoorTemperature) : NaN));
+  const power = states.reduce((sum, state, index) => {
+    const device = data[index];
+    const model = getModel(device.mac);
+    return sum + (state.estimated_power_w != null ? Number(state.estimated_power_w) / 1000 : estimatePower(state, model));
+  }, 0);
+  const connected = data.filter(device => device.connected).length;
+  const fmt = (value, suffix) => value == null ? '--' : value.toFixed(1) + suffix;
+  return `<div class="ops-kpi"><span>UNITÀ ONLINE</span><b>${connected} / ${data.length}</b><small>${connected === data.length ? '● Tutte operative' : '● Verifica connessione'}</small></div>
+    <div class="ops-kpi"><span>TEMP. MEDIA</span><b>${fmt(average(roomTemps),'°')}</b><small>Media sensori ambiente</small></div>
+    <div class="ops-kpi"><span>UMIDITÀ MEDIA</span><b>${fmt(average(humidity),'%')}</b><small>Media sensori HA</small></div>
+    <div class="ops-kpi"><span>POTENZA STIMATA</span><b>${power > 0 ? power.toFixed(2) + ' kW' : '--'}</b><small>${states.filter(state => Number(state.Pow || 0) === 1).length} unità attive</small></div>
+    <div class="ops-kpi"><span>ESTERNO</span><b>${fmt(average(outdoor),'°')}</b><small>Sensore Home Assistant</small></div>`;
+}
+
 async function loadData() {
   try {
     const data = await apiFetch(PANEL_DATA_URL);
@@ -2195,6 +2472,8 @@ async function loadData() {
       container.innerHTML = '';
       badge.textContent = 'no devices';
       badge.style.background = 'var(--yellow)';
+      document.getElementById('opsOverview').innerHTML = '';
+      document.getElementById('opsUpdateText').textContent = 'Nessuna unità configurata';
       return;
     }
 
@@ -2203,7 +2482,9 @@ async function loadData() {
     badge.textContent = allConnected ? `${data.length} device${data.length > 1 ? 's' : ''} online` : `${data.filter(d => d.connected).length}/${data.length} online`;
     badge.style.background = allConnected ? 'var(--green)' : 'var(--yellow)';
 
-    container.innerHTML = data.map(d => renderDevice(d)).join('');
+    document.getElementById('opsOverview').innerHTML = renderOperationsOverview(data);
+    document.getElementById('opsUpdateText').textContent = `${data.length} unità · ${data.filter(d => d.connected).length} online · aggiornato ${new Date().toLocaleTimeString('it-IT')}`;
+    container.innerHTML = data.map(d => renderOperationsDevice(d)).join('');
 
     const info = document.getElementById('serverInfo');
     info.textContent = 'Gree AC Cloud v__VERSION__ | ' + (data[0]?.cloud_host || 'eugrih.gree.com') + ' | ' + (data[0]?.server || 'Europe');

@@ -153,6 +153,11 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "Dettagli tecnici e sonde diagnostiche" in panel_source
     assert "⚙ Configura" in panel_source
     assert "async function setPreset" in panel_source
+    assert "Gree Control operations interface" in panel_source
+    assert "Controllo climatizzazione" in panel_source
+    assert "ops-overview" in panel_source
+    assert "renderOperationsDevice" in panel_source
+    assert "APRI CONTROLLI AVANZATI" in panel_source
 
 
 def test_device_command_round_trip() -> None:

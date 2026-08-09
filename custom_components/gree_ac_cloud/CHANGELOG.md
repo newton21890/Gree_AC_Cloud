@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.18
+
+### Nuova interfaccia Gree Control
+
+- Applicata al pannello reale la direzione grafica `Operations` scelta dal mockup Gree Control.
+- Aggiunta una barra laterale compatta con navigazione Controllo, Manuale, Diagnostica e Sistema.
+- Inserito un riepilogo impianto con unità online, temperatura e umidità medie, potenza stimata e temperatura esterna.
+- Ogni unità usa ora un layout operativo a tre aree: condizioni ambiente, controlli principali e telemetria.
+- Accensione, target, modalità e profili rimangono immediatamente accessibili; ventilatore, oscillazione, funzioni e I-Demand sono raccolti nei controlli avanzati.
+- Migliorato il comportamento responsive per tablet e smartphone senza rimuovere alcuna funzione esistente.
+
 ## 0.2.17
 
 ### Nuovo pannello di controllo semplificato
