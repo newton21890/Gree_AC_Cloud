@@ -59,8 +59,9 @@ def _history_sensor_ids(hass, entry, device) -> dict[str, list[str]]:
         registry_entry = registry.async_get(entity_id) if entity_id else None
         return entity_id if registry_entry and registry_entry.disabled_by is None else None
 
-    # Climate entities historically use the bare MAC as unique ID.
-    climate_entity = platform_entity(device.mac, "climate")
+    climate_entity = platform_entity(f"climate_{device.mac}", "climate")
+    if climate_entity is None:  # Compatibility with early integration versions.
+        climate_entity = platform_entity(device.mac, "climate")
     fallback_temperature = platform_entity(f"{device.mac}_TemSen", "sensor")
     fallback_humidity = platform_entity(f"{device.mac}_InHumi", "sensor")
     outdoor_temperature = entry.options.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
