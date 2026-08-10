@@ -16,6 +16,7 @@ from .const import (
     CONF_PRESET_DRED,
     CONF_PRESET_ENABLED,
     CONF_PRESET_FAN,
+    CONF_PRESET_HOLD_ACTION,
     CONF_PRESET_HUMIDITY,
     CONF_PRESET_MAX_TEMP,
     CONF_PRESET_MIN_TEMP,
@@ -29,6 +30,8 @@ from .const import (
     PRESET_DRED_OPTIONS,
     PRESET_FAN_ALIASES,
     PRESET_FAN_OPTIONS,
+    PRESET_HOLD_OFF,
+    PRESET_HOLD_OPTIONS,
     PRESET_NAMES,
     SMART_MODES,
 )
@@ -90,6 +93,11 @@ def _clean_profile(profile: dict, current: dict) -> dict:
     )
     if dred not in PRESET_DRED_OPTIONS:
         raise ValueError("invalid I-Demand setting")
+    hold_action = profile.get(
+        CONF_PRESET_HOLD_ACTION, current.get(CONF_PRESET_HOLD_ACTION, PRESET_HOLD_OFF)
+    )
+    if hold_action not in PRESET_HOLD_OPTIONS:
+        raise ValueError("invalid comfort hold action")
 
     cleaned.update(
         {
@@ -105,6 +113,7 @@ def _clean_profile(profile: dict, current: dict) -> dict:
             CONF_PRESET_FAN: fan,
             CONF_PRESET_QUIET: bool(profile.get(CONF_PRESET_QUIET, False)),
             CONF_PRESET_DRED: dred,
+            CONF_PRESET_HOLD_ACTION: hold_action,
         }
     )
     limits = {

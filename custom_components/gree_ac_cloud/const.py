@@ -25,6 +25,11 @@ CONF_PRESET_DEADBAND = "deadband"
 CONF_PRESET_ADAPTIVE = "outdoor_compensation"
 CONF_PRESET_FAN = "fan_speed"
 CONF_PRESET_QUIET = "quiet"
+CONF_PRESET_HOLD_ACTION = "hold_action"
+PRESET_HOLD_OFF = "off"
+PRESET_HOLD_FAN = "fan_only"
+PRESET_HOLD_D1 = "d1_ventilation"
+PRESET_HOLD_OPTIONS = (PRESET_HOLD_OFF, PRESET_HOLD_FAN, PRESET_HOLD_D1)
 PRESET_FAN_SMART = "Smart"
 PRESET_FAN_OPTIONS = (
     "Auto",
@@ -60,7 +65,9 @@ PRESET_MANUAL = "manual"
 PRESET_NAMES = (PRESET_DAY, PRESET_NIGHT, PRESET_AWAY)
 
 UPDATE_INTERVAL = 15
-STALE_AFTER_SECONDS = UPDATE_INTERVAL * 4  # 60s — mark device unavailable after this many seconds without fresh MQTT data
+STALE_AFTER_SECONDS = (
+    UPDATE_INTERVAL * 4
+)  # 60s — mark device unavailable after this many seconds without fresh MQTT data
 
 TARGET_TEMPERATURE_STEP = 1
 MIN_TEMP_C = 16
@@ -97,20 +104,69 @@ GREE_MQTT_PORTS = {
 }
 
 POLL_COLS = [
-    "Pow", "Mod", "SetTem", "WdSpd", "Air", "Blo", "Health",
-    "SwhSlp", "Lig", "SwUpDn", "SwingLfRig", "Quiet", "Tur",
-    "StHt", "TemUn", "HeatCoolType", "TemRec", "SvSt", "SlpMod",
-    "InTem", "OutTem", "TemSen", "InHumi", "SetDeciTem",
-    "Err", "Errcode", "ErrType", "RefLeak", "MSysStatus",
-    "Filter", "CleanEn", "CleanTime", "CleanDataFlag", "CleanState", "FClTime",
-    "Idemand", "DRED", "DREDEn", "WaterSen",
+    "Pow",
+    "Mod",
+    "SetTem",
+    "WdSpd",
+    "Air",
+    "Blo",
+    "Health",
+    "SwhSlp",
+    "Lig",
+    "SwUpDn",
+    "SwingLfRig",
+    "Quiet",
+    "Tur",
+    "StHt",
+    "TemUn",
+    "HeatCoolType",
+    "TemRec",
+    "SvSt",
+    "SlpMod",
+    "InTem",
+    "OutTem",
+    "TemSen",
+    "InHumi",
+    "SetDeciTem",
+    "Err",
+    "Errcode",
+    "ErrType",
+    "RefLeak",
+    "MSysStatus",
+    "Filter",
+    "CleanEn",
+    "CleanTime",
+    "CleanDataFlag",
+    "CleanState",
+    "FClTime",
+    "Idemand",
+    "DRED",
+    "DREDEn",
+    "WaterSen",
 ]
 
 COMMAND_OPTIONS = frozenset(
     {
-        "Pow", "Mod", "SetTem", "SetDeciTem", "WdSpd", "Air", "Blo",
-        "Health", "SwhSlp", "Lig", "SwUpDn", "SwingLfRig", "Quiet", "Tur",
-        "StHt", "TemUn", "TemRec", "SvSt", "SlpMod", "DRED",
+        "Pow",
+        "Mod",
+        "SetTem",
+        "SetDeciTem",
+        "WdSpd",
+        "Air",
+        "Blo",
+        "Health",
+        "SwhSlp",
+        "Lig",
+        "SwUpDn",
+        "SwingLfRig",
+        "Quiet",
+        "Tur",
+        "StHt",
+        "TemUn",
+        "TemRec",
+        "SvSt",
+        "SlpMod",
+        "DRED",
     }
 )
 
@@ -128,14 +184,22 @@ PRESET_DRED_OPTIONS = [STARTUP_DRED_NO_ACTION, PRESET_DRED_SMART, *DRED_OPTIONS_
 PRESET_DRED_ALIASES = {"Invariato": STARTUP_DRED_NO_ACTION}
 
 FAN_MAP = {
-    0: "Auto", 1: "Bassa", 2: "Media-Bassa", 3: "Media",
-    4: "Media-Alta", 5: "Alta",
+    0: "Auto",
+    1: "Bassa",
+    2: "Media-Bassa",
+    3: "Media",
+    4: "Media-Alta",
+    5: "Alta",
 }
 
 FAN_MAP_REV = {v: k for k, v in FAN_MAP.items()}
 
 HVAC_MAP = {
-    0: "auto", 1: "cool", 2: "heat", 3: "fan_only", 4: "dry",
+    0: "auto",
+    1: "cool",
+    2: "heat",
+    3: "fan_only",
+    4: "dry",
 }
 HVAC_MAP_REV = {v: k for k, v in HVAC_MAP.items()}
 
@@ -158,7 +222,11 @@ DEVICE_SENSORS = {
     "MSysStatus": {"name": "System Status", "icon": "mdi:state-machine", "diagnostic": True},
     "CleanState": {"name": "Auto Clean Status", "icon": "mdi:auto-fix", "diagnostic": True},
     "CleanTime": {"name": "Filter Runtime", "icon": "mdi:timer-outline", "diagnostic": True},
-    "FClTime": {"name": "Filter Cleaning Interval", "icon": "mdi:calendar-clock", "diagnostic": True},
+    "FClTime": {
+        "name": "Filter Cleaning Interval",
+        "icon": "mdi:calendar-clock",
+        "diagnostic": True,
+    },
 }
 
 DEVICE_SWITCHES = {

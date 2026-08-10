@@ -35,6 +35,7 @@ from .const import (
     CONF_PRESET_DRED,
     CONF_PRESET_ENABLED,
     CONF_PRESET_FAN,
+    CONF_PRESET_HOLD_ACTION,
     CONF_PRESET_HUMIDITY,
     CONF_PRESET_MAX_TEMP,
     CONF_PRESET_MIN_TEMP,
@@ -57,6 +58,9 @@ from .const import (
     PRESET_DRED_SMART,
     PRESET_FAN_ALIASES,
     PRESET_FAN_SMART,
+    PRESET_HOLD_D1,
+    PRESET_HOLD_FAN,
+    PRESET_HOLD_OFF,
     PRESET_MANUAL,
     PRESET_NAMES,
     SMART_COMMAND_COOLDOWN_SECONDS,
@@ -645,15 +649,53 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         self._smart_dred_level = dred
 
         if desired_mode is None:
-            self._smart_fan_speed = None
-            self._smart_last_action = "comfort_hold"
-            if is_on and can_command:
+            hold_action = preset.get(CONF_PRESET_HOLD_ACTION, PRESET_HOLD_OFF)
+            fan = self._smart_fan_for_profile(preset, HVACMode.FAN_ONLY, current, target, deadband)
+            self._smart_fan_speed = fan if hold_action != PRESET_HOLD_OFF else None
+            self._smart_last_action = f"comfort_hold_{hold_action}"
+            if hold_action == PRESET_HOLD_OFF:
+                if is_on and can_command:
+                    self._preset_action_lock = True
+                    try:
+                        await self.async_turn_off()
+                        self._smart_last_command_at = now
+                        self._smart_last_action = "comfort_reached_off"
+                        self._smart_holding = True
+                    finally:
+                        self._preset_action_lock = False
+            elif can_command:
+                # Two explicit circulation strategies are supported at comfort:
+                # FAN_ONLY is semantically clear and compressor-independent;
+                # D1 keeps Cool selected but requests compressor inhibition on
+                # controllers where this is the preferred ventilation path.
+                hold_mode = HVACMode.FAN_ONLY if hold_action == PRESET_HOLD_FAN else HVACMode.COOL
+                options = ["Pow", "Mod"]
+                values = [1, HVAC_MAP_REV.get(hold_mode, 3)]
+                if fan in FAN_MAP_REV:
+                    options.append("WdSpd")
+                    values.append(FAN_MAP_REV[fan])
+                if hold_action == PRESET_HOLD_D1 and self.coordinator.data.get("DREDEn") == 1:
+                    options.append("DRED")
+                    values.append(DRED_OPTIONS_REV["D1"])
+                elif hold_action == PRESET_HOLD_FAN and "DRED" in self.coordinator.data:
+                    # FAN_ONLY does not need I-Demand; clear any old D1/D2/D3
+                    # so the next compressor request starts from a known state.
+                    options.append("DRED")
+                    values.append(DRED_OPTIONS_REV["Off"])
                 self._preset_action_lock = True
+                self._expect_power_echo(True)
                 try:
-                    await self.async_turn_off()
-                    self._smart_last_command_at = now
-                    self._smart_last_action = "comfort_reached_off"
-                    self._smart_holding = True
+                    if await self.coordinator._mqtt.send_command(self._device.mac, options, values):
+                        for option, value in zip(options, values):
+                            self._device.properties[option] = value
+                        self._sync_data()
+                        self._smart_last_command_at = now
+                        self._smart_last_action = (
+                            "comfort_circulation_fan"
+                            if hold_action == PRESET_HOLD_FAN
+                            else "comfort_circulation_d1"
+                        )
+                        self._smart_holding = True
                 finally:
                     self._preset_action_lock = False
         else:
@@ -677,6 +719,16 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                 ):
                     options.append("DRED")
                     values.append(DRED_OPTIONS_REV[dred])
+                elif (
+                    desired_mode == HVACMode.COOL
+                    and self.coordinator.data.get("DREDEn") == 1
+                    and self._smart_holding
+                    and int(self.coordinator.data.get("DRED", 0)) == 1
+                ):
+                    # Leaving a D1 comfort hold must always restore compressor
+                    # availability, even when cooling I-Demand is "No action".
+                    options.append("DRED")
+                    values.append(DRED_OPTIONS_REV["Off"])
                 self._preset_action_lock = True
                 self._expect_power_echo(True)
                 try:

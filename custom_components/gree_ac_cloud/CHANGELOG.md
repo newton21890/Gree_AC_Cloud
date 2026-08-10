@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.10.0
+
+### Sensori interni e mantenimento del comfort configurabile
+
+- Ripristinato nel pannello un editor dedicato per associare a ogni macchina uno o più sensori interni di temperatura e umidità.
+- Il salvataggio delle associazioni interne conserva profili e sensori esterni; la regolazione usa la media delle sole entità disponibili.
+- Separati chiaramente i pulsanti Sensori interni e Sensori esterni nella pagina Profili.
+- Aggiunta a ogni profilo l'azione da eseguire quando non esiste più richiesta termica: spegnere l'unità, passare a Solo ventola oppure mantenere Cool con D1 e compressore inibito.
+- Solo ventola è l'opzione consigliata per movimentare aria in modo semanticamente chiaro; Cool + D1 è disponibile per gli impianti DRED che preferiscono mantenere la modalità Cool.
+- La strategia I-Demand del raffrescamento resta separata dall'azione di mantenimento: D2/D3/Off modulano una richiesta Cool reale, mentre D1 può ora essere scelto esplicitamente a comfort.
+- L'azione di mantenimento rispetta la velocità ventola del profilo; con ventola Smart usa la velocità Bassa.
+
 ## 0.9.0
 
 ### Profili spiegati, configurazione esterna semplificata e andamento Smart

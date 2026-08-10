@@ -21,6 +21,7 @@ from .const import (
     CONF_PRESET_DRED,
     CONF_PRESET_ENABLED,
     CONF_PRESET_FAN,
+    CONF_PRESET_HOLD_ACTION,
     CONF_PRESET_HUMIDITY,
     CONF_PRESET_MAX_TEMP,
     CONF_PRESET_MIN_TEMP,
@@ -38,6 +39,8 @@ from .const import (
     PRESET_DAY,
     PRESET_DRED_OPTIONS,
     PRESET_FAN_OPTIONS,
+    PRESET_HOLD_OFF,
+    PRESET_HOLD_OPTIONS,
     PRESET_NIGHT,
     SMART_MODES,
 )
@@ -290,6 +293,10 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                     CONF_PRESET_DRED,
                     default=defaults.get(CONF_PRESET_DRED, "No action"),
                 ): vol.In(PRESET_DRED_OPTIONS),
+                vol.Required(
+                    CONF_PRESET_HOLD_ACTION,
+                    default=defaults.get(CONF_PRESET_HOLD_ACTION, PRESET_HOLD_OFF),
+                ): vol.In(PRESET_HOLD_OPTIONS),
             }
         )
 

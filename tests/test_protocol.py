@@ -221,6 +221,10 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
             )
         ]
     )
+    assert "PRESET_HOLD_FAN" in climate_source
+    assert "PRESET_HOLD_D1" in climate_source
+    assert '"comfort_circulation_fan"' in climate_source
+    assert '"comfort_circulation_d1"' in climate_source
     assert "smart_dred_level" in climate_source
     assert "smart_dred_applied" in climate_source
     assert "smart_dred_verified" in climate_source
@@ -262,6 +266,9 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "value.name" in panel_source
     assert "config-dialog" in panel_source
     assert "saveOutdoorSensors" in panel_source
+    assert "openRoomSensorSettings" in panel_source
+    assert "saveRoomSensorAssociations" in panel_source
+    assert "room-sensor-settings" in panel_source
     assert "outdoor-sensor-settings" in panel_source
     assert "Giorno, Notte e Assente si modificano esclusivamente" in panel_source
     sensor_modal_source = panel_source[
@@ -307,6 +314,10 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert 'data-tab="profiles"' in panel_source
     assert "Auto profilo non è Auto Gree" in profiles_source
     assert "allowed_modes" in profiles_source
+    assert "hold_action" in profiles_source
+    assert "Solo ventola" in profiles_source
+    assert "Cool + D1" in profiles_source
+    assert "CONF_PRESET_HOLD_ACTION" in profile_api_source
     assert "È isteresi di riavvio, non tolleranza" in profiles_source
     assert "ogni due minuti e a ogni variazione" in profiles_source
     assert "smart_temperature_trend_c_per_hour" in profiles_source

@@ -62,7 +62,8 @@
           "humidity_threshold": "Humidity switch-off threshold",
           "min_temperature": "Minimum room temperature",
           "max_temperature": "Maximum room temperature",
-          "dred": "I-Demand level"
+          "dred": "I-Demand level while cooling",
+          "hold_action": "Action when comfort is reached"
         }
       },
       "night": {
@@ -82,7 +83,8 @@
           "humidity_threshold": "Humidity switch-off threshold",
           "min_temperature": "Minimum room temperature",
           "max_temperature": "Maximum room temperature",
-          "dred": "I-Demand level"
+          "dred": "I-Demand level while cooling",
+          "hold_action": "Action when comfort is reached"
         }
       },
       "away": {
@@ -102,7 +104,8 @@
           "humidity_threshold": "Humidity switch-off threshold",
           "min_temperature": "Minimum room temperature",
           "max_temperature": "Maximum room temperature",
-          "dred": "I-Demand level"
+          "dred": "I-Demand level while cooling",
+          "hold_action": "Action when comfort is reached"
         }
       }
     },

@@ -1532,6 +1532,11 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .outdoor-sensor-copy .config-section-title { display:block; margin:0 0 7px; color:var(--primary); }
 .outdoor-sensor-copy h3 { margin:0 0 5px; color:#e5eefb; font-size:13px; }
 .outdoor-sensor-copy p { margin:0; color:#8494aa; font-size:10px; line-height:1.55; }
+.room-sensor-settings { display:grid; gap:12px; }
+.room-sensor-device { padding:16px; border:1px solid var(--border); border-radius:12px; background:#101823; }
+.room-sensor-device-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:12px; }
+.room-sensor-device h3 { margin:0 0 3px; font-size:13px; }
+.room-sensor-device code { color:#718097; font-size:9px; }
 .preset-table { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
 .preset-head,.preset-row { display:grid; grid-template-columns:100px 55px 65px 100px 165px 70px 75px 75px 82px 88px 110px 60px 86px; gap:1px; min-width:1195px; align-items:center; }
 .profile-master { display:flex; gap:8px; align-items:center; padding:10px 12px; margin-bottom:12px; border:1px solid rgba(255,193,7,.35); border-radius:8px; background:rgba(255,193,7,.08); font-weight:700; }
@@ -1698,7 +1703,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
     <div id="chartsContent" class="charts-grid"></div>
   </div>
   <div id="tab-profiles" style="display:none;">
-    <div class="ops-page-head"><div><span class="ops-eyebrow">AUTOMAZIONE AMBIENTE</span><h2>Profili climatici</h2><p>Clicca su Giorno, Notte o Assente per aprire la configurazione dedicata e spiegata.</p></div><button class="config-btn" onclick="openSensorSettings()">Sensori ambiente</button></div>
+    <div class="ops-page-head"><div><span class="ops-eyebrow">AUTOMAZIONE AMBIENTE</span><h2>Profili climatici</h2><p>Clicca su Giorno, Notte o Assente per aprire la configurazione dedicata e spiegata.</p></div><div class="config-actions"><button class="config-btn" onclick="openRoomSensorSettings()">Sensori interni</button><button class="config-btn" onclick="openSensorSettings()">Sensori esterni</button></div></div>
     <div id="profilesContent"></div>
   </div>
   <div id="tab-wiki" style="display:none;">
@@ -2153,6 +2158,17 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   </div>
 </div>
 
+<div id="roomSensorSettings" class="config-modal" role="dialog" aria-modal="true" aria-labelledby="roomSensorTitle" onclick="if(event.target===this)closeRoomSensorSettings()">
+  <div class="config-dialog">
+    <header class="config-header">
+      <div class="config-heading"><span class="config-heading-icon"><svg viewBox="0 0 24 24"><path d="M12 3v10"/><circle cx="12" cy="17" r="4"/><path d="M8 7H5v12h3"/><path d="M16 7h3v12h-3"/></svg></span><div><h2 id="roomSensorTitle">Sensori interni</h2><p>Associazione delle sonde ambiente alle singole unità</p></div></div>
+      <button class="config-close" onclick="closeRoomSensorSettings()" aria-label="Chiudi sensori interni">×</button>
+    </header>
+    <div class="config-body"><p class="config-intro">Per ogni macchina puoi selezionare più sonde di temperatura e umidità. La regolazione usa la media dei valori disponibili e ignora automaticamente entità unavailable.</p><div id="roomSensorSettingsContent" class="config-loading">Caricamento sensori interni…</div></div>
+    <footer class="config-footer"><span class="config-status" id="roomSensorSettingsStatus">Profili e sensori esterni non verranno modificati.</span><div class="config-actions"><button class="config-btn" onclick="closeRoomSensorSettings()">Annulla</button><button class="config-btn primary" id="saveRoomSensorSettings">Salva associazioni</button></div></footer>
+  </div>
+</div>
+
 <div id="sensorSettings" class="config-modal" role="dialog" aria-modal="true" aria-labelledby="configTitle" onclick="if(event.target===this)closeSensorSettings()">
   <div class="config-dialog">
     <header class="config-header">
@@ -2241,6 +2257,49 @@ async function apiFetch(url, opts = {}) {
 function sensorOptions(sensors, selected) {
   const chosen = new Set(selected || []);
   return sensors.map(s => `<option value="${escHtml(s.entity_id)}" ${chosen.has(s.entity_id) ? 'selected' : ''}>${escHtml(s.name)} — ${escHtml(s.state)} ${escHtml(s.unit || '')}</option>`).join('');
+}
+
+async function openRoomSensorSettings() {
+  const modal = document.getElementById('roomSensorSettings');
+  const content = document.getElementById('roomSensorSettingsContent');
+  modal.style.display = 'block';
+  content.className = 'config-loading';
+  content.textContent = 'Caricamento sensori interni…';
+  try {
+    const data = await apiFetch(PANEL_ROOM_SENSORS_URL);
+    const temperatures = data.sensors.filter(sensor => sensor.device_class === 'temperature');
+    const humidities = data.sensors.filter(sensor => sensor.device_class === 'humidity');
+    content.className = 'room-sensor-settings';
+    content.innerHTML = data.devices.map(device => { const mac=escHtml(device.mac); return `<section class="room-sensor-device" data-entry-id="${escHtml(device.entry_id)}" data-mac="${mac}"><div class="room-sensor-device-head"><div><h3>${escHtml(__DEVICE_NAMES__[device.mac] || device.name || device.mac)}</h3><code>${mac}</code></div><span class="config-device-status" id="room-status-${mac}">Pronto</span></div><div class="config-sensor-grid"><label>Sensori temperatura ambiente<select class="config-select" id="room-temp-${mac}" multiple size="6">${sensorOptions(temperatures,device.temperature_sensors)}</select><span class="config-help">La media alimenta temperatura corrente, target Smart e storico.</span></label><label>Sensori umidità ambiente<select class="config-select" id="room-hum-${mac}" multiple size="6">${sensorOptions(humidities,device.humidity_sensors)}</select><span class="config-help">La media viene usata dalla soglia Dry del profilo.</span></label></div></section>`; }).join('');
+    document.getElementById('saveRoomSensorSettings').onclick = () => saveRoomSensorAssociations(data.devices);
+  } catch (error) {
+    content.className = 'config-loading';
+    content.textContent = `Impossibile caricare i sensori interni: ${error.message}`;
+  }
+}
+function closeRoomSensorSettings() {
+  document.getElementById('roomSensorSettings').style.display = 'none';
+}
+async function saveRoomSensorAssociations(devices) {
+  const button = document.getElementById('saveRoomSensorSettings');
+  const status = document.getElementById('roomSensorSettingsStatus');
+  const selected = id => [...document.getElementById(id).selectedOptions].map(option => option.value);
+  button.disabled = true;
+  status.textContent = 'Salvataggio associazioni…';
+  try {
+    for (const device of devices) {
+      const mac = device.mac;
+      await apiFetch(PANEL_ROOM_SENSORS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entry_id:device.entry_id,mac,temperature_sensors:selected(`room-temp-${mac}`),humidity_sensors:selected(`room-hum-${mac}`),outdoor_temperature_sensor:device.outdoor_temperature_sensor || '',outdoor_humidity_sensor:device.outdoor_humidity_sensor || ''})});
+      const deviceStatus = document.getElementById(`room-status-${mac}`);
+      if (deviceStatus) deviceStatus.textContent = 'Salvato';
+    }
+    status.textContent = 'Associazioni salvate. Ricarica integrazione in corso…';
+    setTimeout(() => { closeRoomSensorSettings(); loadData(); },1600);
+  } catch (error) {
+    status.textContent = `Errore: ${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function openSensorSettings() {
