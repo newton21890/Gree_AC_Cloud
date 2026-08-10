@@ -301,6 +301,8 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "mobile-menu-scrim" in panel_source
     assert "toggleMobileMenu" in panel_source
     assert "mobile-menu-open" in panel_source
+    assert "body.mobile-menu-open .header" in panel_source
+    assert "z-index:43" in panel_source
     assert "ops-power-icon" in panel_source
     assert "toLocaleString" in history_source
     assert "Override manuale" in panel_source

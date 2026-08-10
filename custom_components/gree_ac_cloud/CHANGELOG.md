@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.3
+
+### Correzione livello del menu mobile
+
+- Corretto il contesto di sovrapposizione dell'intestazione mobile: pulsante hamburger e pannello laterale ora rimangono sopra lo sfondo oscurato e sfocato.
+- Riservato nel drawer lo spazio superiore del pulsante, evitando sovrapposizioni con la prima voce di navigazione.
+
 ## 0.8.2
 
 ### Menu mobile e grafici reali nel Controllo

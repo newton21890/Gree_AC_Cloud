@@ -1592,7 +1592,12 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .chart-values { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .mobile-menu-scrim { position:fixed; inset:0; z-index:39; border:0; padding:0; background:rgba(2,7,13,.68); backdrop-filter:blur(2px); }
   body.mobile-menu-open .mobile-menu-scrim { display:block; }
-  .tab-nav { position:fixed; z-index:40; top:0; bottom:0; left:0; display:flex; width:min(82vw,310px); margin:0; padding:18px 12px; gap:5px; overflow-y:auto; overflow-x:hidden; flex-direction:column; background:#0c111a; border-right:1px solid var(--border); box-shadow:18px 0 50px rgba(0,0,0,.52); transform:translateX(-105%); transition:transform .22s ease; overscroll-behavior:contain; }
+  /* The sticky header creates its own stacking context. Raise that context
+     while the drawer is open, otherwise the sibling blur layer also covers
+     the hamburger and the drawer even if their local z-index is higher. */
+  body.mobile-menu-open .header,body.mobile-menu-open.desktop .header { z-index:41; }
+  body.mobile-menu-open .mobile-menu-button { position:relative; z-index:43; border-color:#39788a; background:#123943; color:#bdf7ff; }
+  .tab-nav { position:fixed; z-index:42; top:0; bottom:0; left:0; display:flex; width:min(82vw,310px); margin:0; padding:68px 12px 18px; gap:5px; overflow-y:auto; overflow-x:hidden; flex-direction:column; background:#0c111a; border-right:1px solid var(--border); box-shadow:18px 0 50px rgba(0,0,0,.52); transform:translateX(-105%); transition:transform .22s ease; overscroll-behavior:contain; }
   body.mobile-menu-open .tab-nav { transform:translateX(0); }
   .tab-nav::before { display:block; content:'GREE CONTROL'; padding:7px 12px 16px; color:#8fa1b7; font-size:10px; font-weight:900; letter-spacing:.14em; }
   .tab-btn { flex:0 0 auto; width:100%; min-height:48px; justify-content:flex-start; padding:0 14px; font-size:13px; }
