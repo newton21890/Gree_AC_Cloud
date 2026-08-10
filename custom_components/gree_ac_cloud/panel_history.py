@@ -187,8 +187,8 @@ class GreePanelHistoryView(HomeAssistantView):
                 }
             )
         try:
-            from homeassistant.components.history import get_significant_states
             from homeassistant.components.recorder import get_instance
+            from homeassistant.components.recorder.history import get_significant_states
 
             histories = await get_instance(hass).async_add_executor_job(
                 partial(
