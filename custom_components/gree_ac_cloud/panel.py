@@ -127,6 +127,7 @@ _changelog_path = _os.path.join(_os.path.dirname(__file__), "CHANGELOG.md")
 _readme_path = _os.path.join(_os.path.dirname(__file__), "README.md")
 _manifest_path = _os.path.join(_os.path.dirname(__file__), "manifest.json")
 _panel_history_js_path = _os.path.join(_os.path.dirname(__file__), "frontend", "panel_history.js")
+_panel_profiles_js_path = _os.path.join(_os.path.dirname(__file__), "frontend", "panel_profiles.js")
 for _cache_var, _path in [("_README_CACHE", _readme_path), ("_CHANGELOG_CACHE", _changelog_path)]:
     try:
         with open(_path, encoding="utf-8") as _f:
@@ -153,6 +154,13 @@ except OSError:
     _LOGGER.exception("Unable to load panel history frontend module")
     _PANEL_HISTORY_JS = ""
 
+try:
+    with open(_panel_profiles_js_path, encoding="utf-8") as _file:
+        _PANEL_PROFILES_JS = _file.read()
+except OSError:
+    _LOGGER.exception("Unable to load panel profiles frontend module")
+    _PANEL_PROFILES_JS = ""
+
 
 async def async_register_panel(hass: HomeAssistant):
     """Register the sidebar panel and API views once."""
@@ -170,6 +178,9 @@ async def async_register_panel(hass: HomeAssistant):
         from .panel_history import GreePanelHistoryView
 
         hass.http.register_view(GreePanelHistoryView)
+        from .panel_profiles import GreePanelProfileView
+
+        hass.http.register_view(GreePanelProfileView)
         hass.http.register_view(GreePanelCommandView)
         hass.http.register_view(GreePanelLogView)
         hass.http.register_view(GreePanelModelsView)
@@ -224,6 +235,7 @@ class GreePanelView(HomeAssistantView):
         html = html.replace("__VERSION__", _VERSION_CACHE)
         html = html.replace("__DEVICE_NAMES_JSON__", "{}")
         html = html.replace("__PANEL_HISTORY_JS__", _PANEL_HISTORY_JS)
+        html = html.replace("__PANEL_PROFILES_JS__", _PANEL_PROFILES_JS)
         return web.Response(
             text=html,
             content_type="text/html",
@@ -1433,14 +1445,35 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .profile-rule b { color:#e2eaf5; text-align:right; }
 .profile-actions { display:flex; gap:6px; margin-top:10px; }
 .profile-actions button { flex:1; }
+.profile-card[role="button"] { cursor:pointer; transition:border-color .18s,transform .18s,background .18s; }
+.profile-card[role="button"]:hover,.profile-card[role="button"]:focus-visible { border-color:#357f91; background:#101b27; outline:none; transform:translateY(-2px); }
+.profile-edit-btn { color:#aef6ff !important; border-color:#2b7180 !important; }
+.profile-editor-modal { padding:16px; }
+.profile-editor-dialog { width:min(1180px,calc(100vw - 32px)); }
+.profile-editor-body { background:#0d131c; }
+.profile-editor-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.profile-editor-section { overflow:hidden; border:1px solid #263449; border-radius:13px; background:#111925; }
+.profile-editor-section-head { display:flex; gap:11px; align-items:flex-start; padding:14px 16px; border-bottom:1px solid #263449; background:#101722; }
+.profile-editor-section-head > span { display:grid; width:28px; height:28px; flex:0 0 28px; place-items:center; border-radius:8px; color:#aef6ff; background:#123943; font-size:9px; font-weight:900; }
+.profile-editor-section-head h3 { margin:0; color:#eaf3ff; font-size:13px; }
+.profile-editor-section-head p { margin:3px 0 0; color:#8190a5; font-size:9px; line-height:1.45; }
+.profile-editor-field { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(145px,.75fr); gap:16px; align-items:center; padding:13px 16px; border-bottom:1px solid #202c3d; }
+.profile-editor-field:last-child { border-bottom:0; }
+.profile-editor-copy label { display:block; color:#dce7f5; font-size:10px; font-weight:800; }
+.profile-editor-copy p { margin:4px 0 0; color:#7f90a6; font-size:9px; line-height:1.5; }
+.profile-editor-control { min-width:0; }
+.profile-toggle { display:flex; justify-content:flex-end; align-items:center; gap:7px; color:#b8c6d8; font-size:10px; font-weight:700; }
+.profile-toggle input,.profile-mode-selector input { accent-color:var(--primary); }
+.profile-mode-selector { display:flex; justify-content:flex-end; gap:5px; flex-wrap:wrap; }
+.profile-mode-selector label { display:flex; align-items:center; gap:4px; padding:6px 7px; border:1px solid #304158; border-radius:7px; color:#adbbce; font-size:9px; }
 .profile-docs { position:sticky; top:16px; padding:18px; border:1px solid var(--border); border-radius:14px; background:#111722; }
 .profile-docs h3 { margin:0 0 10px; font-size:15px; }
 .profile-docs h4 { margin:16px 0 6px; color:#d9e6f7; font-size:12px; }
 .profile-docs p,.profile-docs li { color:#93a2b6; font-size:10px; line-height:1.55; }
 .profile-docs ul,.profile-docs ol { padding-left:18px; }
 .profile-callout { margin:10px 0; padding:10px; border-left:3px solid var(--primary); border-radius:6px; background:#10202b; color:#b8dce4; font-size:10px; }
-@media (max-width:1100px) { .profiles-layout { grid-template-columns:1fr; } .profile-docs { position:static; } }
-@media (max-width:720px) { .profile-cards { grid-template-columns:1fr; } .chart-toolbar { align-items:stretch; flex-direction:column; } .chart-periods,.chart-navigation { justify-content:center; } }
+@media (max-width:1100px) { .profiles-layout { grid-template-columns:1fr; } .profile-docs { position:static; } .profile-editor-grid { grid-template-columns:1fr; } }
+@media (max-width:720px) { .profile-cards { grid-template-columns:1fr; } .profile-editor-field { grid-template-columns:1fr; } .profile-toggle,.profile-mode-selector { justify-content:flex-start; } .chart-toolbar { align-items:stretch; flex-direction:column; } .chart-periods,.chart-navigation { justify-content:center; } }
 .ops-empty { margin-top:10px; color:var(--text2); font-size:10px; }
 .ops-telemetry-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:11px; }
 .ops-health { color:var(--green); font-size:9px; }
@@ -1626,7 +1659,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
     <div id="chartsContent" class="charts-grid"></div>
   </div>
   <div id="tab-profiles" style="display:none;">
-    <div class="ops-page-head"><div><span class="ops-eyebrow">AUTOMAZIONE AMBIENTE</span><h2>Profili climatici</h2><p>Stato, configurazione e guida operativa completa per Giorno, Notte e Assente.</p></div><button class="config-btn primary" onclick="openSensorSettings()">Configura profili</button></div>
+    <div class="ops-page-head"><div><span class="ops-eyebrow">AUTOMAZIONE AMBIENTE</span><h2>Profili climatici</h2><p>Clicca su Giorno, Notte o Assente per aprire la configurazione dedicata e spiegata.</p></div><button class="config-btn" onclick="openSensorSettings()">Sensori ambiente</button></div>
     <div id="profilesContent"></div>
   </div>
   <div id="tab-wiki" style="display:none;">
@@ -2070,6 +2103,17 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 </div>
 </div>
 
+<div id="profileEditorModal" class="config-modal profile-editor-modal" role="dialog" aria-modal="true" aria-labelledby="profileEditorTitle" onclick="if(event.target===this)closeProfileEditor()">
+  <div class="config-dialog profile-editor-dialog">
+    <header class="config-header">
+      <div class="config-heading"><span class="config-heading-icon"><svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></svg></span><div><h2 id="profileEditorTitle">Configurazione profilo</h2><p id="profileEditorSubtitle">Impostazioni climatiche dedicate</p></div></div>
+      <button class="config-close" onclick="closeProfileEditor()" aria-label="Chiudi configurazione profilo">×</button>
+    </header>
+    <div class="config-body profile-editor-body" id="profileEditorBody"><div class="config-loading">Caricamento profilo…</div></div>
+    <footer class="config-footer"><span class="config-status" id="profileEditorStatus">Il salvataggio aggiorna solo il profilo selezionato.</span><div class="config-actions"><button class="config-btn" onclick="closeProfileEditor()">Annulla</button><button class="config-btn primary" id="saveProfileEditor" onclick="saveProfileEditor()">Salva profilo</button></div></footer>
+  </div>
+</div>
+
 <div id="sensorSettings" class="config-modal" role="dialog" aria-modal="true" aria-labelledby="configTitle" onclick="if(event.target===this)closeSensorSettings()">
   <div class="config-dialog">
     <header class="config-header">
@@ -2102,6 +2146,7 @@ const PANEL_REFRESH_URL = HA_BASE + '/api/gree_ac_cloud/panel/refresh';
 const PANEL_DEVICES_INFO_URL = HA_BASE + '/api/gree_ac_cloud/panel/devices-info';
 const PANEL_ROOM_SENSORS_URL = HA_BASE + '/api/gree_ac_cloud/panel/room-sensors';
 const PANEL_HISTORY_URL = HA_BASE + '/api/gree_ac_cloud/panel/history';
+const PANEL_PROFILE_URL = HA_BASE + '/api/gree_ac_cloud/panel/profile';
 
 const __README_CONTENT__ = __README_JSON__;
 const __CHANGELOG_CONTENT__ = __CHANGELOG_JSON__;
@@ -2610,11 +2655,11 @@ function renderDevice(d) {
       <label>Adesso</label>
       <div class="btn-group">
         ${[['Off',0],['D1',1],['D2',2],['D3',3]].map(([label,value]) =>
-          `<button class="btn ${effectiveDred === value ? 'active' : ''}" onclick="setDred('${safeMac}',${value})" title="${value === 0 ? 'Nessun livello DRED' : value === 1 ? 'D1: compressore disabilitato; la ventola interna può continuare' : value === 2 ? 'D2: domanda elettrica limitata a non oltre il 50%' : 'D3: domanda elettrica limitata a non oltre il 75%'}">${label}</button>`
+          `<button class="btn ${effectiveDred === value ? 'active' : ''}" onclick="setDred('${safeMac}',${value})" title="${value === 0 ? 'Nessun limite I-Demand: piena capacità disponibile' : value === 1 ? 'D1: compressore disabilitato; non raffresca attivamente' : value === 2 ? 'D2: domanda elettrica limitata a non oltre il 50%' : 'D3: domanda elettrica limitata a non oltre il 75%'}">${label}</button>`
         ).join('')}
         ${iDemandActive ? '<span class="switch-btn on" title="Flag I-Demand separato riportato dal dispositivo">I-Demand attivo</span>' : ''}
       </div>
-      <span style="color:${effectiveDred > 0 ? 'var(--green)' : 'var(--text-secondary)'};font-size:11px;font-weight:${effectiveDred > 0 ? '600' : '400'};">Stato effettivo: ${effectiveDred > 0 ? `D${effectiveDred} attivo${iDemandActive ? ' (I-Demand)' : ''}` : 'Off'} · D1: compressore fermo · D2: max 50% · D3: max 75%.</span>
+      <span style="color:${effectiveDred > 0 ? 'var(--green)' : 'var(--text-secondary)'};font-size:11px;font-weight:${effectiveDred > 0 ? '600' : '400'};">Stato effettivo: ${effectiveDred > 0 ? `D${effectiveDred} attivo${iDemandActive ? ' (I-Demand)' : ''}` : 'Off · piena capacità'} · D1 ferma il compressore e non viene mai scelto da Smart durante una richiesta Cool · D2: max 50% · D3: max 75%.</span>
       <label style="margin-top:8px;">Alla prossima accensione</label>
       <div class="btn-group">
         ${[['Nessuna','none'],['Off','0'],['D1','1'],['D2','2'],['D3','3']].map(([label,value]) =>
@@ -2775,30 +2820,7 @@ function renderOperationsDevice(d) {
   </article>`;
 }
 
-function renderProfilesPage(data) {
-  const content = document.getElementById('profilesContent');
-  if (!content) return;
-  const labels = {day:'Giorno',night:'Notte',away:'Assente'};
-  const modeLabels = {auto:'Auto profilo',cool:'Solo Cool',heat:'Solo Heat',dry:'Solo Dry'};
-  const modeChip = mode => `<span class="profile-mode-chip">${{cool:'❄ Cool',heat:'☀ Heat',dry:'◇ Dry'}[mode] || escHtml(mode)}</span>`;
-  const devices = data.map(device => {
-    const state = device.state || {};
-    const active = state.ActivePreset || 'manual';
-    const presets = state.Presets || {};
-    const cards = ['day','night','away'].map(name => {
-      const preset = presets[name] || {};
-      const strategy = preset.smart_mode || 'auto';
-      const allowed = preset.allowed_modes || (strategy === 'auto' ? ['cool','heat','dry'] : [strategy]);
-      const modes = strategy === 'auto' ? allowed : [strategy];
-      const target = finiteNumber(preset.target_temperature);
-      const margin = finiteNumber(preset.deadband) ?? .5;
-      return `<article class="profile-card ${active === name ? 'active' : ''}"><div class="profile-card-top"><h4>${labels[name]}</h4><span class="profile-badge">${active === name ? 'ATTIVO' : preset.enabled ? 'DISPONIBILE' : 'DISABILITATO'}</span></div><div class="profile-mode-path">${modeLabels[strategy] || strategy}</div><div>${modes.map(modeChip).join('') || '<span class="profile-mode-chip">Nessuna modalità</span>'}</div><div class="profile-rule"><span>Target configurato</span><b>${target == null ? '--' : target.toFixed(1)+' °C'}</b></div><div class="profile-rule"><span>Target effettivo</span><b>${active === name && finiteNumber(state.smart_effective_target) != null ? Number(state.smart_effective_target).toFixed(1)+' °C' : 'quando attivo'}</b></div><div class="profile-rule"><span>Arresto / ripartenza</span><b>${target == null ? '--' : `${target.toFixed(1)}° / ${(target+margin).toFixed(1)}° Cool`}</b></div><div class="profile-rule"><span>Umidità Dry</span><b>${preset.humidity_threshold == null ? 'non configurata' : '&gt; '+Number(preset.humidity_threshold).toFixed(0)+'%'}</b></div><div class="profile-rule"><span>Ventola · Quiet</span><b>${escHtml(preset.fan_speed || 'Smart')} · ${preset.quiet ? 'sì' : 'no'}</b></div><div class="profile-rule"><span>Compensazione esterna</span><b>${preset.outdoor_compensation ? 'attiva' : 'disattiva'}</b></div><div class="profile-rule"><span>I-Demand</span><b>${escHtml(preset.dred || 'Nessuna azione')}</b></div><div class="profile-actions"><button class="btn ${active === name ? 'active' : ''}" ${preset.enabled ? `onclick="setPreset('${escHtml(device.mac)}','${name}')"` : 'disabled'}>${active === name ? 'Profilo attivo' : 'Applica'}</button></div></article>`;
-    }).join('');
-    return `<section class="profile-device"><div class="profile-device-head"><div><h3>${escHtml(__DEVICE_NAMES__[device.mac] || device.name || device.mac)}</h3><span class="ops-sub">Decisione: ${escHtml(state.smart_last_action || 'inattiva')} · ambiente ${finiteNumber(state.RoomTemperature)?.toFixed(1) || '--'} °C</span></div><span class="profile-badge">${active === 'manual' ? 'MANUALE' : 'PROFILO '+(labels[active] || active).toUpperCase()}</span></div><div class="profile-cards">${cards}</div></section>`;
-  }).join('');
-  content.innerHTML = `<div class="profiles-layout"><div>${devices}</div><aside class="profile-docs"><h3>Come funzionano i profili</h3><p>Un profilo è un regolatore climatico persistente. Usa i sensori ambiente Home Assistant, applica le regole configurate e invia alla macchina alimentazione, modalità, setpoint, ventola, Quiet e I-Demand.</p><div class="profile-callout"><b>Auto profilo non è Auto Gree.</b><br>È l’integrazione a scegliere Cool, Heat oppure Dry tra le modalità che hai autorizzato. La modalità Gree viene comandata esplicitamente.</div><h4>Selezione automatica modalità</h4><ul><li><b>Cool:</b> parte sopra target + margine; dopo l’avvio continua fino al target.</li><li><b>Heat:</b> parte sotto target − margine; continua fino al target.</li><li><b>Dry:</b> viene preferita quando supera la soglia di umidità ed è consentita.</li><li>Deseleziona Heat, Cool o Dry per vietarne l’uso nel singolo profilo.</li></ul><h4>Strategia fissa</h4><p>“Solo Cool”, “Solo Heat” e “Solo Dry” impediscono cambi di modalità. È la scelta più prevedibile per profili stagionali.</p><h4>Target e margine</h4><p>Con target 26 °C e margine 0,5 °C, Cool spegne a 26 °C e riparte oltre 26,5 °C. Heat spegne a 26 °C e riparte sotto 25,5 °C.</p><h4>Personalizzazioni</h4><ul><li><b>Smart:</b> abilita la regolazione continua; se spento il profilo applica solo il setpoint.</li><li><b>Min/Max:</b> soglie di sicurezza che forzano Heat o Cool, purché la modalità sia consentita.</li><li><b>Compensazione esterna:</b> modifica il target effettivo in condizioni estreme.</li><li><b>Ventola Smart:</b> aumenta la portata con la distanza dal target.</li><li><b>Quiet:</b> utile soprattutto di notte.</li><li><b>I-Demand:</b> limita la domanda elettrica in Cool.</li></ul><h4>Priorità e comandi manuali</h4><ol><li>Un On/Off manuale ha priorità sul profilo.</li><li>Se cambi temperatura con il profilo attivo, aggiorni il target persistente di quel profilo.</li><li>Riselezionare il profilo azzera l’override manuale e riapplica tutte le regole.</li></ol><h4>Configurazione consigliata</h4><p><b>Giorno:</b> Auto profilo con Cool/Heat/Dry. <b>Notte:</b> solo Cool o Heat, Quiet e ventola bassa/Smart. <b>Assente:</b> target più permissivo, margine ampio e I-Demand.</p><button class="config-btn primary" style="width:100%" onclick="openSensorSettings()">Apri configurazione completa</button></aside></div>`;
-}
-
+__PANEL_PROFILES_JS__
 function renderOperationsOverview(data) {
   const states = data.map(device => device.state || {});
   const valid = values => values.filter(value => Number.isFinite(value));

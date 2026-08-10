@@ -427,25 +427,24 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         configured = PRESET_DRED_ALIASES.get(
             preset.get(CONF_PRESET_DRED), preset.get(CONF_PRESET_DRED, "No action")
         )
-        if configured == PRESET_DRED_SMART and desired_mode is None:
-            return "D3"
         if desired_mode != HVACMode.COOL or configured == "No action":
             return None
         if configured != PRESET_DRED_SMART:
             return configured
-        demand = current - target - deadband
+        # D1 disables the compressor, so Smart must never request it while
+        # cooling is needed. High thermal demand runs without I-Demand;
+        # D3/D2 are introduced only as the room approaches its target.
+        demand = current - target
         humidity = self.current_humidity
         humidity_limit = preset.get(CONF_PRESET_HUMIDITY)
         humidity_pressure = (
             humidity is not None and humidity_limit is not None and humidity > float(humidity_limit)
         )
-        if demand >= 2.5 or humidity_pressure:
+        if demand >= 1.5 or humidity_pressure:
             return "Off"
-        if demand >= 1.5:
-            return "D1"
         if demand >= 0.8:
-            return "D2"
-        return "D3"
+            return "D3"
+        return "D2"
 
     def _effective_smart_target(self, preset: dict) -> float:
         target = float(preset.get(CONF_PRESET_TARGET, 26))

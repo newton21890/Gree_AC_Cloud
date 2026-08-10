@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0
+
+### Configurazione dedicata dei profili e correzione I-Demand Smart
+
+- Le schede Giorno, Notte e Assente nella pagina Profili sono ora cliccabili e aprono un editor dedicato al singolo profilo.
+- I parametri sono organizzati in quattro sezioni: strategia, comfort, limiti ambientali e gestione di ventola/rumore/consumi.
+- Ogni controllo include una spiegazione operativa su effetti, priorità e interazioni con gli altri parametri.
+- Il salvataggio aggiorna esclusivamente il profilo aperto, senza sovrascrivere sensori o gli altri profili della stessa unità.
+- Aggiunta validazione server-side di modalità, target, isteresi, soglie, ventola e I-Demand.
+- Corretta la strategia I-Demand Smart: D1 non viene più richiesto durante il raffrescamento, perché arresta il compressore.
+- Con richiesta Cool elevata Smart usa piena capacità; avvicinandosi al target introduce D3 e quindi D2. D1 resta disponibile solo come scelta manuale esplicita.
+
 ## 0.7.0
 
 ### Storico persistente e navigazione temporale

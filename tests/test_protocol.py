@@ -35,8 +35,10 @@ def test_panel_data_apis_require_authentication() -> None:
     source = (COMPONENT / "panel.py").read_text()
     # The HTML shell must stay public for the iframe; every data view is protected.
     history_source = (COMPONENT / "panel_history.py").read_text()
+    profile_source = (COMPONENT / "panel_profiles.py").read_text()
     assert source.count("requires_auth = True") == 9
     assert history_source.count("requires_auth = True") == 1
+    assert profile_source.count("requires_auth = True") == 1
     assert source.count("requires_auth = False") == 1
 
 
@@ -95,6 +97,9 @@ def test_panel_javascript_parses_when_node_is_available() -> None:
     panel_html = panel_html.replace(
         "__PANEL_HISTORY_JS__",
         (COMPONENT / "frontend" / "panel_history.js").read_text(),
+    ).replace(
+        "__PANEL_PROFILES_JS__",
+        (COMPONENT / "frontend" / "panel_profiles.js").read_text(),
     )
     script_start = panel_html.find("<script>")
     script_end = panel_html.rfind("</script>")
@@ -207,6 +212,15 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert 'options = ["Pow", "Mod", "SetDeciTem"]' in climate_source
     assert "PRESET_MANUAL" in climate_source
     assert "_smart_dred_for_profile" in climate_source
+    assert "Smart must never request it while" in climate_source
+    assert (
+        'return "D1"'
+        not in climate_source[
+            climate_source.index("def _smart_dred_for_profile") : climate_source.index(
+                "def _effective_smart_target"
+            )
+        ]
+    )
     assert "smart_dred_level" in climate_source
     assert "smart_dred_applied" in climate_source
     assert "smart_dred_verified" in climate_source
@@ -259,10 +273,18 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "shiftHistory" in history_source
     assert "Memoria persistente HA Recorder" in history_source
     assert "GreePanelHistoryView" in (COMPONENT / "panel_history.py").read_text()
-    assert "renderProfilesPage" in panel_source
+    profiles_source = (COMPONENT / "frontend" / "panel_profiles.js").read_text()
+    profile_api_source = (COMPONENT / "panel_profiles.py").read_text()
+    assert "renderProfilesPage" in profiles_source
+    assert "openProfileEditor" in profiles_source
+    assert "saveProfileEditor" in profiles_source
+    assert "profileEditorModal" in panel_source
+    assert "PANEL_PROFILE_URL" in panel_source
+    assert "async_reload" in profile_api_source
+    assert "Update a single profile" in profile_api_source
     assert 'data-tab="profiles"' in panel_source
-    assert "Auto profilo non è Auto Gree" in panel_source
-    assert "allowed_modes" in panel_source
+    assert "Auto profilo non è Auto Gree" in profiles_source
+    assert "allowed_modes" in profiles_source
     assert "Andamento climatico" in panel_source
     assert "toggleChartExpand" in history_source
     assert "chart-point" in history_source
