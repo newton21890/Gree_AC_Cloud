@@ -71,10 +71,7 @@ def _safe_json_for_script(value) -> str:
 
 
 def _valid_mac(value) -> bool:
-    return (
-        isinstance(value, str)
-        and re.fullmatch(r"[0-9A-Fa-f]{12,14}", value) is not None
-    )
+    return isinstance(value, str) and re.fullmatch(r"[0-9A-Fa-f]{12,14}", value) is not None
 
 
 def _redact_secret(value: str) -> str:
@@ -95,6 +92,7 @@ def _all_coordinators(hass: HomeAssistant) -> list:
 
 # ── In-memory log capture ─────────────────────────────
 
+
 class _GreeLogHandler(logging.Handler):
     def __init__(self, maxlen: int = 200):
         super().__init__()
@@ -102,11 +100,14 @@ class _GreeLogHandler(logging.Handler):
         self.setLevel(logging.DEBUG)
 
     def emit(self, record: logging.LogRecord):
-        self.logs.append({
-            "t": datetime.fromtimestamp(record.created).strftime("%H:%M:%S"),
-            "l": record.levelname,
-            "m": record.getMessage(),
-        })
+        self.logs.append(
+            {
+                "t": datetime.fromtimestamp(record.created).strftime("%H:%M:%S"),
+                "l": record.levelname,
+                "m": record.getMessage(),
+            }
+        )
+
 
 _log_handler = _GreeLogHandler()
 _logger_root = logging.getLogger("custom_components.gree_ac_cloud")
@@ -125,6 +126,7 @@ _VERSION_CACHE = "0.0.0"
 _changelog_path = _os.path.join(_os.path.dirname(__file__), "CHANGELOG.md")
 _readme_path = _os.path.join(_os.path.dirname(__file__), "README.md")
 _manifest_path = _os.path.join(_os.path.dirname(__file__), "manifest.json")
+_panel_history_js_path = _os.path.join(_os.path.dirname(__file__), "frontend", "panel_history.js")
 for _cache_var, _path in [("_README_CACHE", _readme_path), ("_CHANGELOG_CACHE", _changelog_path)]:
     try:
         with open(_path, encoding="utf-8") as _f:
@@ -144,6 +146,13 @@ try:
 except Exception:
     pass
 
+try:
+    with open(_panel_history_js_path, encoding="utf-8") as _file:
+        _PANEL_HISTORY_JS = _file.read()
+except OSError:
+    _LOGGER.exception("Unable to load panel history frontend module")
+    _PANEL_HISTORY_JS = ""
+
 
 async def async_register_panel(hass: HomeAssistant):
     """Register the sidebar panel and API views once."""
@@ -158,6 +167,9 @@ async def async_register_panel(hass: HomeAssistant):
     if not domain_data.get("panel_views_registered"):
         hass.http.register_view(GreePanelView)
         hass.http.register_view(GreePanelDataView)
+        from .panel_history import GreePanelHistoryView
+
+        hass.http.register_view(GreePanelHistoryView)
         hass.http.register_view(GreePanelCommandView)
         hass.http.register_view(GreePanelLogView)
         hass.http.register_view(GreePanelModelsView)
@@ -211,6 +223,7 @@ class GreePanelView(HomeAssistantView):
         html = html.replace("__CHANGELOG_JSON__", _safe_json_for_script(_CHANGELOG_CACHE))
         html = html.replace("__VERSION__", _VERSION_CACHE)
         html = html.replace("__DEVICE_NAMES_JSON__", "{}")
+        html = html.replace("__PANEL_HISTORY_JS__", _PANEL_HISTORY_JS)
         return web.Response(
             text=html,
             content_type="text/html",
@@ -252,9 +265,7 @@ class GreePanelDataView(HomeAssistantView):
                     idemand_active = False
                 # Some firmware exposes D1 through Idemand instead of DRED.
                 # Send the normalized value explicitly to avoid UI ambiguity.
-                state["DREDEffective"] = (
-                    1 if raw_dred == 0 and idemand_active else raw_dred
-                )
+                state["DREDEffective"] = 1 if raw_dred == 0 and idemand_active else raw_dred
                 state["IdemandActive"] = idemand_active
                 state["StartupDRED"] = coord.startup_dred
                 room = entry.options.get(CONF_DEVICES, {}).get(device.mac, {})
@@ -275,14 +286,10 @@ class GreePanelDataView(HomeAssistantView):
                     return round(sum(values) / len(values), 2) if values else None
 
                 temperature_ids = room.get(CONF_TEMPERATURE_SENSORS) or (
-                    [room[CONF_TEMPERATURE_SENSOR]]
-                    if room.get(CONF_TEMPERATURE_SENSOR)
-                    else []
+                    [room[CONF_TEMPERATURE_SENSOR]] if room.get(CONF_TEMPERATURE_SENSOR) else []
                 )
                 humidity_ids = room.get(CONF_HUMIDITY_SENSORS) or (
-                    [room[CONF_HUMIDITY_SENSOR]]
-                    if room.get(CONF_HUMIDITY_SENSOR)
-                    else []
+                    [room[CONF_HUMIDITY_SENSOR]] if room.get(CONF_HUMIDITY_SENSOR) else []
                 )
                 state["RoomTemperature"] = _average(temperature_ids)
                 state["RoomHumidity"] = _average(humidity_ids)
@@ -294,24 +301,20 @@ class GreePanelDataView(HomeAssistantView):
                 try:
                     state["OutdoorTemperature"] = (
                         float(outdoor_state.state)
-                        if outdoor_state
-                        and outdoor_state.state not in ("unknown", "unavailable")
+                        if outdoor_state and outdoor_state.state not in ("unknown", "unavailable")
                         else None
                     )
                 except (TypeError, ValueError):
                     state["OutdoorTemperature"] = None
                 outdoor_humidity_entity = entry.options.get(CONF_OUTDOOR_HUMIDITY_SENSOR)
                 outdoor_humidity_state = (
-                    hass.states.get(outdoor_humidity_entity)
-                    if outdoor_humidity_entity
-                    else None
+                    hass.states.get(outdoor_humidity_entity) if outdoor_humidity_entity else None
                 )
                 try:
                     state["OutdoorHumidity"] = (
                         float(outdoor_humidity_state.state)
                         if outdoor_humidity_state
-                        and outdoor_humidity_state.state
-                        not in ("unknown", "unavailable")
+                        and outdoor_humidity_state.state not in ("unknown", "unavailable")
                         else None
                     )
                 except (TypeError, ValueError):
@@ -320,19 +323,13 @@ class GreePanelDataView(HomeAssistantView):
                 climate_entity_id = registry.async_get_entity_id(
                     "climate", DOMAIN, f"climate_{device.mac}"
                 )
-                climate_state = (
-                    hass.states.get(climate_entity_id) if climate_entity_id else None
-                )
+                climate_state = hass.states.get(climate_entity_id) if climate_entity_id else None
                 state["ClimateEntityId"] = climate_entity_id
                 state["ActivePreset"] = (
-                    climate_state.attributes.get("preset_mode")
-                    if climate_state
-                    else None
+                    climate_state.attributes.get("preset_mode") if climate_state else None
                 )
                 if climate_state:
-                    state["ClimateTargetTemperature"] = climate_state.attributes.get(
-                        "temperature"
-                    )
+                    state["ClimateTargetTemperature"] = climate_state.attributes.get("temperature")
                     for key in (
                         "smart_profile_active",
                         "smart_manual_power_override",
@@ -345,18 +342,22 @@ class GreePanelDataView(HomeAssistantView):
                         "smart_effective_target",
                     ):
                         state[key] = climate_state.attributes.get(key)
-                data.append({
-                    "mac": device.mac,
-                    "name": device.name,
-                    "connected": (
-                        coord._mqtt.connected
-                        and coord._mqtt.seconds_since_last_seen(device.mac) is not None
-                    ) if hasattr(coord, "_mqtt") else False,
-                    "state": state,
-                    "server": server,
-                    "mqtt_host": mqtt_host,
-                    "cloud_host": cloud_host,
-                })
+                data.append(
+                    {
+                        "mac": device.mac,
+                        "name": device.name,
+                        "connected": (
+                            coord._mqtt.connected
+                            and coord._mqtt.seconds_since_last_seen(device.mac) is not None
+                        )
+                        if hasattr(coord, "_mqtt")
+                        else False,
+                        "state": state,
+                        "server": server,
+                        "mqtt_host": mqtt_host,
+                        "cloud_host": cloud_host,
+                    }
+                )
         return self.json(data)
 
 
@@ -396,14 +397,16 @@ class GreePanelRoomSensorsView(HomeAssistantView):
                         "mac": coord.device.mac,
                         "name": coord.device.name,
                         "temperature_sensors": room.get(CONF_TEMPERATURE_SENSORS)
-                        or ([room[CONF_TEMPERATURE_SENSOR]] if room.get(CONF_TEMPERATURE_SENSOR) else []),
+                        or (
+                            [room[CONF_TEMPERATURE_SENSOR]]
+                            if room.get(CONF_TEMPERATURE_SENSOR)
+                            else []
+                        ),
                         "humidity_sensors": room.get(CONF_HUMIDITY_SENSORS)
                         or ([room[CONF_HUMIDITY_SENSOR]] if room.get(CONF_HUMIDITY_SENSOR) else []),
                         "outdoor_temperature_sensor": outdoor,
                         "outdoor_humidity_sensor": outdoor_humidity,
-                        "profile_control_enabled": room.get(
-                            CONF_PROFILE_CONTROL_ENABLED, True
-                        ),
+                        "profile_control_enabled": room.get(CONF_PROFILE_CONTROL_ENABLED, True),
                         "presets": room.get(CONF_PRESETS, {}),
                     }
                 )
@@ -548,9 +551,7 @@ class GreePanelCommandView(HomeAssistantView):
                                 2,
                                 3,
                             ):
-                                return self.json(
-                                    {"error": "invalid startup DRED"}, status=400
-                                )
+                                return self.json({"error": "invalid startup DRED"}, status=400)
                             await coord.async_set_startup_dred(startup_dred)
                             return self.json({"ok": True})
                         if (
@@ -572,10 +573,7 @@ class GreePanelCommandView(HomeAssistantView):
                             for opt, val in zip(options, values):
                                 coord.device.properties[opt] = val
                             coord.async_set_updated_data(dict(coord.device.properties))
-                            if any(
-                                opt == "Pow" and val == 1
-                                for opt, val in zip(options, values)
-                            ):
+                            if any(opt == "Pow" and val == 1 for opt, val in zip(options, values)):
                                 await coord.async_apply_startup_settings()
                         return self.json({"ok": ok})
 
@@ -755,27 +753,31 @@ class GreePanelDevicesInfoView(HomeAssistantView):
             coordinators = runtime.get("coordinators", [])
             for coord in coordinators:
                 dev = coord.device
-                devices_info.append({
-                    "mac": dev.mac,
-                    "name": dev.name,
-                    "key": _redact_secret(dev.key),
-                    "parent_mac": dev.parent_mac,
-                    "hid": dev.hid,
-                    "mqtt_topic_request": f"request/{dev.parent_mac}",
-                    "mqtt_topic_status": f"status/{dev.parent_mac}/#",
-                    "mqtt_topic_response": f"response/{dev.parent_mac}/#",
-                    "properties_count": len(dev.properties) if dev.properties else 0,
-                    "connected": mqtt.connected if hasattr(mqtt, "connected") else False,
-                })
+                devices_info.append(
+                    {
+                        "mac": dev.mac,
+                        "name": dev.name,
+                        "key": _redact_secret(dev.key),
+                        "parent_mac": dev.parent_mac,
+                        "hid": dev.hid,
+                        "mqtt_topic_request": f"request/{dev.parent_mac}",
+                        "mqtt_topic_status": f"status/{dev.parent_mac}/#",
+                        "mqtt_topic_response": f"response/{dev.parent_mac}/#",
+                        "properties_count": len(dev.properties) if dev.properties else 0,
+                        "connected": mqtt.connected if hasattr(mqtt, "connected") else False,
+                    }
+                )
 
-            result.append({
-                "uid": uid,
-                "server_region": server,
-                "cloud_host": cloud_host,
-                "mqtt_host": mqtt_host,
-                "mqtt_port": mqtt_port,
-                "devices": devices_info,
-            })
+            result.append(
+                {
+                    "uid": uid,
+                    "server_region": server,
+                    "cloud_host": cloud_host,
+                    "mqtt_host": mqtt_host,
+                    "mqtt_port": mqtt_port,
+                    "devices": devices_info,
+                }
+            )
 
         return self.json(result)
 
@@ -807,12 +809,14 @@ class GreePanelDevicesInfoView(HomeAssistantView):
                         old_key = existing.key
                         existing.key = d.key
                         existing._cipher = None  # force cipher re-creation with new key
-                        key_changes.append({
-                            "mac": d.mac,
-                            "name": d.name,
-                            "old_key": _redact_secret(old_key),
-                            "new_key": _redact_secret(d.key),
-                        })
+                        key_changes.append(
+                            {
+                                "mac": d.mac,
+                                "name": d.name,
+                                "old_key": _redact_secret(old_key),
+                                "new_key": _redact_secret(d.key),
+                            }
+                        )
                         _LOGGER.info("Re-auth: key updated for %s (%s)", d.mac, d.name)
 
                 if mqtt:
@@ -1372,6 +1376,14 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-chart-legend span { display:inline-flex; align-items:center; gap:5px; }
 .ops-chart-legend i { width:18px; height:3px; display:inline-block; border-radius:4px; }
 .charts-grid { display:grid; grid-template-columns:1fr; gap:18px; max-width:1500px; margin:0 auto; }
+.chart-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 auto 14px; max-width:1500px; padding:10px 12px; border:1px solid var(--border); border-radius:11px; background:#111722; }
+.chart-periods,.chart-navigation { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+.chart-toolbar button { min-height:30px; padding:5px 10px; border:1px solid #2b394e; border-radius:7px; background:#151d29; color:#9cabc0; cursor:pointer; font-size:9px; font-weight:800; }
+.chart-toolbar button:hover:not(:disabled),.chart-toolbar button.active { border-color:#2b8294; background:#12343d; color:#bdf7ff; }
+.chart-toolbar button:disabled { opacity:.35; cursor:not-allowed; }
+.chart-window-label { min-width:190px; color:#aab8cb; text-align:center; font-size:10px; }
+.chart-recorder-note { color:#6f8199; font-size:9px; }
+.chart-loading { padding:28px; color:#8292a8; text-align:center; font-size:10px; }
 .chart-detail-card { padding:20px; border:1px solid #253247; border-radius:16px; background:linear-gradient(145deg,#121a27,#0f1621); box-shadow:0 12px 32px rgba(0,0,0,.2); }
 .chart-detail-card h3 { margin:0 0 4px; font-size:17px; }
 .chart-detail-card > p { margin:0 0 16px; color:var(--text2); font-size:11px; }
@@ -1428,7 +1440,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .profile-docs ul,.profile-docs ol { padding-left:18px; }
 .profile-callout { margin:10px 0; padding:10px; border-left:3px solid var(--primary); border-radius:6px; background:#10202b; color:#b8dce4; font-size:10px; }
 @media (max-width:1100px) { .profiles-layout { grid-template-columns:1fr; } .profile-docs { position:static; } }
-@media (max-width:720px) { .profile-cards { grid-template-columns:1fr; } }
+@media (max-width:720px) { .profile-cards { grid-template-columns:1fr; } .chart-toolbar { align-items:stretch; flex-direction:column; } .chart-periods,.chart-navigation { justify-content:center; } }
 .ops-empty { margin-top:10px; color:var(--text2); font-size:10px; }
 .ops-telemetry-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:11px; }
 .ops-health { color:var(--green); font-size:9px; }
@@ -2089,6 +2101,7 @@ const PANEL_SETTINGS_URL = HA_BASE + '/api/gree_ac_cloud/panel/settings';
 const PANEL_REFRESH_URL = HA_BASE + '/api/gree_ac_cloud/panel/refresh';
 const PANEL_DEVICES_INFO_URL = HA_BASE + '/api/gree_ac_cloud/panel/devices-info';
 const PANEL_ROOM_SENSORS_URL = HA_BASE + '/api/gree_ac_cloud/panel/room-sensors';
+const PANEL_HISTORY_URL = HA_BASE + '/api/gree_ac_cloud/panel/history';
 
 const __README_CONTENT__ = __README_JSON__;
 const __CHANGELOG_CONTENT__ = __CHANGELOG_JSON__;
@@ -2631,109 +2644,7 @@ function renderDevice(d) {
 </div>`;
 }
 
-const _environmentHistory = {};
-function finiteNumber(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-function chartTarget(state) {
-  const smart = finiteNumber(state.smart_effective_target);
-  if (smart !== null && smart >= 10 && smart <= 40) return smart;
-  const climate = finiteNumber(state.ClimateTargetTemperature);
-  if (climate !== null && climate >= 10 && climate <= 40) return climate;
-  const deci = finiteNumber(state.SetDeciTem);
-  if (deci !== null && deci >= 100 && deci <= 400) return deci / 10;
-  const raw = finiteNumber(state.SetTem);
-  return raw !== null && raw >= 10 && raw <= 40 ? raw : null;
-}
-function updateEnvironmentHistory(mac, state) {
-  const now = Date.now();
-  const point = {
-    t: now,
-    room: finiteNumber(state.RoomTemperature),
-    target: chartTarget(state),
-    outdoor: finiteNumber(state.OutdoorTemperature),
-    humidity: finiteNumber(state.RoomHumidity),
-    outdoorHumidity: finiteNumber(state.OutdoorHumidity),
-  };
-  const history = _environmentHistory[mac] || (_environmentHistory[mac] = []);
-  if (!history.length || now - history[history.length - 1].t >= 9000) history.push(point);
-  while (history.length > 180) history.shift();
-  return history;
-}
-function showChartTooltip(event, id, label, value, unit, timestamp) {
-  const tip = document.getElementById(id);
-  if (!tip) return;
-  const plot = tip.parentElement.getBoundingClientRect();
-  const marker = event.currentTarget?.getBoundingClientRect();
-  const pointerX = Number.isFinite(event.clientX) && event.clientX > 0 ? event.clientX : marker.left + marker.width / 2;
-  const pointerY = Number.isFinite(event.clientY) && event.clientY > 0 ? event.clientY : marker.top;
-  tip.innerHTML = `<b>${escHtml(label)} · ${Number(value).toFixed(1)} ${unit}</b><small>${new Date(Number(timestamp)).toLocaleString('it-IT')}</small>`;
-  tip.style.left = `${Math.max(85,Math.min(plot.width-85,pointerX-plot.left))}px`;
-  tip.style.top = `${Math.max(70,pointerY-plot.top)}px`;
-  tip.classList.add('visible');
-}
-function hideChartTooltip(id) {
-  document.getElementById(id)?.classList.remove('visible');
-}
-function renderTimeSeriesPanel(mac, history, config) {
-  const width = 1000, height = 300, left = 56, right = 22, top = 18, bottom = 42;
-  const values = history.flatMap(point => config.series.map(item => point[item.key])).filter(Number.isFinite);
-  if (!values.length) return `<section class="chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div></div><div class="chart-empty">Nessun dato disponibile · seleziona il relativo sensore Home Assistant</div></section>`;
-  let min = config.fixedMin ?? Math.floor(Math.min(...values) - config.padding);
-  let max = config.fixedMax ?? Math.ceil(Math.max(...values) + config.padding);
-  if (max - min < config.minimumRange) { const middle = (max + min) / 2; min = middle - config.minimumRange / 2; max = middle + config.minimumRange / 2; }
-  const start = history[0]?.t || Date.now(), endRaw = history[history.length - 1]?.t || start, end = Math.max(endRaw,start + 1);
-  const x = timestamp => left + (timestamp-start) * (width-left-right) / (end-start);
-  const y = value => top + (max-value) * (height-top-bottom) / (max-min);
-  const ticks = Array.from({length:5},(_,index) => ({value:max-index*(max-min)/4,y:top+index*(height-top-bottom)/4}));
-  const times = Array.from({length:4},(_,index) => start+index*(endRaw-start)/3);
-  const timeLabel = timestamp => new Date(timestamp).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
-  const tooltipId = `chart-tip-${mac}-${config.id}`;
-  const draw = item => {
-    const points = history.map(point => Number.isFinite(point[item.key]) ? {point,value:point[item.key]} : null).filter(Boolean);
-    if (!points.length) return '';
-    const coords = points.map(entry => `${x(entry.point.t)},${y(entry.value)}`).join(' ');
-    const area = item.area && points.length > 1 ? `<polygon class="chart-area" fill="${item.color}" points="${x(points[0].point.t)},${height-bottom} ${coords} ${x(points[points.length-1].point.t)},${height-bottom}"/>` : '';
-    const line = points.length > 1 ? `<polyline class="chart-series ${item.css || ''}" stroke="${item.color}" points="${coords}"/>` : '';
-    const dots = points.map(entry => `<circle class="chart-point" tabindex="0" cx="${x(entry.point.t)}" cy="${y(entry.value)}" r="4" fill="${item.color}" aria-label="${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit}" onmouseenter="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmousemove="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmouseleave="hideChartTooltip('${tooltipId}')" onfocus="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onblur="hideChartTooltip('${tooltipId}')"><title>${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit} · ${new Date(entry.point.t).toLocaleString('it-IT')}</title></circle>`).join('');
-    return area + line + dots;
-  };
-  return `<section class="chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div><div class="ops-chart-legend">${config.series.map(item => `<span><i style="background:${item.color};${item.css === 'target' ? 'background:repeating-linear-gradient(90deg,'+item.color+' 0 7px,transparent 7px 11px)' : ''}"></i>${item.label}</span>`).join('')}</div></div><div class="ops-chart-plot"><div class="chart-tooltip" id="${tooltipId}"></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${config.title}">${ticks.map(tick => `<line class="chart-grid-line" x1="${left}" y1="${tick.y}" x2="${width-right}" y2="${tick.y}"/><text class="chart-axis-label" x="${left-10}" y="${tick.y+4}" text-anchor="end">${tick.value.toFixed(config.decimals)}${config.unit}</text>`).join('')}<line class="chart-axis-line" x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}"/><line class="chart-axis-line" x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}"/>${times.map((timestamp,index) => `<text class="chart-axis-label" x="${left+index*(width-left-right)/3}" y="${height-12}" text-anchor="${index === 0 ? 'start' : index === 3 ? 'end' : 'middle'}">${timeLabel(timestamp)}</text>`).join('')}${config.series.map(draw).join('')}</svg></div></section>`;
-}
-function renderEnvironmentChart(mac, state, detailed = false) {
-  const history = updateEnvironmentHistory(mac, state);
-  if (!detailed) {
-    const values = history.flatMap(point => [point.room,point.target]).filter(Number.isFinite);
-    if (!values.length) return '';
-    const min = Math.floor(Math.min(...values)-1), max = Math.ceil(Math.max(...values)+1), range = Math.max(2,max-min);
-    const x = index => history.length === 1 ? 4 : 4+index*92/(history.length-1);
-    const y = value => 94-(value-min)*88/range;
-    const line = (key,color,dash='') => { const points=history.map((point,index) => Number.isFinite(point[key]) ? `${x(index)},${y(point[key])}` : null).filter(Boolean); return points.length>1 ? `<polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-dasharray="${dash}" vector-effect="non-scaling-stroke"/>` : ''; };
-    return `<div class="ops-chart"><div class="ops-chart-legend"><span><i style="background:#22d3ee"></i>Interna</span><span><i style="background:#facc15"></i>Target</span></div><svg viewBox="0 0 100 100" preserveAspectRatio="none">${line('room','#22d3ee')}${line('target','#facc15','5 4')}</svg></div>`;
-  }
-  return `<div class="chart-panels">${renderTimeSeriesPanel(mac,history,{id:'temperature',title:'Temperatura',subtitle:'Andamento ambiente, setpoint ed esterno',unit:'°C',padding:1,minimumRange:4,decimals:1,series:[{key:'room',label:'Interna',color:'#22d3ee',area:true},{key:'target',label:'Target',color:'#facc15',css:'target'},{key:'outdoor',label:'Esterna',color:'#fb7185',css:'outdoor'}]})}${renderTimeSeriesPanel(mac,history,{id:'humidity',className:'humidity',title:'Umidità relativa',subtitle:'Confronto interno ed esterno',unit:'%',padding:5,minimumRange:20,decimals:0,series:[{key:'humidity',label:'Interna',color:'#60a5fa',area:true},{key:'outdoorHumidity',label:'Esterna',color:'#a78bfa',css:'outdoor'}]})}</div>`;
-}
-
-function toggleChartExpand(mac) {
-  const card = document.getElementById(`detail-chart-${mac}`);
-  if (!card) return;
-  const expanded = card.classList.toggle('expanded');
-  const button = card.querySelector('.chart-expand');
-  if (button) button.textContent = expanded ? '✕ Riduci' : '⛶ Espandi';
-}
-
-function renderChartsPage(data) {
-  const content = document.getElementById('chartsContent');
-  if (!content) return;
-  content.innerHTML = data.map(d => {
-    const s = d.state || {};
-    const value = (number, suffix) => Number.isFinite(Number(number)) ? Number(number).toFixed(1) + suffix : '--';
-    return `<article class="chart-detail-card" id="detail-chart-${escHtml(d.mac)}"><button class="chart-expand" onclick="toggleChartExpand('${escHtml(d.mac)}')">⛶ Espandi</button><h3>${escHtml(__DEVICE_NAMES__[d.mac] || d.name || d.mac)}</h3><p>Profilo ${escHtml(s.ActivePreset || 'manuale')} · ${s.Pow ? 'unità accesa' : 'unità spenta'} · ${escHtml(s.smart_last_action || 'nessuna decisione')}</p>${renderEnvironmentChart(d.mac,s,true)}<div class="chart-values"><div>Interna<b>${value(s.RoomTemperature,'°')}</b></div><div>Target<b>${value(chartTarget(s),'°')}</b></div><div>Esterna<b>${value(s.OutdoorTemperature,'°')}</b></div><div>Umi. interna<b>${value(s.RoomHumidity,'%')}</b></div><div>Umi. esterna<b>${value(s.OutdoorHumidity,'%')}</b></div></div></article>`;
-  }).join('');
-}
-
+__PANEL_HISTORY_JS__
 function renderOperationsDevice(d) {
   const s = d.state || {};
   const pow = Number(s.Pow || 0) === 1;

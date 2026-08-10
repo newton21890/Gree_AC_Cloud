@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0
+
+### Storico persistente e navigazione temporale
+
+- I grafici dettagliati leggono ora i dati persistenti già conservati da Home Assistant Recorder, invece di limitarsi alla sessione corrente del pannello.
+- Aggiunti intervalli selezionabili di 6 ore, 24 ore, 3 giorni, 7 giorni e 30 giorni.
+- Aggiunta la navigazione temporale avanti/indietro e il ritorno rapido al periodo corrente.
+- Temperatura ambiente, target del climate, temperatura esterna e umidità vengono ricostruiti dalle entità configurate e aggregati quando sono presenti più sensori ambiente.
+- I payload storici vengono campionati fino a un massimo di 720 punti per mantenere fluido il pannello.
+- Separata la logica Recorder in `panel_history.py` e la UI dei grafici in `frontend/panel_history.js`, migliorando modularità e manutenzione.
+
 ## 0.6.0
 
 ### Pagina Profili e modalità automatiche configurabili

@@ -34,8 +34,24 @@ def test_json_files_parse() -> None:
 def test_panel_data_apis_require_authentication() -> None:
     source = (COMPONENT / "panel.py").read_text()
     # The HTML shell must stay public for the iframe; every data view is protected.
+    history_source = (COMPONENT / "panel_history.py").read_text()
     assert source.count("requires_auth = True") == 9
+    assert history_source.count("requires_auth = True") == 1
     assert source.count("requires_auth = False") == 1
+
+
+def test_persistent_history_is_modular_and_recorder_backed() -> None:
+    panel_source = (COMPONENT / "panel.py").read_text()
+    history_source = (COMPONENT / "panel_history.py").read_text()
+    frontend_source = (COMPONENT / "frontend" / "panel_history.js").read_text()
+    assert "get_significant_states" in history_source
+    assert "get_instance(hass).async_add_executor_job" in history_source
+    assert '"30d": timedelta(days=30)' in history_source
+    assert "HISTORY_MAX_POINTS = 720" in history_source
+    assert "__PANEL_HISTORY_JS__" in panel_source
+    assert "loadPersistentHistory" in frontend_source
+    assert "shiftHistory" in frontend_source
+    assert "goToLatestHistory" in frontend_source
 
 
 def test_panel_keeps_log_capture_and_d1_normalization() -> None:
@@ -76,6 +92,10 @@ def test_panel_javascript_parses_when_node_is_available() -> None:
             break
 
     assert panel_html is not None
+    panel_html = panel_html.replace(
+        "__PANEL_HISTORY_JS__",
+        (COMPONENT / "frontend" / "panel_history.js").read_text(),
+    )
     script_start = panel_html.find("<script>")
     script_end = panel_html.rfind("</script>")
     assert script_start >= 0 and script_end > script_start
@@ -230,18 +250,23 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "Sessione non disponibile" in panel_source
     assert "Smart (profilo)" in panel_source
     assert "Regolazione profili attiva" in panel_source
-    assert "renderEnvironmentChart" in panel_source
-    assert "ClimateTargetTemperature" in panel_source
+    history_source = (COMPONENT / "frontend" / "panel_history.js").read_text()
+    assert "renderEnvironmentChart" in history_source
+    assert "ClimateTargetTemperature" in history_source
     assert "outdoorHumiditySensor" in panel_source
-    assert "renderChartsPage" in panel_source
+    assert "renderChartsPage" in history_source
+    assert "loadPersistentHistory" in history_source
+    assert "shiftHistory" in history_source
+    assert "Memoria persistente HA Recorder" in history_source
+    assert "GreePanelHistoryView" in (COMPONENT / "panel_history.py").read_text()
     assert "renderProfilesPage" in panel_source
     assert 'data-tab="profiles"' in panel_source
     assert "Auto profilo non è Auto Gree" in panel_source
     assert "allowed_modes" in panel_source
     assert "Andamento climatico" in panel_source
-    assert "toggleChartExpand" in panel_source
-    assert "chart-point" in panel_source
-    assert "toLocaleTimeString" in panel_source
+    assert "toggleChartExpand" in history_source
+    assert "chart-point" in history_source
+    assert "toLocaleString" in history_source
     assert "Override manuale" in panel_source
     assert "I-Demand Smart" in panel_source
     assert "applicato" in panel_source
