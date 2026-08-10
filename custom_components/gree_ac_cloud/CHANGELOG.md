@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.0
+
+### Grafici energetici e indicatori di risparmio
+
+- Aggiunti alla pagina Grafici i trend della potenza elettrica stimata e dell'energia cumulata nel periodo selezionato.
+- Introdotto un riferimento controfattuale che confronta lo stesso modo HVAC senza DRED e Quiet, mostrando risparmio istantaneo, kWh evitati e percentuale stimata.
+- Aggiunti indicatori per consumo del periodo, potenza media, picco, riferimento comparabile e risparmio stimato.
+- Registrati in Home Assistant i nuovi sensori Estimated Baseline Power ed Estimated Saving Power, entrambi esplicitamente marcati come stime e non come contatori fiscali.
+- Lo storico Recorder include ora potenza, energia, preset attivo, strategia Smart e livello DRED, consentendo di attribuire i risparmi stimati ai profili Giorno, Notte e Assente.
+- Aggiunta una lettura preventiva del potenziale dei preset in base a I-Demand, Quiet e comportamento a comfort, distinguendola chiaramente dai risparmi realmente stimati sullo storico.
+- Tutte le metriche energetiche restano stime basate sul modello selezionato dell'unità e non sono adatte a fatturazione o verifica fiscale.
+
 ## 0.10.1
 
 ### Selezione dei sensori interni

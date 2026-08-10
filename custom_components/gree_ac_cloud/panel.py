@@ -356,6 +356,8 @@ class GreePanelDataView(HomeAssistantView):
                         "smart_temperature_trend_samples",
                     ):
                         state[key] = climate_state.attributes.get(key)
+                state["EstimatedBaselinePowerW"] = state.get("estimated_baseline_power_w")
+                state["EstimatedSavingPowerW"] = state.get("estimated_saving_power_w")
                 data.append(
                     {
                         "mac": device.mac,
@@ -1439,6 +1441,29 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .chart-values { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; margin-top:14px; }
 .chart-values div { padding:7px; border-radius:7px; background:#0d131d; text-align:center; font-size:9px; color:var(--text2); }
 .chart-values b { display:block; margin-top:2px; color:var(--text); font-size:12px; }
+.energy-section { margin-top:22px; padding-top:20px; border-top:1px solid #2a384b; }
+.energy-section-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:13px; }
+.energy-section-head h4 { margin:2px 0 4px; color:#f1f6ff; font-size:15px; }
+.energy-section-head p { margin:0; color:#7f8fa5; font-size:9px; }
+.energy-estimate-badge { padding:5px 8px; border:1px solid #725c26; border-radius:7px; color:#f8d878; background:#292410; font-size:8px; font-weight:900; white-space:nowrap; }
+.energy-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; margin-bottom:14px; }
+.energy-kpis article { padding:12px; border:1px solid #27364a; border-radius:10px; background:#0c141f; }
+.energy-kpis article.saving { border-color:#256447; background:linear-gradient(145deg,rgba(34,197,94,.13),#0c141f); }
+.energy-kpis span,.energy-kpis small { display:block; color:#76869c; font-size:8px; }
+.energy-kpis b { display:block; margin:5px 0 3px; color:#f8d878; font-size:17px; }
+.energy-kpis .saving b { color:#5ee89a; }
+.energy-panels { margin-bottom:14px; }
+.energy-insights { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.energy-insights > article { padding:13px; border:1px solid #263549; border-radius:11px; background:#0c131d; }
+.energy-insights h5 { margin:0 0 9px; color:#dce8f7; font-size:11px; }
+.energy-insights p,.energy-insights > article > small { display:block; margin:7px 0 0; color:#718096; font-size:8px; line-height:1.5; }
+.energy-profile-rows,.energy-scenarios { display:grid; gap:5px; }
+.energy-profile-rows > div,.energy-scenarios > div { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:7px 8px; border-radius:7px; background:#121c29; color:#aab8ca; font-size:9px; }
+.energy-profile-rows b,.energy-scenarios strong { color:#5ee89a; white-space:nowrap; }
+.energy-scenarios span b,.energy-scenarios span small { display:block; }
+.energy-scenarios span b { color:#dce7f5; font-size:9px; }
+.energy-scenarios span small { margin-top:2px; color:#728198; font-size:7px; }
+.energy-empty { min-height:110px; display:grid; place-items:center; padding:20px; border:1px dashed #34445b; border-radius:11px; color:#7c8ba0; text-align:center; font-size:10px; line-height:1.55; }
 .profiles-layout { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(320px,.75fr); gap:16px; align-items:start; }
 .profile-device { margin-bottom:16px; padding:18px; border:1px solid var(--border); border-radius:14px; background:#111722; }
 .profile-device-head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:13px; }
@@ -1628,6 +1653,9 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .chart-series.target { stroke-width:2.5; }
   .chart-point { stroke-width:2.5; }
   .chart-values { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .energy-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .energy-insights { grid-template-columns:1fr; }
+  .energy-section-head { flex-direction:column; }
   .mobile-menu-scrim { position:fixed; inset:0; z-index:39; border:0; padding:0; background:rgba(2,7,13,.68); backdrop-filter:blur(2px); }
   body.mobile-menu-open .mobile-menu-scrim { display:block; }
   /* The sticky header creates its own stacking context. Raise that context
@@ -1725,7 +1753,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
     <div class="devices" id="devices"></div>
   </div>
   <div id="tab-charts" style="display:none;">
-    <div class="ops-page-head"><div><h2>Andamento climatico</h2><p>Confronto dettagliato dei valori raccolti durante la sessione del pannello.</p></div></div>
+    <div class="ops-page-head"><div><h2>Clima ed energia</h2><p>Storico persistente di temperatura, umidità, consumi stimati e risparmi attribuibili ai profili.</p></div></div>
     <div id="chartsContent" class="charts-grid"></div>
   </div>
   <div id="tab-profiles" style="display:none;">

@@ -106,6 +106,75 @@ function historyWindowLabel() {
   const format = value => new Date(value).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
   return `${format(start)} → ${format(end)}`;
 }
+function inferredBaselinePower(point, actualW) {
+  const explicit = finiteNumber(point.baselinePower);
+  if (explicit !== null) return Math.max(actualW,explicit);
+  const explicitSaving = finiteNumber(point.savingPower);
+  if (explicitSaving !== null) return actualW + Math.max(0,explicitSaving);
+  // Compatibility for history recorded before the baseline sensor existed.
+  // The estimator uses 70% nominal without a limit, 50% for D2 and 5% for D1.
+  if (point.dred === 'D1') return actualW * 14;
+  if (point.dred === 'D2') return actualW * 1.4;
+  return actualW;
+}
+function buildEnergyHistory(history) {
+  const source = history.filter(point => finiteNumber(point.power) !== null).sort((a,b) => a.t - b.t);
+  if (source.length < 2) return [];
+  let actualKwh = 0;
+  let baselineKwh = 0;
+  return source.map((point,index) => {
+    const actualW = Math.max(0,finiteNumber(point.power) || 0);
+    const baselineW = inferredBaselinePower(point,actualW);
+    if (index) {
+      const previous = source[index - 1];
+      const elapsedHours = Math.max(0,(point.t - previous.t) / 3600000);
+      const previousActual = Math.max(0,finiteNumber(previous.power) || 0);
+      const previousBaseline = inferredBaselinePower(previous,previousActual);
+      actualKwh += ((previousActual + actualW) / 2) * elapsedHours / 1000;
+      baselineKwh += ((previousBaseline + baselineW) / 2) * elapsedHours / 1000;
+    }
+    return {...point,powerKw:actualW / 1000,baselineKw:baselineW / 1000,savingKw:Math.max(0,baselineW - actualW) / 1000,energyKwh:actualKwh,baselineEnergyKwh:baselineKwh,savingKwh:Math.max(0,baselineKwh - actualKwh)};
+  });
+}
+function profileEnergyScenarios(state) {
+  const labels = {day:'Giorno',night:'Notte',away:'Assente'};
+  return Object.entries(state.Presets || {}).filter(([,preset]) => preset && preset.enabled !== false).map(([key,preset]) => {
+    const dred = preset.dred || 'No action';
+    let reduction = 0;
+    let range = false;
+    if (dred === 'D1') reduction = 93;
+    else if (dred === 'D2') reduction = 29;
+    else if (dred === 'D3') reduction = 0;
+    else if (dred === 'Smart') { reduction = 29; range = true; }
+    if (preset.quiet) reduction = 100 - ((100 - reduction) * .85);
+    const hold = preset.hold_action === 'fan_only' ? 'Solo ventola a comfort' : preset.hold_action === 'd1_ventilation' ? 'D1 a comfort' : 'Spegnimento a comfort';
+    return {name:labels[key] || key,reduction,range,hold,dred,quiet:Boolean(preset.quiet)};
+  });
+}
+function renderEnergyIndicators(mac,state,history) {
+  const energy = buildEnergyHistory(history);
+  if (energy.length < 2) return `<section class="energy-section"><div class="energy-section-head"><div><span class="ops-eyebrow">ENERGIA STIMATA</span><h4>Consumi e opportunità di risparmio</h4></div></div><div class="energy-empty">Lo storico energetico verrà mostrato dopo la raccolta di almeno due campioni del sensore Estimated Power. Seleziona il modello corretto dell'unità per abilitare la stima.</div></section>`;
+  const last = energy[energy.length - 1];
+  const actual = last.energyKwh;
+  const baseline = last.baselineEnergyKwh;
+  const saved = last.savingKwh;
+  const savingPct = baseline > 0 ? saved / baseline * 100 : 0;
+  const peak = Math.max(...energy.map(point => point.powerKw));
+  const average = actual / Math.max((last.t - energy[0].t) / 3600000,.001);
+  const profileSavings = {};
+  for (let index=1; index<energy.length; index++) {
+    const point = energy[index];
+    const previous = energy[index - 1];
+    const presetNames = {day:'Giorno',night:'Notte',away:'Assente',manual:'Manuale'};
+    const preset = presetNames[previous.preset] || previous.preset || 'Manuale';
+    profileSavings[preset] = (profileSavings[preset] || 0) + Math.max(0,point.savingKwh - previous.savingKwh);
+  }
+  const profileRows = Object.entries(profileSavings).filter(([,value]) => value > .0001).sort((a,b) => b[1] - a[1]);
+  const scenarios = profileEnergyScenarios(state);
+  const powerChart = renderTimeSeriesPanel(mac,energy,{id:'energy-power',title:'Potenza elettrica stimata',subtitle:'Confronto con lo stesso modo operativo senza DRED e Quiet',unit:' kW',padding:.08,minimumRange:.3,decimals:2,series:[{key:'powerKw',label:'Consumo stimato',color:'#fbbf24',area:true},{key:'baselineKw',label:'Riferimento',color:'#94a3b8',css:'target'},{key:'savingKw',label:'Risparmio istantaneo',color:'#34d399'}]});
+  const cumulativeChart = renderTimeSeriesPanel(mac,energy,{id:'energy-cumulative',title:'Energia cumulata nel periodo',subtitle:'Integrale della potenza stimata sui campioni HA Recorder',unit:' kWh',padding:.03,minimumRange:.1,decimals:2,series:[{key:'energyKwh',label:'Consumo',color:'#fb923c',area:true},{key:'baselineEnergyKwh',label:'Riferimento',color:'#94a3b8',css:'target'},{key:'savingKwh',label:'Risparmio',color:'#22c55e'}]});
+  return `<section class="energy-section"><div class="energy-section-head"><div><span class="ops-eyebrow">ENERGIA STIMATA</span><h4>Consumi e opportunità di risparmio</h4><p>Periodo ${_historyView.period} · stima basata sul modello dell'unità, non su un contatore elettrico.</p></div><span class="energy-estimate-badge">STIMA · NON FATTURAZIONE</span></div><div class="energy-kpis"><article><span>Consumo periodo</span><b>${actual.toFixed(2)} kWh</b><small>Potenza media ${average.toFixed(2)} kW</small></article><article><span>Riferimento comparabile</span><b>${baseline.toFixed(2)} kWh</b><small>Stesso modo senza DRED/Quiet</small></article><article class="saving"><span>Risparmio stimato</span><b>${saved.toFixed(2)} kWh</b><small>${savingPct.toFixed(1)}% sul riferimento</small></article><article><span>Picco stimato</span><b>${peak.toFixed(2)} kW</b><small>Massimo nel periodo selezionato</small></article></div><div class="chart-panels energy-panels">${powerChart}${cumulativeChart}</div><div class="energy-insights"><article><h5>Risparmio attribuito ai profili</h5>${profileRows.length ? `<div class="energy-profile-rows">${profileRows.map(([preset,value]) => `<div><span>${escHtml(preset)}</span><b>${value.toFixed(2)} kWh</b></div>`).join('')}</div>` : '<p>Non sono ancora presenti riduzioni attribuibili nello storico selezionato.</p>'}<small>Attribuzione basata sul preset registrato da Home Assistant durante ogni intervallo.</small></article><article><h5>Potenziale delle impostazioni</h5>${scenarios.length ? `<div class="energy-scenarios">${scenarios.map(item => `<div><span><b>${escHtml(item.name)}</b><small>${escHtml(item.hold)} · I-Demand ${escHtml(item.dred)}${item.quiet ? ' · Quiet' : ''}</small></span><strong>${item.range ? 'fino a ' : ''}${item.reduction.toFixed(0)}%</strong></div>`).join('')}</div>` : '<p>Nessun profilo automatico abilitato.</p>'}<small>Riduzione teorica della potenza durante richieste equivalenti. Il risparmio a comfort dipende dal tempo reale senza domanda e non è una promessa di consumo.</small></article></div></section>`;
+}
 function historyToolbar() {
   const atNow = !_historyView.end;
   return `<div class="chart-toolbar"><div class="chart-periods">${Object.keys(HISTORY_PERIOD_MS).map(period => `<button class="${_historyView.period === period ? 'active' : ''}" onclick="setHistoryPeriod('${period}')">${period}</button>`).join('')}</div><div class="chart-navigation"><button onclick="shiftHistory(-1)">← Indietro</button><span class="chart-window-label">${historyWindowLabel()}</span><button onclick="shiftHistory(1)" ${atNow ? 'disabled' : ''}>Avanti →</button><button onclick="goToLatestHistory()" ${atNow ? 'disabled' : ''}>Adesso</button></div><span class="chart-recorder-note">Memoria persistente HA Recorder${_historyView.loading ? ' · caricamento…' : ''}</span></div>`;
@@ -171,7 +240,8 @@ function renderChartsPage(data, requestHistory = true) {
     const value = (raw,unit) => finiteNumber(raw) == null ? '--' : `${Number(raw).toFixed(1)}${unit}`;
     const stored = _persistentHistory[device.mac];
     const chart = stored?.error ? `<div class="chart-empty">Storico non disponibile: ${escHtml(stored.error)}</div>` : renderEnvironmentChart(device.mac,state,true);
-    return `<article class="chart-detail-card" id="detail-chart-${escHtml(device.mac)}"><button class="chart-expand" onclick="toggleChartExpand('${escHtml(device.mac)}')">⛶ Espandi</button><h3>${escHtml(__DEVICE_NAMES__[device.mac] || device.name || device.mac)}</h3><p>Profilo ${escHtml(state.ActivePreset || 'manuale')} · ${state.Pow ? 'unità accesa' : 'unità spenta'} · ${stored?.points?.length || 0} campioni storici</p>${chart}<div class="chart-values"><div>Interna<b>${value(state.RoomTemperature,'°')}</b></div><div>Target<b>${value(chartTarget(state),'°')}</b></div><div>Esterna<b>${value(state.OutdoorTemperature,'°')}</b></div><div>Umi. interna<b>${value(state.RoomHumidity,'%')}</b></div><div>Umi. esterna<b>${value(state.OutdoorHumidity,'%')}</b></div></div></article>`;
+    const energy = stored?.error ? '' : renderEnergyIndicators(device.mac,state,stored?.points || []);
+    return `<article class="chart-detail-card" id="detail-chart-${escHtml(device.mac)}"><button class="chart-expand" onclick="toggleChartExpand('${escHtml(device.mac)}')">⛶ Espandi</button><h3>${escHtml(__DEVICE_NAMES__[device.mac] || device.name || device.mac)}</h3><p>Profilo ${escHtml(state.ActivePreset || 'manuale')} · ${state.Pow ? 'unità accesa' : 'unità spenta'} · ${stored?.points?.length || 0} campioni storici</p>${chart}<div class="chart-values"><div>Interna<b>${value(state.RoomTemperature,'°')}</b></div><div>Target<b>${value(chartTarget(state),'°')}</b></div><div>Esterna<b>${value(state.OutdoorTemperature,'°')}</b></div><div>Umi. interna<b>${value(state.RoomHumidity,'%')}</b></div><div>Umi. esterna<b>${value(state.OutdoorHumidity,'%')}</b></div></div>${energy}</article>`;
   }).join('');
   content.innerHTML = historyToolbar() + (_historyView.loading && !Object.keys(_persistentHistory).length ? '<div class="chart-loading">Caricamento dello storico persistente da Home Assistant…</div>' : cards);
   if (requestHistory && !_historyView.loading) loadPersistentHistory();

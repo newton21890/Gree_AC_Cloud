@@ -17,6 +17,8 @@ async def async_setup_entry(hass, entry, async_add_entities: AddEntitiesCallback
         for key, cfg in DEVICE_SENSORS.items():
             entities.append(GreeSensor(coord, key, cfg))
         entities.append(GreePowerSensor(coord))
+        entities.append(GreeBaselinePowerSensor(coord))
+        entities.append(GreeSavingPowerSensor(coord))
         entities.append(GreeEnergySensor(coord))
     async_add_entities(entities)
 
@@ -55,12 +57,13 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
         self._attr_device_class = SENSOR_CLASSES.get(key)
         self._attr_native_unit_of_measurement = SENSOR_UNITS.get(key)
         self._attr_state_class = SENSOR_STATE_CLASS.get(key)
-        self._attr_entity_registry_enabled_default = (
-            key in ("InHumi",) or cfg.get("diagnostic", False)
+        self._attr_entity_registry_enabled_default = key in ("InHumi",) or cfg.get(
+            "diagnostic", False
         )
 
         if cfg.get("diagnostic"):
             from homeassistant.helpers.entity import EntityCategory
+
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
         if key == "SetDeciTem":
@@ -107,7 +110,6 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
 
 
 class GreePowerSensor(GreeDeviceEntity, SensorEntity):
-
     def __init__(self, coordinator):
         super().__init__(coordinator, coordinator.device, key_suffix="power")
         self._attr_name = "Estimated Power"
@@ -131,8 +133,61 @@ class GreePowerSensor(GreeDeviceEntity, SensorEntity):
         }
 
 
-class GreeEnergySensor(GreeDeviceEntity, SensorEntity):
+class GreeBaselinePowerSensor(GreeDeviceEntity, SensorEntity):
+    """Counterfactual power estimate without DRED and Quiet."""
 
+    def __init__(self, coordinator):
+        super().__init__(coordinator, coordinator.device, key_suffix="baseline_power")
+        self._attr_name = "Estimated Baseline Power"
+        self._attr_device_class = SensorDeviceClass.POWER
+        self._attr_native_unit_of_measurement = UnitOfPower.WATT
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_entity_registry_enabled_default = True
+        self._attr_icon = "mdi:chart-line"
+
+    @property
+    def native_value(self):
+        return self.coordinator.data.get("estimated_baseline_power_w")
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "estimated": True,
+            "model": self.coordinator._model_key or None,
+            "method": "same HVAC mode without DRED or Quiet",
+            "counterfactual": True,
+            "not_a_meter": True,
+        }
+
+
+class GreeSavingPowerSensor(GreeDeviceEntity, SensorEntity):
+    """Instantaneous estimated saving relative to the baseline."""
+
+    def __init__(self, coordinator):
+        super().__init__(coordinator, coordinator.device, key_suffix="saving_power")
+        self._attr_name = "Estimated Saving Power"
+        self._attr_device_class = SensorDeviceClass.POWER
+        self._attr_native_unit_of_measurement = UnitOfPower.WATT
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_entity_registry_enabled_default = True
+        self._attr_icon = "mdi:leaf"
+
+    @property
+    def native_value(self):
+        return self.coordinator.data.get("estimated_saving_power_w")
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "estimated": True,
+            "model": self.coordinator._model_key or None,
+            "method": "estimated baseline power minus estimated actual power",
+            "counterfactual": True,
+            "not_a_meter": True,
+        }
+
+
+class GreeEnergySensor(GreeDeviceEntity, SensorEntity):
     def __init__(self, coordinator):
         super().__init__(coordinator, coordinator.device, key_suffix="energy")
         self._attr_name = "Estimated Energy"

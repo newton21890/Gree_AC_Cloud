@@ -73,7 +73,6 @@ async def async_discover_and_connect(
 
 
 class GreeDeviceCoordinator(DataUpdateCoordinator):
-
     def __init__(
         self,
         hass: HomeAssistant,
@@ -168,9 +167,11 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
             self.hass.async_create_task(self.async_apply_startup_settings())
 
     async def async_save_energy(self):
-        await self._energy_store.async_save({
-            "total_kwh": self._total_energy_kwh,
-        })
+        await self._energy_store.async_save(
+            {
+                "total_kwh": self._total_energy_kwh,
+            }
+        )
 
     @property
     def _model_key(self) -> str:
@@ -179,6 +180,25 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
     @property
     def _model_specs(self) -> dict | None:
         return ENERGY_MODELS.get(self._model_key)
+
+    def _estimate_baseline_power_w(self, state: dict) -> float:
+        """Estimate the same operating mode without efficiency settings.
+
+        This counterfactual baseline removes DRED and Quiet while preserving
+        power state and HVAC mode. It is useful for comparing strategies, but
+        remains a model-based estimate rather than a billing-grade meter.
+        """
+        model = self._model_specs
+        if not model or not state.get("Pow"):
+            return 0.0
+        mode = state.get("Mod")
+        if mode == 3:
+            return round(model["cool"] * 0.05 * 1000)
+        base = model["heat"] if mode == 2 else model["cool"]
+        duty_factor = 0.55 if mode == 4 else 0.70
+        if state.get("Tur"):
+            duty_factor = min(1.0, duty_factor * 1.20)
+        return round(min(base * duty_factor, model["max"]) * 1000)
 
     def _estimate_power_w(self, state: dict) -> float:
         """Estimate electrical input without pretending raw probes are ambient.
@@ -234,6 +254,10 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
     def _build_data(self) -> dict[str, Any]:
         data = dict(self.device.properties)
         data["estimated_power_w"] = self._estimate_power_w(data)
+        data["estimated_baseline_power_w"] = self._estimate_baseline_power_w(data)
+        data["estimated_saving_power_w"] = max(
+            0.0, data["estimated_baseline_power_w"] - data["estimated_power_w"]
+        )
         now = time.monotonic()
         elapsed_h = (now - self._last_energy_time) / 3600.0
         self._last_energy_time = now
@@ -261,7 +285,9 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         else:
             _LOGGER.debug(
                 "%s: refresh (Pow=%s, last_seen=%.1fs ago)",
-                self.device.name, self.device.properties.get("Pow"), elapsed,
+                self.device.name,
+                self.device.properties.get("Pow"),
+                elapsed,
             )
 
         result = self._build_data()

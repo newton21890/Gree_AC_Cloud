@@ -64,6 +64,10 @@ def _history_sensor_ids(hass, entry, device) -> dict[str, list[str]]:
         climate_entity = platform_entity(device.mac, "climate")
     fallback_temperature = platform_entity(f"{device.mac}_TemSen", "sensor")
     fallback_humidity = platform_entity(f"{device.mac}_InHumi", "sensor")
+    estimated_power = platform_entity(f"{device.mac}_power", "sensor")
+    baseline_power = platform_entity(f"{device.mac}_baseline_power", "sensor")
+    saving_power = platform_entity(f"{device.mac}_saving_power", "sensor")
+    estimated_energy = platform_entity(f"{device.mac}_energy", "sensor")
     outdoor_temperature = entry.options.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
     outdoor_humidity = entry.options.get(CONF_OUTDOOR_HUMIDITY_SENSOR)
     return {
@@ -74,6 +78,15 @@ def _history_sensor_ids(hass, entry, device) -> dict[str, list[str]]:
         "outdoor": [outdoor_temperature] if outdoor_temperature else [],
         "outdoorHumidity": [outdoor_humidity] if outdoor_humidity else [],
         "target": [climate_entity] if climate_entity else [],
+        "power": [estimated_power] if estimated_power else [],
+        "baselinePower": [baseline_power] if baseline_power else [],
+        "savingPower": [saving_power] if saving_power else [],
+        "energy": [estimated_energy] if estimated_energy else [],
+        "mode": [climate_entity] if climate_entity else [],
+        "preset": [climate_entity] if climate_entity else [],
+        "dred": [climate_entity] if climate_entity else [],
+        "profileActive": [climate_entity] if climate_entity else [],
+        "smartAction": [climate_entity] if climate_entity else [],
     }
 
 
@@ -92,7 +105,8 @@ def _merge_histories(histories, sensor_ids, period) -> list[dict]:
     for key, entity_ids in sensor_ids.items():
         for entity_id in entity_ids:
             entity_series.setdefault(entity_id, []).append(key)
-    events: list[tuple[float, str, str, float | None]] = []
+    categorical_keys = {"mode", "preset", "dred", "profileActive", "smartAction"}
+    events: list[tuple[float, str, str, float | str | bool | None]] = []
     for entity_id, states in histories.items():
         keys = entity_series.get(entity_id, [])
         for state in states:
@@ -106,16 +120,29 @@ def _merge_histories(histories, sensor_ids, period) -> list[dict]:
                     )
                 elif key == "room" and entity_id.startswith("climate."):
                     raw_value = state.attributes.get("current_temperature")
+                elif key == "preset":
+                    raw_value = state.attributes.get("preset_mode")
+                elif key == "dred":
+                    raw_value = state.attributes.get("smart_dred_applied")
+                elif key == "profileActive":
+                    raw_value = state.attributes.get("smart_profile_active")
+                elif key == "smartAction":
+                    raw_value = state.attributes.get("smart_last_action")
                 else:
                     raw_value = state.state
-                try:
-                    value = float(raw_value)
-                except (TypeError, ValueError):
-                    value = None
+                if key in categorical_keys:
+                    value = (
+                        raw_value if raw_value not in (None, "", "unknown", "unavailable") else None
+                    )
+                else:
+                    try:
+                        value = float(raw_value)
+                    except (TypeError, ValueError):
+                        value = None
                 events.append((state.last_updated.timestamp() * 1000, key, entity_id, value))
 
     events.sort(key=lambda item: item[0])
-    current: dict[str, dict[str, float]] = {key: {} for key in sensor_ids}
+    current: dict[str, dict[str, float | str | bool]] = {key: {} for key in sensor_ids}
     points: list[dict] = []
     last_bucket = None
     bucket_seconds = max(60, int(period.total_seconds() / HISTORY_MAX_POINTS))
@@ -132,8 +159,13 @@ def _merge_histories(histories, sensor_ids, period) -> list[dict]:
             points.append(point)
             last_bucket = bucket
         for series_key, values in current.items():
-            if values:
-                point[series_key] = round(sum(values.values()) / len(values), 2)
+            if not values:
+                continue
+            if series_key in categorical_keys:
+                point[series_key] = next(reversed(values.values()))
+            else:
+                numeric_values = [float(item) for item in values.values()]
+                point[series_key] = round(sum(numeric_values) / len(numeric_values), 3)
     return _downsample(points)
 
 

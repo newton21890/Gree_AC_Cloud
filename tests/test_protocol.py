@@ -54,6 +54,23 @@ def test_persistent_history_is_modular_and_recorder_backed() -> None:
     assert "loadPersistentHistory" in frontend_source
     assert "shiftHistory" in frontend_source
     assert "goToLatestHistory" in frontend_source
+    assert '"power": [estimated_power]' in history_source
+    assert '"baselinePower": [baseline_power]' in history_source
+    assert '"preset": [climate_entity]' in history_source
+    assert "buildEnergyHistory" in frontend_source
+    assert "renderEnergyIndicators" in frontend_source
+    assert "Risparmio attribuito ai profili" in frontend_source
+
+
+def test_energy_estimates_expose_baseline_and_saving_sensors() -> None:
+    sensor_source = (COMPONENT / "sensor.py").read_text()
+    coordinator_source = (COMPONENT / "coordinator.py").read_text()
+    assert "Estimated Power" in sensor_source
+    assert "Estimated Baseline Power" in sensor_source
+    assert "Estimated Saving Power" in sensor_source
+    assert "Estimated Energy" in sensor_source
+    assert "estimated_baseline_power_w" in coordinator_source
+    assert "estimated_saving_power_w" in coordinator_source
 
 
 def test_panel_keeps_log_capture_and_d1_normalization() -> None:
@@ -329,7 +346,7 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "_record_smart_temperature" in climate_source
     assert "Recorder remains the persistent source" in climate_source
     assert "_trend_adjusted_deadband" in climate_source
-    assert "Andamento climatico" in panel_source
+    assert "Clima ed energia" in panel_source
     assert "toggleChartExpand" in history_source
     assert "chart-point-group" in panel_source
     assert "aspect-ratio:460 / 580" in panel_source
