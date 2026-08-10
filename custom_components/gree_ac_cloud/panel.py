@@ -1532,11 +1532,37 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .outdoor-sensor-copy .config-section-title { display:block; margin:0 0 7px; color:var(--primary); }
 .outdoor-sensor-copy h3 { margin:0 0 5px; color:#e5eefb; font-size:13px; }
 .outdoor-sensor-copy p { margin:0; color:#8494aa; font-size:10px; line-height:1.55; }
-.room-sensor-settings { display:grid; gap:12px; }
-.room-sensor-device { padding:16px; border:1px solid var(--border); border-radius:12px; background:#101823; }
-.room-sensor-device-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:12px; }
-.room-sensor-device h3 { margin:0 0 3px; font-size:13px; }
+.room-sensor-settings { display:grid; gap:14px; }
+.room-sensor-device { padding:17px; border:1px solid #2b394c; border-radius:14px; background:linear-gradient(145deg,#111b28,#0d141e); box-shadow:0 12px 28px rgba(0,0,0,.2); }
+.room-sensor-device-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+.room-sensor-device h3 { margin:0 0 4px; font-size:14px; letter-spacing:-.01em; }
 .room-sensor-device code { color:#718097; font-size:9px; }
+.room-sensor-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.room-sensor-group { min-width:0; overflow:hidden; border:1px solid #29394d; border-radius:12px; background:#0b121c; }
+.room-sensor-group.temperature { --sensor-accent:#40c4ff; --sensor-soft:rgba(64,196,255,.12); }
+.room-sensor-group.humidity { --sensor-accent:#7c9cff; --sensor-soft:rgba(124,156,255,.12); }
+.room-sensor-group-head { display:flex; align-items:center; gap:10px; min-height:64px; padding:11px 12px; border-bottom:1px solid #263448; background:linear-gradient(135deg,var(--sensor-soft),transparent 72%); }
+.room-sensor-kind-icon { width:34px; height:34px; flex:0 0 34px; display:grid; place-items:center; border:1px solid color-mix(in srgb,var(--sensor-accent) 45%,transparent); border-radius:9px; color:var(--sensor-accent); background:var(--sensor-soft); font-size:11px; font-weight:800; }
+.room-sensor-kind-copy { min-width:0; flex:1; }
+.room-sensor-kind-copy h4 { margin:0 0 2px; color:#edf4ff; font-size:12px; }
+.room-sensor-kind-copy p { margin:0; color:#7f8da2; font-size:9px; line-height:1.35; }
+.room-sensor-tools { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+.room-sensor-count { color:var(--sensor-accent); font-size:9px; font-weight:700; white-space:nowrap; }
+.room-sensor-clear { padding:0; border:0; color:#728197; background:transparent; font:inherit; font-size:8px; cursor:pointer; }
+.room-sensor-clear:hover { color:#c9d6e8; }
+.room-sensor-list { display:grid; align-content:start; gap:6px; min-height:158px; max-height:238px; padding:9px; overflow:auto; scrollbar-color:#34465f transparent; }
+.room-sensor-option { position:relative; display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:8px; min-height:48px; padding:8px 9px; border:1px solid #243145; border-radius:9px; color:#aeb9c9; background:#111a27; cursor:pointer; transition:border-color .15s,background .15s,transform .15s; }
+.room-sensor-option:hover { border-color:#40536d; background:#152132; transform:translateY(-1px); }
+.room-sensor-option.is-selected { border-color:color-mix(in srgb,var(--sensor-accent) 62%,#263448); background:var(--sensor-soft); box-shadow:inset 3px 0 0 var(--sensor-accent); }
+.room-sensor-option.is-unavailable { opacity:.63; }
+.room-sensor-checkbox { width:15px; height:15px; margin:0; accent-color:var(--sensor-accent); cursor:pointer; }
+.room-sensor-option-copy { min-width:0; }
+.room-sensor-option-copy b,.room-sensor-option-copy small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.room-sensor-option-copy b { color:#dce6f5; font-size:10px; font-weight:600; }
+.room-sensor-option-copy small { margin-top:2px; color:#6f7e93; font-size:8px; }
+.room-sensor-value { padding:3px 6px; border-radius:6px; color:var(--sensor-accent); background:var(--sensor-soft); font-size:9px; font-weight:700; white-space:nowrap; }
+.room-sensor-empty { display:grid; place-items:center; min-height:138px; padding:18px; color:#6f7e93; text-align:center; font-size:10px; line-height:1.5; }
+.room-sensor-group-foot { min-height:43px; padding:9px 11px; border-top:1px solid #202d3e; color:#718097; font-size:8px; line-height:1.45; }
 .preset-table { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
 .preset-head,.preset-row { display:grid; grid-template-columns:100px 55px 65px 100px 165px 70px 75px 75px 82px 88px 110px 60px 86px; gap:1px; min-width:1195px; align-items:center; }
 .profile-master { display:flex; gap:8px; align-items:center; padding:10px 12px; margin-bottom:12px; border:1px solid rgba(255,193,7,.35); border-radius:8px; background:rgba(255,193,7,.08); font-weight:700; }
@@ -1579,7 +1605,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .config-modal { padding:0; }
   .config-dialog { min-height:100vh; margin:0; border:0; border-radius:0; }
   .config-body { padding:14px; }
-  .config-common,.config-sensor-grid,.outdoor-sensor-card { grid-template-columns:1fr; }
+  .config-common,.config-sensor-grid,.room-sensor-grid,.outdoor-sensor-card { grid-template-columns:1fr; }
   .config-header { padding:14px; }
   .config-footer { padding:12px 14px; }
   .config-status { display:none; }
@@ -2164,7 +2190,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
       <div class="config-heading"><span class="config-heading-icon"><svg viewBox="0 0 24 24"><path d="M12 3v10"/><circle cx="12" cy="17" r="4"/><path d="M8 7H5v12h3"/><path d="M16 7h3v12h-3"/></svg></span><div><h2 id="roomSensorTitle">Sensori interni</h2><p>Associazione delle sonde ambiente alle singole unità</p></div></div>
       <button class="config-close" onclick="closeRoomSensorSettings()" aria-label="Chiudi sensori interni">×</button>
     </header>
-    <div class="config-body"><p class="config-intro">Per ogni macchina puoi selezionare più sonde di temperatura e umidità. La regolazione usa la media dei valori disponibili e ignora automaticamente entità unavailable.</p><div id="roomSensorSettingsContent" class="config-loading">Caricamento sensori interni…</div></div>
+    <div class="config-body"><p class="config-intro">Temperatura e umidità sono gestite in due gruppi indipendenti: seleziona liberamente tutte le sonde da associare alla macchina. La regolazione usa la media dei valori disponibili e ignora automaticamente le entità non disponibili.</p><div id="roomSensorSettingsContent" class="config-loading">Caricamento sensori interni…</div></div>
     <footer class="config-footer"><span class="config-status" id="roomSensorSettingsStatus">Profili e sensori esterni non verranno modificati.</span><div class="config-actions"><button class="config-btn" onclick="closeRoomSensorSettings()">Annulla</button><button class="config-btn primary" id="saveRoomSensorSettings">Salva associazioni</button></div></footer>
   </div>
 </div>
@@ -2259,6 +2285,54 @@ function sensorOptions(sensors, selected) {
   return sensors.map(s => `<option value="${escHtml(s.entity_id)}" ${chosen.has(s.entity_id) ? 'selected' : ''}>${escHtml(s.name)} — ${escHtml(s.state)} ${escHtml(s.unit || '')}</option>`).join('');
 }
 
+function roomSensorOptions(sensors, selected, mac, kind) {
+  const chosen = new Set(selected || []);
+  if (!sensors.length) return '<div class="room-sensor-empty">Nessun sensore compatibile disponibile in Home Assistant.</div>';
+  return sensors.map(sensor => {
+    const entityId = escHtml(sensor.entity_id);
+    const checked = chosen.has(sensor.entity_id);
+    const unavailable = ['unknown','unavailable'].includes(String(sensor.state).toLowerCase());
+    const value = unavailable ? 'Non disponibile' : `${escHtml(sensor.state)}${sensor.unit ? ` ${escHtml(sensor.unit)}` : ''}`;
+    return `<label class="room-sensor-option${checked ? ' is-selected' : ''}${unavailable ? ' is-unavailable' : ''}"><input class="room-sensor-checkbox" type="checkbox" name="room-${kind}-${mac}" value="${entityId}" ${checked ? 'checked' : ''}><span class="room-sensor-option-copy"><b>${escHtml(sensor.name)}</b><small>${entityId}</small></span><span class="room-sensor-value">${value}</span></label>`;
+  }).join('');
+}
+
+function updateRoomSensorCount(group) {
+  const count = group.querySelectorAll('.room-sensor-checkbox:checked').length;
+  const badge = group.querySelector('.room-sensor-count');
+  if (badge) badge.textContent = count === 1 ? '1 selezionato' : `${count} selezionati`;
+}
+
+function bindRoomSensorLists() {
+  document.querySelectorAll('.room-sensor-group').forEach(group => {
+    group.querySelectorAll('.room-sensor-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', () => {
+        checkbox.closest('.room-sensor-option').classList.toggle('is-selected', checkbox.checked);
+        updateRoomSensorCount(group);
+      });
+    });
+    const clear = group.querySelector('.room-sensor-clear');
+    if (clear) clear.addEventListener('click', () => {
+      group.querySelectorAll('.room-sensor-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+        checkbox.closest('.room-sensor-option').classList.remove('is-selected');
+      });
+      updateRoomSensorCount(group);
+    });
+    updateRoomSensorCount(group);
+  });
+}
+
+function roomSensorGroup(device, sensors, selected, kind) {
+  const isTemperature = kind === 'temp';
+  const mac = escHtml(device.mac);
+  const title = isTemperature ? 'Temperatura ambiente' : 'Umidità ambiente';
+  const subtitle = isTemperature ? 'Sonde usate dalla regolazione termica' : 'Sonde usate per la gestione Dry';
+  const icon = isTemperature ? '°C' : '%';
+  const help = isTemperature ? 'I valori disponibili vengono mediati per temperatura corrente, profili Smart e storico.' : 'I valori disponibili vengono mediati e confrontati con la soglia di umidità del profilo.';
+  return `<section class="room-sensor-group ${isTemperature ? 'temperature' : 'humidity'}" id="room-${kind}-${mac}"><header class="room-sensor-group-head"><span class="room-sensor-kind-icon">${icon}</span><div class="room-sensor-kind-copy"><h4>${title}</h4><p>${subtitle}</p></div><div class="room-sensor-tools"><span class="room-sensor-count">0 selezionati</span><button class="room-sensor-clear" type="button">Deseleziona tutti</button></div></header><div class="room-sensor-list">${roomSensorOptions(sensors,selected,mac,kind)}</div><footer class="room-sensor-group-foot">${help}</footer></section>`;
+}
+
 async function openRoomSensorSettings() {
   const modal = document.getElementById('roomSensorSettings');
   const content = document.getElementById('roomSensorSettingsContent');
@@ -2270,7 +2344,12 @@ async function openRoomSensorSettings() {
     const temperatures = data.sensors.filter(sensor => sensor.device_class === 'temperature');
     const humidities = data.sensors.filter(sensor => sensor.device_class === 'humidity');
     content.className = 'room-sensor-settings';
-    content.innerHTML = data.devices.map(device => { const mac=escHtml(device.mac); return `<section class="room-sensor-device" data-entry-id="${escHtml(device.entry_id)}" data-mac="${mac}"><div class="room-sensor-device-head"><div><h3>${escHtml(__DEVICE_NAMES__[device.mac] || device.name || device.mac)}</h3><code>${mac}</code></div><span class="config-device-status" id="room-status-${mac}">Pronto</span></div><div class="config-sensor-grid"><label>Sensori temperatura ambiente<select class="config-select" id="room-temp-${mac}" multiple size="6">${sensorOptions(temperatures,device.temperature_sensors)}</select><span class="config-help">La media alimenta temperatura corrente, target Smart e storico.</span></label><label>Sensori umidità ambiente<select class="config-select" id="room-hum-${mac}" multiple size="6">${sensorOptions(humidities,device.humidity_sensors)}</select><span class="config-help">La media viene usata dalla soglia Dry del profilo.</span></label></div></section>`; }).join('');
+    content.innerHTML = data.devices.map(device => {
+      const mac = escHtml(device.mac);
+      const name = escHtml(__DEVICE_NAMES__[device.mac] || device.name || device.mac);
+      return `<section class="room-sensor-device" data-entry-id="${escHtml(device.entry_id)}" data-mac="${mac}"><div class="room-sensor-device-head"><div><h3>${name}</h3><code>${mac}</code></div><span class="config-device-status" id="room-status-${mac}">Pronto</span></div><div class="room-sensor-grid">${roomSensorGroup(device,temperatures,device.temperature_sensors,'temp')}${roomSensorGroup(device,humidities,device.humidity_sensors,'hum')}</div></section>`;
+    }).join('');
+    bindRoomSensorLists();
     document.getElementById('saveRoomSensorSettings').onclick = () => saveRoomSensorAssociations(data.devices);
   } catch (error) {
     content.className = 'config-loading';
@@ -2283,7 +2362,7 @@ function closeRoomSensorSettings() {
 async function saveRoomSensorAssociations(devices) {
   const button = document.getElementById('saveRoomSensorSettings');
   const status = document.getElementById('roomSensorSettingsStatus');
-  const selected = id => [...document.getElementById(id).selectedOptions].map(option => option.value);
+  const selected = id => [...document.querySelectorAll(`#${id} .room-sensor-checkbox:checked`)].map(checkbox => checkbox.value);
   button.disabled = true;
   status.textContent = 'Salvataggio associazioni…';
   try {

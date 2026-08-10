@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.1
+
+### Selezione dei sensori interni
+
+- Sostituite le liste native a selezione multipla con schede dotate di checkbox indipendenti, evitando che la selezione di un sensore di umidità deselezioni quello di temperatura.
+- Separati visivamente e logicamente i gruppi Temperatura ambiente e Umidità ambiente per ogni macchina.
+- Aggiunti stato corrente, entity ID, conteggio delle selezioni e comando Deseleziona tutti per ciascun gruppo.
+- Migliorata la disposizione responsive delle liste su desktop e dispositivi mobili.
+
 ## 0.10.0
 
 ### Sensori interni e mantenimento del comfort configurabile

@@ -268,7 +268,11 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "saveOutdoorSensors" in panel_source
     assert "openRoomSensorSettings" in panel_source
     assert "saveRoomSensorAssociations" in panel_source
+    assert "roomSensorOptions" in panel_source
+    assert "room-sensor-checkbox:checked" in panel_source
     assert "room-sensor-settings" in panel_source
+    assert "room-sensor-group ${isTemperature" in panel_source
+    assert "'temperature' : 'humidity'" in panel_source
     assert "outdoor-sensor-settings" in panel_source
     assert "Giorno, Notte e Assente si modificano esclusivamente" in panel_source
     sensor_modal_source = panel_source[
