@@ -270,8 +270,12 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "outdoorHumiditySensor" in panel_source
     assert "renderChartsPage" in history_source
     assert "chart-point-hit" in history_source
-    assert "Math.ceil(points.length / 48)" in history_source
+    assert "markerLimit = config.compact ? 28 : 48" in history_source
+    assert "Math.ceil(points.length / markerLimit)" in history_source
     assert 'onpointerdown="showChartTooltip' in history_source
+    assert "renderControlCharts" in history_source
+    assert "HA Recorder · periodo" in history_source
+    assert "compact:true" in history_source
     assert "loadPersistentHistory" in history_source
     assert "shiftHistory" in history_source
     assert "Memoria persistente HA Recorder" in history_source
@@ -293,8 +297,10 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "chart-point-group" in panel_source
     assert "aspect-ratio:460 / 580" in panel_source
     assert "orientation:portrait" in history_source
-    assert "overflow-x:scroll" in panel_source
-    assert "scrollIntoView" in panel_source
+    assert "mobile-menu-button" in panel_source
+    assert "mobile-menu-scrim" in panel_source
+    assert "toggleMobileMenu" in panel_source
+    assert "mobile-menu-open" in panel_source
     assert "ops-power-icon" in panel_source
     assert "toLocaleString" in history_source
     assert "Override manuale" in panel_source

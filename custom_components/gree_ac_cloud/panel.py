@@ -1323,6 +1323,9 @@ body.desktop .header {
 .tab-nav::before { content:'NAVIGAZIONE'; padding:4px 12px 5px; color:#57657a; font-size:9px; font-weight:900; letter-spacing:.15em; }
 .tab-btn { display:flex; align-items:center; gap:11px; justify-content:flex-start; width:100%; min-height:42px; border:1px solid transparent; border-radius:9px; padding:0 12px; color:#8c99ae; font-size:12px; font-weight:600; }
 .nav-icon,.sidebar-action-icon { width:17px; height:17px; flex:0 0 17px; display:grid; place-items:center; }
+.mobile-menu-button,.mobile-menu-scrim { display:none; }
+.mobile-menu-button { width:42px; height:42px; padding:0; border:1px solid #2b394e; border-radius:9px; background:#151d29; color:#d8e5f5; cursor:pointer; place-items:center; }
+.mobile-menu-button svg { width:23px; height:23px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
 .nav-icon svg,.sidebar-action-icon svg { width:100%; height:100%; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .nav-icon svg rect { fill:none; }
 .tab-btn.active { color:#d9fbff; background:#152733; border-color:#1d4753; box-shadow:inset 3px 0 0 var(--primary); }
@@ -1384,7 +1387,10 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-alert { padding:5px 8px; border-radius:7px; border:1px solid rgba(255,193,7,.4); background:rgba(255,193,7,.12); color:#ffd966; font-size:9px; font-weight:800; text-transform:uppercase; }
 .ops-alert.manual { border-color:rgba(3,169,244,.45); background:rgba(3,169,244,.12); color:#7dd3fc; }
 .ops-chart { margin-top:12px; padding:10px; border:1px solid var(--border); border-radius:10px; background:#0b111a; }
-.ops-chart svg { width:100%; height:112px; display:block; overflow:visible; }
+.ops-chart svg { width:100%; height:210px; display:block; overflow:visible; }
+.chart-panel.control-chart { margin-top:12px; padding:12px 10px 8px; }
+.chart-panel.control-chart svg { height:230px; }
+.control-chart-loading .chart-empty { height:190px; }
 .ops-chart-legend { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; font-size:10px; color:#a7b3c5; }
 .ops-chart-legend span { display:inline-flex; align-items:center; gap:5px; }
 .ops-chart-legend i { width:18px; height:3px; display:inline-block; border-radius:4px; }
@@ -1569,29 +1575,32 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .config-btn { flex:1; }
   .app-shell { display:block; }
   .header,
-  body.desktop .header { position:sticky; width:100%; height:auto; margin:0; padding:9px 10px 0; border-right:0; border-bottom:1px solid var(--border); display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:7px; overflow:hidden; }
-  .header-top { justify-content:flex-start; padding:0; }
+  body.desktop .header { position:sticky; width:100%; height:60px; margin:0; padding:8px 10px; border-right:0; border-bottom:1px solid var(--border); display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:8px; overflow:visible; }
+  .header-top { justify-content:flex-start; padding:0; grid-column:2; }
+  .mobile-menu-button { display:grid; grid-column:1; grid-row:1; }
   .header h1 { display:block; font-size:14px; }
   .header .icon-ac { width:30px; height:30px; }
   .chart-detail-card { padding:13px 8px; border-radius:12px; }
   .chart-panel { padding:11px 4px 8px; }
   .chart-panel svg,.chart-panel.humidity svg { height:auto; min-height:0; aspect-ratio:460 / 580; }
+  .chart-panel.control-chart svg { height:auto; aspect-ratio:460 / 300; }
   .chart-panels { gap:12px; }
   .chart-axis-label { font-size:13px; }
   .chart-series { stroke-width:3; }
   .chart-series.target { stroke-width:2.5; }
   .chart-point { stroke-width:2.5; }
   .chart-values { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .tab-nav { grid-column:1/-1; display:flex; order:3; min-width:0; width:calc(100% + 20px); margin:0 -10px; padding:2px 10px 8px; gap:5px; overflow-x:scroll; overflow-y:hidden; overscroll-behavior-x:contain; scroll-snap-type:x proximity; scrollbar-width:thin; scrollbar-color:#36516a transparent; -webkit-overflow-scrolling:touch; touch-action:pan-x; }
-  .tab-nav::-webkit-scrollbar { display:block; height:3px; }
-  .tab-nav::-webkit-scrollbar-thumb { border-radius:3px; background:#36516a; }
-  .tab-nav::before { display:none; }
-  .tab-btn { flex:0 0 auto; min-width:max-content; justify-content:center; min-height:42px; padding:0 12px; scroll-snap-align:start; }
-  .nav-label { display:inline; font-size:10px; }
-  .nav-icon { width:14px; height:14px; flex-basis:14px; }
-  .tab-btn.active { box-shadow:inset 0 -2px 0 var(--primary); }
+  .mobile-menu-scrim { position:fixed; inset:0; z-index:39; border:0; padding:0; background:rgba(2,7,13,.68); backdrop-filter:blur(2px); }
+  body.mobile-menu-open .mobile-menu-scrim { display:block; }
+  .tab-nav { position:fixed; z-index:40; top:0; bottom:0; left:0; display:flex; width:min(82vw,310px); margin:0; padding:18px 12px; gap:5px; overflow-y:auto; overflow-x:hidden; flex-direction:column; background:#0c111a; border-right:1px solid var(--border); box-shadow:18px 0 50px rgba(0,0,0,.52); transform:translateX(-105%); transition:transform .22s ease; overscroll-behavior:contain; }
+  body.mobile-menu-open .tab-nav { transform:translateX(0); }
+  .tab-nav::before { display:block; content:'GREE CONTROL'; padding:7px 12px 16px; color:#8fa1b7; font-size:10px; font-weight:900; letter-spacing:.14em; }
+  .tab-btn { flex:0 0 auto; width:100%; min-height:48px; justify-content:flex-start; padding:0 14px; font-size:13px; }
+  .nav-label { display:inline; font-size:13px; }
+  .nav-icon { width:19px; height:19px; flex-basis:19px; }
+  .tab-btn.active { box-shadow:inset 3px 0 0 var(--primary); }
   .header-controls,
-  body.desktop .header-controls { position:static; display:flex; margin:0; padding:0; border:0; }
+  body.desktop .header-controls { position:static; grid-column:3; grid-row:1; display:flex; margin:0; padding:0; border:0; }
   .interval-label,.sidebar-connection,.header-controls .refresh-btn:first-of-type { display:none; }
   .refresh-btn { width:36px; min-height:34px; }
   .sidebar-action-icon { display:grid; }
@@ -1609,8 +1618,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 }
 @media (max-width:420px) {
   .header h1 { font-size:13px; }
-  .nav-label { font-size:10px; }
-  .tab-btn { padding-inline:10px; }
+  .nav-label { font-size:13px; }
+  .tab-btn { padding-inline:14px; }
   .chart-panel svg,.chart-panel.humidity svg { height:auto; min-height:0; aspect-ratio:460 / 580; }
   .chart-detail-card.expanded { inset:0; border-radius:0; }
   .chart-detail-card.expanded .chart-panel svg { height:65vh; min-height:430px; }
@@ -1624,6 +1633,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 <div class="app-shell">
 
 <div class="header">
+  <button class="mobile-menu-button" type="button" onclick="toggleMobileMenu()" aria-label="Apri menu di navigazione" aria-controls="primaryNavigation" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
   <div class="header-top">
     <span class="icon-ac"><svg viewBox="0 0 24 24"><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg></span>
     <h1>Gree Control</h1>
@@ -1643,7 +1653,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
     <button class="refresh-btn" onclick="openSensorSettings()" title="Configura sensori ambiente e profili"><span class="sidebar-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.95 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.58 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.95a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.05 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.13.61.6 1.08 1.2 1.04H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></span><span class="sidebar-action-label">Configura</span></button>
     <button class="refresh-btn refresh-action" onclick="refreshNow()" title="Aggiorna ora"><span class="sidebar-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 6v5h-5"/><path d="M19 11a7 7 0 1 0 1 4"/></svg></span><span class="sidebar-action-label">Aggiorna ora</span></button>
   </div>
-  <nav class="tab-nav" aria-label="Navigazione principale">
+  <nav class="tab-nav" id="primaryNavigation" aria-label="Navigazione principale">
     <button class="tab-btn active" data-tab="devices" onclick="switchTab('devices')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span><span class="nav-label">Controllo</span></button>
     <button class="tab-btn" data-tab="charts" onclick="switchTab('charts')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="m5 16 4-5 4 3 6-8"/></svg></span><span class="nav-label">Grafici</span></button>
     <button class="tab-btn" data-tab="profiles" onclick="switchTab('profiles')"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></svg></span><span class="nav-label">Profili</span></button>
@@ -1655,6 +1665,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
     <button class="tab-btn" data-tab="changelog" onclick="switchTab('changelog')" style="display:none;">Changelog</button>
   </nav>
 </div>
+<button class="mobile-menu-scrim" type="button" onclick="closeMobileMenu()" aria-label="Chiudi menu di navigazione"></button>
 
 <div id="content">
   <div id="tab-devices">
@@ -2812,7 +2823,7 @@ function renderOperationsDevice(d) {
         <div class="ops-section-label" style="margin-top:12px">Profili ambiente</div>
         <div class="ops-presets"><button class="btn ${activePreset === 'manual' || !profileEnabled ? 'active' : ''}" onclick="setPreset('${safeMac}','manual')">MANUALE</button>${enabledPresets.map(([name]) => `<button class="btn ${activePreset === name ? 'active' : ''}" onclick="setPreset('${safeMac}','${escHtml(name)}')">${presetLabels[name] || escHtml(name).toUpperCase()}</button>`).join('')}</div>
         <div class="ops-alerts">${alerts}</div>
-        ${renderEnvironmentChart(d.mac, s)}
+        <div id="control-chart-${safeMac}">${renderEnvironmentChart(d.mac, s)}</div>
       </section>
       <section class="ops-telemetry">
         <div class="ops-telemetry-head"><span class="ops-section-label">Telemetria</span><span class="ops-health">${errorCode === 0 ? '● NESSUN ERRORE' : '● ERRORE ' + errorCode}</span></div>
@@ -3133,12 +3144,17 @@ function onLogAutoRefreshChange() {
   }
 }
 
+function toggleMobileMenu(force) {
+  const open = force == null ? !document.body.classList.contains('mobile-menu-open') : Boolean(force);
+  document.body.classList.toggle('mobile-menu-open', open);
+  document.querySelector('.mobile-menu-button')?.setAttribute('aria-expanded', String(open));
+}
+function closeMobileMenu() {
+  toggleMobileMenu(false);
+}
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  const activeNavigation = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
-  if (window.matchMedia('(max-width:720px)').matches) {
-    activeNavigation?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
-  }
+  closeMobileMenu();
   const tabs = ['devices','charts','profiles','wiki','umatch','logs','readme','changelog','info'];
   tabs.forEach(t => {
     const el = document.getElementById('tab-' + t);
@@ -3269,7 +3285,13 @@ function updateViewportClass() {
   document.body.classList.toggle('desktop', window.innerWidth >= 600);
 }
 updateViewportClass();
-window.addEventListener('resize', updateViewportClass);
+window.addEventListener('resize', () => {
+  updateViewportClass();
+  if (window.innerWidth > 720) closeMobileMenu();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeMobileMenu();
+});
 
 loadModels();
 loadNames().then(loadData);

@@ -53,12 +53,14 @@ function renderTimeSeriesPanel(mac, history, config) {
   // the SVG element taller leaves the wide viewBox letterboxed and the actual
   // plot remains tiny. In portrait the plot therefore gets a genuinely tall
   // viewBox, while landscape and desktop retain the wide timeline.
-  const portraitChart = window.matchMedia('(max-width:720px) and (orientation:portrait)').matches;
-  const width = portraitChart ? 460 : 1000;
-  const height = portraitChart ? 580 : 380;
-  const left = portraitChart ? 52 : 64;
-  const right = portraitChart ? 16 : 26;
-  const top = 24, bottom = portraitChart ? 62 : 54;
+  const mobileChart = window.matchMedia('(max-width:720px)').matches;
+  const portraitChart = !config.compact && window.matchMedia('(max-width:720px) and (orientation:portrait)').matches;
+  const compactMobile = config.compact && mobileChart;
+  const width = portraitChart || compactMobile ? 460 : 1000;
+  const height = portraitChart ? 580 : compactMobile ? 300 : 380;
+  const left = portraitChart || compactMobile ? 52 : 64;
+  const right = portraitChart || compactMobile ? 16 : 26;
+  const top = 24, bottom = portraitChart || compactMobile ? 62 : 54;
   const values = history.flatMap(point => config.series.map(item => point[item.key])).filter(Number.isFinite);
   if (!values.length) return `<section class="chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div></div><div class="chart-empty">Nessun dato disponibile nello storico di Home Assistant</div></section>`;
   let min = config.fixedMin ?? Math.floor(Math.min(...values) - config.padding);
@@ -69,7 +71,7 @@ function renderTimeSeriesPanel(mac, history, config) {
   const x = t => left + (tMax === tMin ? .5 : (t - tMin) / (tMax - tMin)) * (width-left-right);
   const y = value => top + (max-value)/(max-min)*(height-top-bottom);
   const ticks = Array.from({length:5},(_,index) => ({value:max-index*(max-min)/4,y:top+index*(height-top-bottom)/4}));
-  const timeTickCount = portraitChart ? 3 : 5;
+  const timeTickCount = portraitChart || compactMobile ? 3 : 5;
   const timeTicks = Array.from({length:timeTickCount},(_,index) => ({t:tMin+index*(tMax-tMin)/(timeTickCount-1),x:left+index*(width-left-right)/(timeTickCount-1)}));
   const tooltipId = `chart-tip-${mac}-${config.id}`.replace(/[^a-zA-Z0-9_-]/g,'_');
   const drawSeries = item => {
@@ -81,26 +83,20 @@ function renderTimeSeriesPanel(mac, history, config) {
     // Keep long Recorder histories readable: show a limited number of visual
     // markers while preserving every sample in the line. Transparent hit
     // targets make the markers easy to select with a finger.
-    const dotStep = Math.max(1, Math.ceil(points.length / 48));
+    const markerLimit = config.compact ? 28 : 48;
+    const dotStep = Math.max(1, Math.ceil(points.length / markerLimit));
     const dots = points.filter((_,index) => index % dotStep === 0 || index === points.length - 1).map(entry => `<g class="chart-point-group" tabindex="0" role="button" aria-label="${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit}" onpointerdown="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmouseenter="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmousemove="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmouseleave="hideChartTooltip('${tooltipId}')" onfocus="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onblur="hideChartTooltip('${tooltipId}')"><circle class="chart-point-hit" cx="${x(entry.point.t)}" cy="${y(entry.value)}" r="14"/><circle class="chart-point" cx="${x(entry.point.t)}" cy="${y(entry.value)}" r="4.5" fill="${item.color}"/><title>${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit} · ${new Date(entry.point.t).toLocaleString('it-IT')}</title></g>`).join('');
     return area + line + dots;
   };
-  return `<section class="chart-panel ${config.className || ''} ${portraitChart ? 'portrait-chart' : ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div><div class="ops-chart-legend">${config.series.map(item => `<span><i style="background:${item.color};${item.css === 'target' ? 'background:repeating-linear-gradient(90deg,'+item.color+' 0 7px,transparent 7px 11px)' : ''}"></i>${item.label}</span>`).join('')}</div></div><div class="ops-chart-plot"><div class="chart-tooltip" id="${tooltipId}"></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${config.title}">${ticks.map(tick => `<line class="chart-grid-line" x1="${left}" y1="${tick.y}" x2="${width-right}" y2="${tick.y}"/><text class="chart-axis-label" x="${left-10}" y="${tick.y+4}" text-anchor="end">${tick.value.toFixed(config.decimals)}${config.unit}</text>`).join('')}<line class="chart-axis-line" x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}"/><line class="chart-axis-line" x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}"/>${config.series.map(drawSeries).join('')}${timeTicks.map(tick => `<text class="chart-axis-label" x="${tick.x}" y="${height-13}" text-anchor="middle">${new Date(tick.t).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</text>`).join('')}</svg></div></section>`;
+  return `<section class="chart-panel ${config.className || ''} ${portraitChart ? 'portrait-chart' : ''} ${compactMobile ? 'compact-mobile-chart' : ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div><div class="ops-chart-legend">${config.series.map(item => `<span><i style="background:${item.color};${item.css === 'target' ? 'background:repeating-linear-gradient(90deg,'+item.color+' 0 7px,transparent 7px 11px)' : ''}"></i>${item.label}</span>`).join('')}</div></div><div class="ops-chart-plot"><div class="chart-tooltip" id="${tooltipId}"></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${config.title}">${ticks.map(tick => `<line class="chart-grid-line" x1="${left}" y1="${tick.y}" x2="${width-right}" y2="${tick.y}"/><text class="chart-axis-label" x="${left-10}" y="${tick.y+4}" text-anchor="end">${tick.value.toFixed(config.decimals)}${config.unit}</text>`).join('')}<line class="chart-axis-line" x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}"/><line class="chart-axis-line" x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}"/>${config.series.map(drawSeries).join('')}${timeTicks.map(tick => `<text class="chart-axis-label" x="${tick.x}" y="${height-13}" text-anchor="middle">${new Date(tick.t).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</text>`).join('')}</svg></div></section>`;
 }
 function renderEnvironmentChart(mac, state, detailed = false) {
   const liveHistory = updateEnvironmentHistory(mac, state);
-  const history = detailed ? (_persistentHistory[mac]?.points || []) : liveHistory;
+  const recorderHistory = _persistentHistory[mac]?.points || [];
+  const history = detailed ? recorderHistory : (recorderHistory.length > 1 ? recorderHistory : liveHistory);
   if (!detailed) {
-    const recent = liveHistory.slice(-45);
-    if (recent.length < 2) return `<div class="ops-chart"><div class="ops-chart-legend"><span><i style="background:#22d3ee"></i>Interna</span><span><i style="background:#facc15"></i>Target</span><span><i style="background:#fb7185"></i>Esterna</span></div><div class="chart-empty">Raccolta dati in corso…</div></div>`;
-    const width = 920, height = 112, pad = 8;
-    const values = recent.flatMap(point => [point.room,point.target,point.outdoor]).filter(Number.isFinite);
-    const min = Math.min(...values)-1, max = Math.max(...values)+1;
-    const t0 = recent[0].t, t1 = recent[recent.length-1].t;
-    const x = t => pad+(t-t0)/Math.max(1,t1-t0)*(width-pad*2);
-    const y = value => pad+(max-value)/Math.max(1,max-min)*(height-pad*2);
-    const line = (key,color,dash='') => { const points=recent.filter(point => Number.isFinite(point[key])).map(point => `${x(point.t)},${y(point[key])}`).join(' '); return points ? `<polyline fill="none" stroke="${color}" stroke-width="2.2" ${dash ? `stroke-dasharray="${dash}"` : ''} points="${points}"/>` : ''; };
-    return `<div class="ops-chart"><div class="ops-chart-legend"><span><i style="background:#22d3ee"></i>Interna</span><span><i style="background:#facc15"></i>Target</span><span><i style="background:#fb7185"></i>Esterna</span></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Andamento sessione corrente">${line('room','#22d3ee')}${line('target','#facc15','8 5')}${line('outdoor','#fb7185','2 5')}</svg></div>`;
+    if (history.length < 2) return `<div class="ops-chart control-chart-loading"><div class="ops-chart-legend"><span><i style="background:#22d3ee"></i>Interna</span><span><i style="background:#facc15"></i>Target</span><span><i style="background:#fb7185"></i>Esterna</span></div><div class="chart-empty">${_historyView.loading ? 'Caricamento dati reali da HA Recorder…' : 'Raccolta dati in corso…'}</div></div>`;
+    return renderTimeSeriesPanel(mac,history,{id:'control-temperature',compact:true,className:'control-chart',title:'Temperature reali',subtitle:recorderHistory.length > 1 ? `HA Recorder · periodo ${_historyView.period}` : 'Dati live in attesa dello storico Recorder',unit:'°',padding:1,minimumRange:6,decimals:0,series:[{key:'room',label:'Interna',color:'#22d3ee',area:true},{key:'target',label:'Target',color:'#facc15',css:'target'},{key:'outdoor',label:'Esterna',color:'#fb7185',css:'outdoor'}]});
   }
   return `<div class="chart-panels">${renderTimeSeriesPanel(mac,history,{id:'temperature',title:'Temperature',subtitle:'Storico persistente HA Recorder',unit:'°',padding:1,minimumRange:6,decimals:0,series:[{key:'room',label:'Interna',color:'#22d3ee',area:true},{key:'target',label:'Target',color:'#facc15',css:'target'},{key:'outdoor',label:'Esterna',color:'#fb7185',css:'outdoor'}]})}${renderTimeSeriesPanel(mac,history,{id:'humidity',className:'humidity',title:'Umidità relativa',subtitle:'Sensori interni ed esterni',unit:'%',padding:5,minimumRange:20,fixedMin:0,fixedMax:100,decimals:0,series:[{key:'humidity',label:'Interna',color:'#38bdf8',area:true},{key:'outdoorHumidity',label:'Esterna',color:'#a78bfa',css:'outdoor'}]})}</div>`;
 }
@@ -137,6 +133,13 @@ async function loadPersistentHistory(force = false) {
   if (generation !== _historyView.generation) return;
   _historyView.loading = false;
   renderChartsPage(data, false);
+  renderControlCharts(data);
+}
+function renderControlCharts(data) {
+  for (const device of data) {
+    const container = document.getElementById(`control-chart-${device.mac}`);
+    if (container) container.innerHTML = renderEnvironmentChart(device.mac,device.state || {},false);
+  }
 }
 function setHistoryPeriod(period) {
   if (!HISTORY_PERIOD_MS[period]) return;

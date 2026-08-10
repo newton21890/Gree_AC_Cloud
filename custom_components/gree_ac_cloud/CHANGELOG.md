@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.2
+
+### Menu mobile e grafici reali nel Controllo
+
+- Sostituita la barra mobile orizzontale con un menu hamburger laterale, coerente con la navigazione di Home Assistant.
+- Il menu si apre sopra il contenuto con sfondo oscurato e si chiude selezionando una voce, toccando all'esterno oppure premendo Esc.
+- I grafici nel tab Controllo non usano più soltanto i campioni raccolti dall'apertura della pagina: ora leggono lo storico persistente reale di Home Assistant Recorder.
+- Aggiunte ai grafici del Controllo scale verticali, griglia, asse temporale, marcatori interattivi, tooltip e legenda completa.
+- Il grafico compatto viene aggiornato automaticamente appena termina il caricamento dello storico Recorder.
+- In assenza temporanea dello storico viene indicato chiaramente che sono mostrati dati live oppure che il caricamento è in corso.
+
 ## 0.8.1
 
 ### Correzioni dell'interfaccia mobile
