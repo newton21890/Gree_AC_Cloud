@@ -1367,7 +1367,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-mini span { color:var(--text2); font-size:9px; }
 .ops-power-row { display:flex; justify-content:space-between; align-items:center; min-height:38px; }
 .ops-state { color:var(--green); font-size:10px; font-weight:800; }
-.ops-power { width:38px; height:38px; border:1px solid #256978; border-radius:9px; background:#143942; color:var(--primary); font-size:17px; cursor:pointer; }
+.ops-power { width:42px; height:42px; display:grid; place-items:center; flex:0 0 42px; padding:0; border:1px solid #256978; border-radius:10px; background:#143942; color:var(--primary); cursor:pointer; }
+.ops-power-icon { width:22px; height:22px; display:block; fill:none; stroke:currentColor; stroke-width:2.25; stroke-linecap:round; stroke-linejoin:round; }
 .card:not(.on) .ops-power { color:#798597; border-color:var(--border); background:#171d27; }
 .ops-target { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:15px 0 12px; }
 .temp-control { margin-left:0; }
@@ -1405,8 +1406,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .chart-panel-title { color:#eef6ff; font-size:12px; font-weight:800; letter-spacing:.02em; }
 .chart-panel-subtitle { display:block; margin-top:2px; color:#718097; font-size:9px; font-weight:500; }
 .ops-chart-plot { position:relative; }
-.chart-panel svg { width:100%; height:250px; display:block; }
-.chart-panel.humidity svg { height:250px; }
+.chart-panel svg { width:100%; height:clamp(280px,34vw,390px); display:block; touch-action:pan-y; }
+.chart-panel.humidity svg { height:clamp(280px,34vw,390px); }
 .chart-grid-line { stroke:#223047; stroke-width:1; vector-effect:non-scaling-stroke; }
 .chart-axis-line { stroke:#52627a; stroke-width:1; vector-effect:non-scaling-stroke; }
 .chart-axis-label { fill:#8290a5; font-size:11px; font-weight:600; }
@@ -1414,8 +1415,10 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .chart-series.target { stroke-dasharray:8 6; stroke-width:2; }
 .chart-series.outdoor { stroke-dasharray:2 5; }
 .chart-area { opacity:.12; }
-.chart-point { cursor:pointer; stroke:#0b111a; stroke-width:2; vector-effect:non-scaling-stroke; transition:r .12s ease,stroke .12s ease; }
-.chart-point:hover,.chart-point:focus { r:6; stroke:#fff; outline:none; }
+.chart-point-group { cursor:pointer; outline:none; }
+.chart-point-hit { fill:transparent; pointer-events:all; }
+.chart-point { pointer-events:none; stroke:#0b111a; stroke-width:2; vector-effect:non-scaling-stroke; transition:r .12s ease,stroke .12s ease; }
+.chart-point-group:hover .chart-point,.chart-point-group:focus .chart-point { r:7; stroke:#fff; }
 .chart-tooltip { position:absolute; z-index:4; display:none; min-width:150px; padding:9px 11px; border:1px solid #42536c; border-radius:9px; background:rgba(13,20,31,.97); box-shadow:0 8px 30px rgba(0,0,0,.45); color:#eef6ff; font-size:11px; pointer-events:none; transform:translate(-50%,calc(-100% - 12px)); }
 .chart-tooltip.visible { display:block; }
 .chart-tooltip b { display:block; margin-bottom:3px; font-size:12px; }
@@ -1566,23 +1569,30 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .config-btn { flex:1; }
   .app-shell { display:block; }
   .header,
-  body.desktop .header { position:sticky; width:100%; height:auto; margin:0; padding:10px 14px; border-right:0; border-bottom:1px solid var(--border); display:grid; grid-template-columns:auto 1fr; align-items:center; gap:8px; }
+  body.desktop .header { position:sticky; width:100%; height:auto; margin:0; padding:9px 10px 0; border-right:0; border-bottom:1px solid var(--border); display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:7px; overflow:hidden; }
   .header-top { justify-content:flex-start; padding:0; }
   .header h1 { display:block; font-size:14px; }
   .header .icon-ac { width:30px; height:30px; }
-  .chart-detail-card { padding:13px; }
-  .chart-panel { padding:10px 8px 8px; }
-  .chart-panel svg,.chart-panel.humidity svg { height:220px; }
+  .chart-detail-card { padding:13px 8px; border-radius:12px; }
+  .chart-panel { padding:11px 4px 8px; }
+  .chart-panel svg,.chart-panel.humidity svg { height:auto; min-height:0; aspect-ratio:460 / 580; }
+  .chart-panels { gap:12px; }
+  .chart-axis-label { font-size:13px; }
+  .chart-series { stroke-width:3; }
+  .chart-series.target { stroke-width:2.5; }
+  .chart-point { stroke-width:2.5; }
   .chart-values { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .tab-nav { grid-column:1/-1; display:flex; order:3; }
+  .tab-nav { grid-column:1/-1; display:flex; order:3; min-width:0; width:calc(100% + 20px); margin:0 -10px; padding:2px 10px 8px; gap:5px; overflow-x:scroll; overflow-y:hidden; overscroll-behavior-x:contain; scroll-snap-type:x proximity; scrollbar-width:thin; scrollbar-color:#36516a transparent; -webkit-overflow-scrolling:touch; touch-action:pan-x; }
+  .tab-nav::-webkit-scrollbar { display:block; height:3px; }
+  .tab-nav::-webkit-scrollbar-thumb { border-radius:3px; background:#36516a; }
   .tab-nav::before { display:none; }
-  .tab-btn { flex:1; justify-content:center; min-height:38px; padding:0 8px; }
+  .tab-btn { flex:0 0 auto; min-width:max-content; justify-content:center; min-height:42px; padding:0 12px; scroll-snap-align:start; }
   .nav-label { display:inline; font-size:10px; }
   .nav-icon { width:14px; height:14px; flex-basis:14px; }
   .tab-btn.active { box-shadow:inset 0 -2px 0 var(--primary); }
   .header-controls,
-  body.desktop .header-controls { position:absolute; top:9px; right:13px; display:flex; margin:0; padding:0; border:0; }
-  .interval-label,.header-controls .refresh-btn:first-of-type { display:none; }
+  body.desktop .header-controls { position:static; display:flex; margin:0; padding:0; border:0; }
+  .interval-label,.sidebar-connection,.header-controls .refresh-btn:first-of-type { display:none; }
   .refresh-btn { width:36px; min-height:34px; }
   .sidebar-action-icon { display:grid; }
   #content { padding:14px; }
@@ -1598,6 +1608,12 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .header-row2 { flex-wrap:wrap; }
 }
 @media (max-width:420px) {
+  .header h1 { font-size:13px; }
+  .nav-label { font-size:10px; }
+  .tab-btn { padding-inline:10px; }
+  .chart-panel svg,.chart-panel.humidity svg { height:auto; min-height:0; aspect-ratio:460 / 580; }
+  .chart-detail-card.expanded { inset:0; border-radius:0; }
+  .chart-detail-card.expanded .chart-panel svg { height:65vh; min-height:430px; }
   .ops-overview { grid-template-columns:1fr 1fr; }
   .ops-kpi b { font-size:18px; }
   .ops-page-head p { font-size:10px; }
@@ -2779,7 +2795,7 @@ function renderOperationsDevice(d) {
       <section class="ops-controls">
         <div class="ops-power-row">
           <div><div class="ops-section-label">Stato unità</div><span class="ops-state">${pow ? 'DISPOSITIVO ATTIVO' : 'DISPOSITIVO SPENTO'}</span></div>
-          <button class="ops-power" onclick="setPower('${safeMac}',${pow ? 0 : 1})" aria-label="${pow ? 'Spegni' : 'Accendi'} ${escHtml(deviceName)}" title="${pow ? 'Spegni' : 'Accendi'}">⏻</button>
+          <button class="ops-power" onclick="setPower('${safeMac}',${pow ? 0 : 1})" aria-label="${pow ? 'Spegni' : 'Accendi'} ${escHtml(deviceName)}" title="${pow ? 'Spegni' : 'Accendi'}"><svg class="ops-power-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5v9"/><path d="M7.1 5.6a8 8 0 1 0 9.8 0"/></svg></button>
         </div>
         <div class="ops-target">
           <div><div class="ops-section-label">Temperatura obiettivo</div><span class="state-line">Intervallo 16–30 °C</span></div>
@@ -3119,6 +3135,10 @@ function onLogAutoRefreshChange() {
 
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  const activeNavigation = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+  if (window.matchMedia('(max-width:720px)').matches) {
+    activeNavigation?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  }
   const tabs = ['devices','charts','profiles','wiki','umatch','logs','readme','changelog','info'];
   tabs.forEach(t => {
     const el = document.getElementById('tab-' + t);

@@ -49,7 +49,16 @@ function hideChartTooltip(id) {
   document.getElementById(id)?.classList.remove('visible');
 }
 function renderTimeSeriesPanel(mac, history, config) {
-  const width = 1000, height = 300, left = 56, right = 22, top = 18, bottom = 42;
+  // A portrait-specific coordinate system is essential here: merely making
+  // the SVG element taller leaves the wide viewBox letterboxed and the actual
+  // plot remains tiny. In portrait the plot therefore gets a genuinely tall
+  // viewBox, while landscape and desktop retain the wide timeline.
+  const portraitChart = window.matchMedia('(max-width:720px) and (orientation:portrait)').matches;
+  const width = portraitChart ? 460 : 1000;
+  const height = portraitChart ? 580 : 380;
+  const left = portraitChart ? 52 : 64;
+  const right = portraitChart ? 16 : 26;
+  const top = 24, bottom = portraitChart ? 62 : 54;
   const values = history.flatMap(point => config.series.map(item => point[item.key])).filter(Number.isFinite);
   if (!values.length) return `<section class="chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div></div><div class="chart-empty">Nessun dato disponibile nello storico di Home Assistant</div></section>`;
   let min = config.fixedMin ?? Math.floor(Math.min(...values) - config.padding);
@@ -60,7 +69,8 @@ function renderTimeSeriesPanel(mac, history, config) {
   const x = t => left + (tMax === tMin ? .5 : (t - tMin) / (tMax - tMin)) * (width-left-right);
   const y = value => top + (max-value)/(max-min)*(height-top-bottom);
   const ticks = Array.from({length:5},(_,index) => ({value:max-index*(max-min)/4,y:top+index*(height-top-bottom)/4}));
-  const timeTicks = Array.from({length:5},(_,index) => ({t:tMin+index*(tMax-tMin)/4,x:left+index*(width-left-right)/4}));
+  const timeTickCount = portraitChart ? 3 : 5;
+  const timeTicks = Array.from({length:timeTickCount},(_,index) => ({t:tMin+index*(tMax-tMin)/(timeTickCount-1),x:left+index*(width-left-right)/(timeTickCount-1)}));
   const tooltipId = `chart-tip-${mac}-${config.id}`.replace(/[^a-zA-Z0-9_-]/g,'_');
   const drawSeries = item => {
     const points = history.map(point => ({point,value:point[item.key]})).filter(entry => Number.isFinite(entry.value));
@@ -68,11 +78,14 @@ function renderTimeSeriesPanel(mac, history, config) {
     const coords = points.map(entry => `${x(entry.point.t)},${y(entry.value)}`).join(' ');
     const area = item.area && points.length > 1 ? `<polygon class="chart-area" fill="${item.color}" points="${x(points[0].point.t)},${height-bottom} ${coords} ${x(points[points.length-1].point.t)},${height-bottom}"/>` : '';
     const line = points.length > 1 ? `<polyline class="chart-series ${item.css || ''}" stroke="${item.color}" points="${coords}"/>` : '';
-    const dotStep = Math.max(1, Math.ceil(points.length / 180));
-    const dots = points.filter((_,index) => index % dotStep === 0 || index === points.length - 1).map(entry => `<circle class="chart-point" tabindex="0" cx="${x(entry.point.t)}" cy="${y(entry.value)}" r="4" fill="${item.color}" aria-label="${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit}" onmouseenter="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmousemove="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmouseleave="hideChartTooltip('${tooltipId}')" onfocus="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onblur="hideChartTooltip('${tooltipId}')"><title>${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit} · ${new Date(entry.point.t).toLocaleString('it-IT')}</title></circle>`).join('');
+    // Keep long Recorder histories readable: show a limited number of visual
+    // markers while preserving every sample in the line. Transparent hit
+    // targets make the markers easy to select with a finger.
+    const dotStep = Math.max(1, Math.ceil(points.length / 48));
+    const dots = points.filter((_,index) => index % dotStep === 0 || index === points.length - 1).map(entry => `<g class="chart-point-group" tabindex="0" role="button" aria-label="${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit}" onpointerdown="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmouseenter="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmousemove="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmouseleave="hideChartTooltip('${tooltipId}')" onfocus="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onblur="hideChartTooltip('${tooltipId}')"><circle class="chart-point-hit" cx="${x(entry.point.t)}" cy="${y(entry.value)}" r="14"/><circle class="chart-point" cx="${x(entry.point.t)}" cy="${y(entry.value)}" r="4.5" fill="${item.color}"/><title>${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit} · ${new Date(entry.point.t).toLocaleString('it-IT')}</title></g>`).join('');
     return area + line + dots;
   };
-  return `<section class="chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div><div class="ops-chart-legend">${config.series.map(item => `<span><i style="background:${item.color};${item.css === 'target' ? 'background:repeating-linear-gradient(90deg,'+item.color+' 0 7px,transparent 7px 11px)' : ''}"></i>${item.label}</span>`).join('')}</div></div><div class="ops-chart-plot"><div class="chart-tooltip" id="${tooltipId}"></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${config.title}">${ticks.map(tick => `<line class="chart-grid-line" x1="${left}" y1="${tick.y}" x2="${width-right}" y2="${tick.y}"/><text class="chart-axis-label" x="${left-10}" y="${tick.y+4}" text-anchor="end">${tick.value.toFixed(config.decimals)}${config.unit}</text>`).join('')}<line class="chart-axis-line" x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}"/><line class="chart-axis-line" x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}"/>${config.series.map(drawSeries).join('')}${timeTicks.map(tick => `<text class="chart-axis-label" x="${tick.x}" y="${height-13}" text-anchor="middle">${new Date(tick.t).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</text>`).join('')}</svg></div></section>`;
+  return `<section class="chart-panel ${config.className || ''} ${portraitChart ? 'portrait-chart' : ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div><div class="ops-chart-legend">${config.series.map(item => `<span><i style="background:${item.color};${item.css === 'target' ? 'background:repeating-linear-gradient(90deg,'+item.color+' 0 7px,transparent 7px 11px)' : ''}"></i>${item.label}</span>`).join('')}</div></div><div class="ops-chart-plot"><div class="chart-tooltip" id="${tooltipId}"></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${config.title}">${ticks.map(tick => `<line class="chart-grid-line" x1="${left}" y1="${tick.y}" x2="${width-right}" y2="${tick.y}"/><text class="chart-axis-label" x="${left-10}" y="${tick.y+4}" text-anchor="end">${tick.value.toFixed(config.decimals)}${config.unit}</text>`).join('')}<line class="chart-axis-line" x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}"/><line class="chart-axis-line" x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}"/>${config.series.map(drawSeries).join('')}${timeTicks.map(tick => `<text class="chart-axis-label" x="${tick.x}" y="${height-13}" text-anchor="middle">${new Date(tick.t).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</text>`).join('')}</svg></div></section>`;
 }
 function renderEnvironmentChart(mac, state, detailed = false) {
   const liveHistory = updateEnvironmentHistory(mac, state);

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.1
+
+### Correzioni dell'interfaccia mobile
+
+- La navigazione superiore su smartphone è ora realmente scorrevole in orizzontale, con inerzia touch, indicatore di scorrimento e centratura automatica della voce selezionata.
+- L'intestazione mobile non sovrappone più i controlli alla barra di navigazione.
+- Sostituito il carattere Unicode di accensione con un'icona SVG stabile, evitando che venga visualizzato come una X su alcuni dispositivi e font.
+- I grafici in verticale sono sensibilmente più alti e sfruttano l'altezza disponibile dello schermo.
+- Aumentati spessore e leggibilità di linee, assi e punti sui display stretti.
+- Ridotto l'affollamento dei marcatori negli storici lunghi e aggiunte aree touch trasparenti più grandi per selezionare facilmente ogni punto rappresentativo.
+- Il tooltip dei grafici risponde ora anche al tocco tramite Pointer Events.
+
 ## 0.8.0
 
 ### Configurazione dedicata dei profili e correzione I-Demand Smart
