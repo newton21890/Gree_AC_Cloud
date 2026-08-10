@@ -2942,12 +2942,24 @@ async function setTemp(mac, delta) {
   const card = document.querySelector(`[data-mac="${mac}"]`);
   if (!card) return;
   const el = card.querySelector('.temp-value');
-  let cur = parseFloat(el.textContent) || 26;
-  let newTemp = Math.max(16, Math.min(30, cur + delta));
-  newTemp = Math.round(newTemp * 2) / 2;
-  let deci = Math.round(newTemp * 10);
-  await sendCommand(mac, ['SetDeciTem'], [deci]);
-  setTimeout(loadData, 1000);
+  const cur = parseFloat(el.textContent) || 26;
+  const newTemp = Math.round(Math.max(16,Math.min(30,cur+delta))*2)/2;
+  try {
+    const devices = await apiFetch(PANEL_DATA_URL);
+    const device = devices.find(d => d.mac === mac);
+    const entityId = device?.state?.ClimateEntityId;
+    if (!entityId) throw new Error('Entità climate non disponibile');
+    await apiFetch(HA_BASE + '/api/services/climate/set_temperature', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ entity_id: entityId, temperature: newTemp }),
+    });
+    if (el) el.textContent = `${newTemp.toFixed(1)}°`;
+  } catch (error) {
+    console.error('Temperature command failed:',error);
+    alert('Temperatura non applicata: '+error.message);
+  }
+  setTimeout(loadData,1000);
 }
 
 async function setFan(mac, val) {

@@ -253,6 +253,11 @@ class GreeMQTTClient:
         seen = self._last_seen.get(mac)
         return time.monotonic() - seen if seen is not None else None
 
+    def command_age(self, mac: str) -> float | None:
+        """Return seconds since this integration last commanded the device."""
+        sent = self._last_command.get(mac)
+        return time.monotonic() - sent if sent is not None else None
+
     async def send_command(
         self, mac: str, options: list[str], values: list[Any]
     ) -> bool:

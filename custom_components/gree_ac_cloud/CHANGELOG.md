@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.6
+
+### Target profilo e falsi override manuali
+
+- I pulsanti temperatura del pannello usano ora il servizio `climate.set_temperature`, invece di scrivere direttamente il solo registro `SetDeciTem`.
+- Cambiando temperatura con un profilo attivo viene aggiornato anche il target persistente del profilo; il nuovo setpoint effettivo viene inviato alla macchina e resta quindi visibile sul comando a muro.
+- Rafforzato il riconoscimento degli spegnimenti manuali: gli echi MQTT ritardati entro 45 secondi da un comando dell’integrazione non vengono più scambiati per interventi esterni.
+- Aggiunti log espliciti per distinguere eco ritardato, vero cambio di alimentazione esterno e aggiornamento del target profilo.
+
 ## 0.5.5
 
 ### Isteresi corretta e sensore umidità esterna

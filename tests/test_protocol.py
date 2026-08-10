@@ -175,6 +175,10 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "current < target - deadband" in climate_source
     assert "smart_manual_power_override" in climate_source
     assert "smart_manual_override_explicit" in climate_source
+    assert "command_age" in climate_source
+    assert "Ignoring delayed power echo" in climate_source
+    assert "External power change" in climate_source
+    assert "Profile target updated from climate control" in climate_source
     assert "_expect_power_echo" in climate_source
     assert 'options = ["Pow", "Mod", "SetDeciTem"]' in climate_source
     assert "PRESET_MANUAL" in climate_source
@@ -235,6 +239,7 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "applicato" in panel_source
     assert "D3 · limite 75%" in panel_source
     assert "api/services/climate/${val ? 'turn_on' : 'turn_off'}" in panel_source
+    assert "api/services/climate/set_temperature" in panel_source
 
 
 def test_device_command_round_trip() -> None:

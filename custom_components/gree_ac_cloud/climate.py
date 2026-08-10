@@ -1,3 +1,4 @@
+import logging
 import time
 from datetime import timedelta
 
@@ -63,6 +64,8 @@ from .const import (
     SMART_MODE_HEAT,
 )
 from .entity import GreeDeviceEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry, async_add_entities: AddEntitiesCallback):
@@ -206,9 +209,24 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             if expected_echo:
                 self._ignore_power_echo = None
             elif not self._preset_action_lock and self._smart_profile_enabled:
-                self._smart_manual_power = power
-                self._smart_manual_override_explicit = True
-                self._smart_last_action = "manual_on" if power else "manual_off"
+                command_age = self.coordinator._mqtt.command_age(self._device.mac)
+                if command_age is not None and command_age <= 45:
+                    _LOGGER.info(
+                        "Ignoring delayed power echo for %s: Pow=%s, last integration command %.1fs ago",
+                        self._device.mac,
+                        int(power),
+                        command_age,
+                    )
+                else:
+                    self._smart_manual_power = power
+                    self._smart_manual_override_explicit = True
+                    self._smart_last_action = "manual_on" if power else "manual_off"
+                    _LOGGER.warning(
+                        "External power change for %s classified as %s; last integration command age=%s",
+                        self._device.mac,
+                        self._smart_last_action,
+                        f"{command_age:.1f}s" if command_age is not None else "none",
+                    )
         super()._handle_coordinator_update()
 
     @callback
@@ -608,8 +626,29 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if temp is None:
             return
         mqtt = self.coordinator._mqtt
-        deci = round(temp * 2) * 5
-        if self._device.properties.get("Pow"):
+        temp = round(float(temp) * 2) / 2
+        deci = round(temp * 10)
+        profile_options = None
+        profile_active = self._preset_mode and self._preset_mode != PRESET_MANUAL
+        if profile_active:
+            devices = dict(self.coordinator.config_entry.options.get(CONF_DEVICES, {}))
+            room = dict(devices.get(self._device.mac, {}))
+            presets = dict(room.get(CONF_PRESETS, {}))
+            preset = dict(presets.get(self._preset_mode, {}))
+            preset[CONF_PRESET_TARGET] = temp
+            presets[self._preset_mode] = preset
+            room[CONF_PRESETS] = presets
+            devices[self._device.mac] = room
+            profile_options = {
+                **self.coordinator.config_entry.options,
+                CONF_DEVICES: devices,
+            }
+            self._smart_effective_target = self._effective_smart_target(preset)
+            temp = self._smart_effective_target
+            deci = round(temp * 10)
+        if profile_active or self._device.properties.get("Pow"):
+            # A profile decides power from room demand. Changing its target must
+            # never turn an intentionally idle unit on merely to update the setpoint.
             options, values = ["SetDeciTem"], [deci]
         else:
             options, values = ["Pow", "SetDeciTem"], [1, deci]
@@ -618,7 +657,20 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             for option, value in zip(options, values):
                 self._device.properties[option] = value
             self._sync_data()
-            if "Pow" in options:
+            if profile_options is not None:
+                _LOGGER.info(
+                    "Profile target updated from climate control: %s preset=%s configured=%.1f effective=%.1f",
+                    self._device.mac,
+                    self._preset_mode,
+                    preset[CONF_PRESET_TARGET],
+                    temp,
+                )
+                # Persist only after the hardware command succeeds. The existing
+                # options listener reloads the entry and resumes this profile.
+                self.hass.config_entries.async_update_entry(
+                    self.coordinator.config_entry, options=profile_options
+                )
+            elif "Pow" in options:
                 await self.coordinator.async_apply_startup_settings()
 
     # ── hvac mode ─────────────────────────────────────
