@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+
+### Pagina Profili e modalità automatiche configurabili
+
+- Aggiunta una pagina laterale dedicata ai profili con stato per unità, schede Giorno/Notte/Assente, regole correnti e comandi di attivazione.
+- Inclusa documentazione operativa completa su target, margine di riaccensione, priorità manuale, sensori, ventola, Quiet, compensazione esterna e I-Demand.
+- Introdotta la strategia `Auto profilo`: l’integrazione può scegliere dinamicamente Cool, Heat o Dry in base a temperatura, umidità, target e soglie.
+- Ogni profilo può autorizzare separatamente Cool, Heat e Dry; una modalità non selezionata non viene comandata neppure dalle soglie Min/Max.
+- Le strategie Solo Cool, Solo Heat e Solo Dry restano disponibili per un comportamento stagionale fisso e prevedibile.
+
 ## 0.5.6
 
 ### Target profilo e falsi override manuali

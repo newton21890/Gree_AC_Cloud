@@ -161,6 +161,8 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "if user_input is not None:" in flow_source
     assert "multiple=True" in flow_source
     assert "PRESET_DAY" in flow_source
+    assert "CONF_PRESET_ALLOWED_MODES" in flow_source
+    assert "multiple=True" in flow_source
     assert "ClimateEntityFeature.PRESET_MODE" in climate_source
     assert "async_track_state_change_event" in climate_source
     assert "async_set_preset_mode" in climate_source
@@ -169,6 +171,8 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "smart_effective_target" in climate_source
     assert "_smart_fan_for_demand" in climate_source
     assert "_temperature_hysteresis_mode" in climate_source
+    assert "CONF_PRESET_ALLOWED_MODES" in climate_source
+    assert "mode_names.get(desired_mode) not in allowed_modes" in climate_source
     assert "active_mode == HVACMode.COOL and current > target" in climate_source
     assert "current > target + deadband" in climate_source
     assert "active_mode == HVACMode.HEAT and current < target" in climate_source
@@ -230,6 +234,10 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "ClimateTargetTemperature" in panel_source
     assert "outdoorHumiditySensor" in panel_source
     assert "renderChartsPage" in panel_source
+    assert "renderProfilesPage" in panel_source
+    assert 'data-tab="profiles"' in panel_source
+    assert "Auto profilo non è Auto Gree" in panel_source
+    assert "allowed_modes" in panel_source
     assert "Andamento climatico" in panel_source
     assert "toggleChartExpand" in panel_source
     assert "chart-point" in panel_source

@@ -15,6 +15,7 @@ from .const import (
     CONF_OUTDOOR_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMPERATURE_SENSOR,
     CONF_PRESET_ADAPTIVE,
+    CONF_PRESET_ALLOWED_MODES,
     CONF_PRESET_AUTO_OFF,
     CONF_PRESET_DEADBAND,
     CONF_PRESET_DRED,
@@ -228,6 +229,27 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                     CONF_PRESET_MODE,
                     default=defaults.get(CONF_PRESET_MODE, "auto"),
                 ): vol.In(SMART_MODES),
+                vol.Optional(
+                    CONF_PRESET_ALLOWED_MODES,
+                    description={
+                        "suggested_value": defaults.get(
+                            CONF_PRESET_ALLOWED_MODES,
+                            ["cool", "heat", "dry"]
+                            if defaults.get(CONF_PRESET_MODE, "auto") == "auto"
+                            else [defaults.get(CONF_PRESET_MODE)],
+                        )
+                    },
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(value="cool", label="Cool"),
+                            selector.SelectOptionDict(value="heat", label="Heat"),
+                            selector.SelectOptionDict(value="dry", label="Dry"),
+                        ],
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
                 vol.Required(
                     CONF_PRESET_TARGET,
                     default=defaults.get(CONF_PRESET_TARGET, 26.0),

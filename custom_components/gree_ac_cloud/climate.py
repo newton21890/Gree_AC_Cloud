@@ -29,6 +29,7 @@ from .const import (
     CONF_OUTDOOR_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMPERATURE_SENSOR,
     CONF_PRESET_ADAPTIVE,
+    CONF_PRESET_ALLOWED_MODES,
     CONF_PRESET_DEADBAND,
     CONF_PRESET_DRED,
     CONF_PRESET_ENABLED,
@@ -462,10 +463,20 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         ):
             outdoor = None
         mode = preset.get(CONF_PRESET_MODE, SMART_MODE_AUTO)
+        configured_modes = preset.get(CONF_PRESET_ALLOWED_MODES)
+        allowed_modes = (
+            set(configured_modes)
+            if mode == SMART_MODE_AUTO and configured_modes is not None
+            else (
+                {SMART_MODE_COOL, SMART_MODE_HEAT, SMART_MODE_DRY}
+                if mode == SMART_MODE_AUTO
+                else {mode}
+            )
+        )
         if outdoor is not None:
-            if mode in (SMART_MODE_AUTO, SMART_MODE_COOL) and outdoor > 30:
+            if SMART_MODE_COOL in allowed_modes and outdoor > 30:
                 target += min(2.0, (outdoor - 30) * 0.15)
-            elif mode in (SMART_MODE_AUTO, SMART_MODE_HEAT) and outdoor < 8:
+            elif SMART_MODE_HEAT in allowed_modes and outdoor < 8:
                 target -= min(1.5, (8 - outdoor) * 0.10)
         return round(max(MIN_TEMP_C, min(MAX_TEMP_C, target)) * 2) / 2
 
@@ -503,20 +514,32 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         active_mode = self.hvac_mode if is_on else HVACMode.OFF
         desired_mode: HVACMode | None = None
 
-        if minimum is not None and current < float(minimum):
+        configured_modes = preset.get(CONF_PRESET_ALLOWED_MODES)
+        allowed_modes = (
+            set(configured_modes)
+            if selected_mode == SMART_MODE_AUTO and configured_modes is not None
+            else (
+                {SMART_MODE_COOL, SMART_MODE_HEAT, SMART_MODE_DRY}
+                if selected_mode == SMART_MODE_AUTO
+                else {selected_mode}
+            )
+        )
+        if minimum is not None and current < float(minimum) and SMART_MODE_HEAT in allowed_modes:
             desired_mode = HVACMode.HEAT
-        elif maximum is not None and current > float(maximum):
+        elif maximum is not None and current > float(maximum) and SMART_MODE_COOL in allowed_modes:
             desired_mode = HVACMode.COOL
         elif selected_mode == SMART_MODE_DRY:
             desired_mode = (
                 HVACMode.DRY
-                if humidity_limit is not None
+                if SMART_MODE_DRY in allowed_modes
+                and humidity_limit is not None
                 and humidity is not None
                 and humidity > float(humidity_limit)
                 else None
             )
         elif (
             selected_mode == SMART_MODE_AUTO
+            and SMART_MODE_DRY in allowed_modes
             and humidity_limit is not None
             and humidity is not None
             and humidity > float(humidity_limit)
@@ -527,6 +550,13 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             desired_mode = self._temperature_hysteresis_mode(
                 selected_mode, current, target, deadband, active_mode
             )
+        mode_names = {
+            HVACMode.COOL: SMART_MODE_COOL,
+            HVACMode.HEAT: SMART_MODE_HEAT,
+            HVACMode.DRY: SMART_MODE_DRY,
+        }
+        if desired_mode is not None and mode_names.get(desired_mode) not in allowed_modes:
+            desired_mode = None
 
         if not self._smart_profile_enabled:
             self._smart_fan_speed = None
