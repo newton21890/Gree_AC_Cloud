@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.5
+
+### Isteresi corretta e sensore umidità esterna
+
+- Corretto il controllo Smart: in raffrescamento l’unità resta accesa fino al raggiungimento del target e si riaccende solo sopra `target + margine`; in riscaldamento applica la logica inversa.
+- Rinominata l’isteresi in “Margine riaccensione” per rendere esplicito il suo significato operativo.
+- Resa sempre disponibile la selezione del sensore Home Assistant di umidità esterna, sia nelle opzioni dell’integrazione sia nel pannello.
+- Preparato un valore target affidabile per i grafici usando anche la temperatura target dell’entità climate.
+
 ## 0.5.4
 
 ### Grafici leggibili e interattivi

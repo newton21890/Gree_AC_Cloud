@@ -24,7 +24,7 @@
     "step": {
       "init": {
         "title": "Outdoor sensor",
-        "description": "Choose one optional outdoor temperature sensor shared by the whole system.",
+        "description": "Choose optional outdoor temperature and humidity sensors shared by the whole system and used by the charts.",
         "data": {
           "outdoor_temperature_sensor": "Outdoor temperature sensor",
           "outdoor_humidity_sensor": "Outdoor humidity sensor"
@@ -52,7 +52,7 @@
           "enabled": "Enabled",
           "smart_enabled": "Continuous smart regulation",
           "smart_mode": "Climate strategy",
-          "deadband": "Comfort hysteresis (°C)",
+          "deadband": "Restart margin (°C)",
           "outdoor_compensation": "Outdoor temperature compensation",
           "fan_speed": "Fan management (Smart or controller Auto)",
           "quiet": "Quiet mode",
@@ -71,7 +71,7 @@
           "enabled": "Enabled",
           "smart_enabled": "Continuous smart regulation",
           "smart_mode": "Climate strategy",
-          "deadband": "Comfort hysteresis (°C)",
+          "deadband": "Restart margin (°C)",
           "outdoor_compensation": "Outdoor temperature compensation",
           "fan_speed": "Fan management (Smart or controller Auto)",
           "quiet": "Quiet mode",
@@ -90,7 +90,7 @@
           "enabled": "Enabled",
           "smart_enabled": "Continuous smart regulation",
           "smart_mode": "Climate strategy",
-          "deadband": "Comfort hysteresis (°C)",
+          "deadband": "Restart margin (°C)",
           "outdoor_compensation": "Outdoor temperature compensation",
           "fan_speed": "Fan management (Smart or controller Auto)",
           "quiet": "Quiet mode",

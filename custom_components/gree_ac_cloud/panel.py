@@ -329,6 +329,9 @@ class GreePanelDataView(HomeAssistantView):
                     else None
                 )
                 if climate_state:
+                    state["ClimateTargetTemperature"] = climate_state.attributes.get(
+                        "temperature"
+                    )
                     for key in (
                         "smart_profile_active",
                         "smart_manual_power_override",
@@ -1357,23 +1360,42 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-alerts { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0 0; }
 .ops-alert { padding:5px 8px; border-radius:7px; border:1px solid rgba(255,193,7,.4); background:rgba(255,193,7,.12); color:#ffd966; font-size:9px; font-weight:800; text-transform:uppercase; }
 .ops-alert.manual { border-color:rgba(3,169,244,.45); background:rgba(3,169,244,.12); color:#7dd3fc; }
-.ops-chart { margin-top:12px; padding:10px; border:1px solid var(--border); border-radius:9px; background:#0d131d; }
-.ops-chart svg { width:100%; height:105px; display:block; }
-.ops-chart-legend { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; font-size:9px; color:var(--text2); }
-.ops-chart-legend i { width:8px; height:8px; display:inline-block; border-radius:50%; margin-right:3px; }
-.charts-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-.chart-detail-card { padding:16px; border:1px solid var(--border); border-radius:12px; background:#111722; }
-.chart-detail-card h3 { margin:0 0 4px; font-size:15px; }
-.chart-detail-card p { margin:0 0 12px; color:var(--text2); font-size:10px; }
-.chart-detail-card .ops-chart { margin:0; }
-.chart-detail-card .ops-chart svg { height:300px; }
-.chart-detail-card.expanded { position:fixed; inset:12px; z-index:1100; overflow:auto; background:#111722; box-shadow:0 20px 80px #000; }
-.chart-detail-card.expanded .ops-chart svg { height:calc(100vh - 235px); min-height:420px; }
-.chart-expand { float:right; padding:6px 10px; border:1px solid var(--border); border-radius:7px; background:#172131; color:var(--text); cursor:pointer; }
-.chart-axis { fill:#8c99ae; font-size:3px; }
-.chart-point { cursor:pointer; stroke:#0d131d; stroke-width:.7; }
-.chart-point:hover { r:2.3; stroke:#fff; }
-.chart-values { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; margin-top:10px; }
+.ops-chart { margin-top:12px; padding:10px; border:1px solid var(--border); border-radius:10px; background:#0b111a; }
+.ops-chart svg { width:100%; height:112px; display:block; overflow:visible; }
+.ops-chart-legend { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; font-size:10px; color:#a7b3c5; }
+.ops-chart-legend span { display:inline-flex; align-items:center; gap:5px; }
+.ops-chart-legend i { width:18px; height:3px; display:inline-block; border-radius:4px; }
+.charts-grid { display:grid; grid-template-columns:1fr; gap:18px; max-width:1500px; margin:0 auto; }
+.chart-detail-card { padding:20px; border:1px solid #253247; border-radius:16px; background:linear-gradient(145deg,#121a27,#0f1621); box-shadow:0 12px 32px rgba(0,0,0,.2); }
+.chart-detail-card h3 { margin:0 0 4px; font-size:17px; }
+.chart-detail-card > p { margin:0 0 16px; color:var(--text2); font-size:11px; }
+.chart-panels { display:grid; grid-template-columns:minmax(0,3fr) minmax(300px,2fr); gap:14px; }
+.chart-panel { min-width:0; padding:14px 14px 10px; border:1px solid #202d40; border-radius:12px; background:#0b111a; }
+.chart-panel-header { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:6px; }
+.chart-panel-title { color:#eef6ff; font-size:12px; font-weight:800; letter-spacing:.02em; }
+.chart-panel-subtitle { display:block; margin-top:2px; color:#718097; font-size:9px; font-weight:500; }
+.ops-chart-plot { position:relative; }
+.chart-panel svg { width:100%; height:250px; display:block; }
+.chart-panel.humidity svg { height:250px; }
+.chart-grid-line { stroke:#223047; stroke-width:1; vector-effect:non-scaling-stroke; }
+.chart-axis-line { stroke:#52627a; stroke-width:1; vector-effect:non-scaling-stroke; }
+.chart-axis-label { fill:#8290a5; font-size:11px; font-weight:600; }
+.chart-series { fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.chart-series.target { stroke-dasharray:8 6; stroke-width:2; }
+.chart-series.outdoor { stroke-dasharray:2 5; }
+.chart-area { opacity:.12; }
+.chart-point { cursor:pointer; stroke:#0b111a; stroke-width:2; vector-effect:non-scaling-stroke; transition:r .12s ease,stroke .12s ease; }
+.chart-point:hover,.chart-point:focus { r:6; stroke:#fff; outline:none; }
+.chart-tooltip { position:absolute; z-index:4; display:none; min-width:150px; padding:9px 11px; border:1px solid #42536c; border-radius:9px; background:rgba(13,20,31,.97); box-shadow:0 8px 30px rgba(0,0,0,.45); color:#eef6ff; font-size:11px; pointer-events:none; transform:translate(-50%,calc(-100% - 12px)); }
+.chart-tooltip.visible { display:block; }
+.chart-tooltip b { display:block; margin-bottom:3px; font-size:12px; }
+.chart-tooltip small { color:#96a5ba; }
+.chart-empty { display:grid; place-items:center; height:250px; color:#75849a; font-size:11px; }
+.chart-detail-card.expanded { position:fixed; inset:10px; z-index:1100; overflow:auto; background:#0d141f; box-shadow:0 20px 80px #000; }
+.chart-detail-card.expanded .chart-panel svg { height:calc(100vh - 275px); min-height:430px; }
+.chart-expand { float:right; min-height:34px; padding:6px 11px; border:1px solid #33435a; border-radius:8px; background:#172131; color:var(--text); cursor:pointer; }
+.chart-expand:hover { border-color:#4f6685; background:#1c293b; }
+.chart-values { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; margin-top:14px; }
 .chart-values div { padding:7px; border-radius:7px; background:#0d131d; text-align:center; font-size:9px; color:var(--text2); }
 .chart-values b { display:block; margin-top:2px; color:var(--text); font-size:12px; }
 .ops-empty { margin-top:10px; color:var(--text2); font-size:10px; }
@@ -1451,6 +1473,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .ops-reading { border-right:1px solid var(--border); }
   .ops-controls { border-right:0; }
   .ops-overview { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .chart-panels { grid-template-columns:1fr; }
 }
 @media (max-width:720px) {
   .config-modal { padding:0; }
@@ -1468,6 +1491,10 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .header-top { justify-content:flex-start; padding:0; }
   .header h1 { display:block; font-size:14px; }
   .header .icon-ac { width:30px; height:30px; }
+  .chart-detail-card { padding:13px; }
+  .chart-panel { padding:10px 8px 8px; }
+  .chart-panel svg,.chart-panel.humidity svg { height:220px; }
+  .chart-values { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .tab-nav { grid-column:1/-1; display:flex; order:3; }
   .tab-nav::before { display:none; }
   .tab-btn { flex:1; justify-content:center; min-height:38px; padding:0 8px; }
@@ -2107,7 +2134,7 @@ async function openSensorSettings() {
           <div class="preset-enable" title="Regolazione automatica continua"><input id="smart-${name}-${safeMac}" aria-label="Profilo smart ${label}" type="checkbox" ${p.smart_enabled !== false ? 'checked' : ''}></div>
           <select class="config-select" id="mode-${name}-${safeMac}" aria-label="Strategia ${label}">${[['auto','Auto'],['cool','Freddo'],['heat','Caldo'],['dry','Deumidifica']].map(([v,l]) => `<option value="${v}" ${smartMode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
           ${field('target', p.target_temperature ?? 26, 'Comfort °C', 16, 30)}
-          ${field('deadband', p.deadband ?? 0.5, 'Isteresi °C', 0.2, 2)}
+          ${field('deadband', p.deadband ?? 0.5, 'Margine di riaccensione °C', 0.2, 2)}
           ${field('min', p.min_temperature, 'Soglia minima °C', 10, 30)}
           ${field('max', p.max_temperature, 'Soglia massima °C', 16, 35)}
           ${field('humidity', p.humidity_threshold, 'Umidità massima %', 0, 100)}
@@ -2122,7 +2149,7 @@ async function openSensorSettings() {
         <label class="profile-master"><input id="profile-control-${safeMac}" type="checkbox" ${d.profile_control_enabled !== false ? 'checked' : ''}> Regolazione profili attiva <small>(disattiva per controllo completamente manuale)</small></label>
         <div class="config-sensor-grid"><div class="config-field"><label for="temp-${safeMac}">Temperatura ambiente</label><select class="config-select" id="temp-${safeMac}" multiple size="5">${sensorOptions(temperatures, d.temperature_sensors)}</select><span class="config-help">⌘/Ctrl + clic per selezionare più sensori.</span></div>
         <div class="config-field"><label for="hum-${safeMac}">Umidità ambiente</label><select class="config-select" id="hum-${safeMac}" multiple size="5">${sensorOptions(humidities, d.humidity_sensors)}</select><span class="config-help">I valori validi vengono mediati automaticamente.</span></div></div>
-        <div class="config-section-title">Profili automatici</div><div class="preset-table"><div class="preset-head"><span>Profilo</span><span>On</span><span>Smart</span><span>Strategia</span><span>Comfort</span><span>Isteresi</span><span>Min</span><span>Max</span><span>Umidità</span><span>Ventola</span><span>Esterno</span><span>I-Demand</span></div>${presetHtml}</div>
+        <div class="config-section-title">Profili automatici</div><div class="preset-table"><div class="preset-head"><span>Profilo</span><span>On</span><span>Smart</span><span>Strategia</span><span>Comfort</span><span>Riaccensione</span><span>Min</span><span>Max</span><span>Umidità</span><span>Ventola</span><span>Esterno</span><span>I-Demand</span></div>${presetHtml}</div>
         <span id="sensor-status-${safeMac}" class="config-help"></span></div></section>`;
     }
     content.classList.remove('config-loading');
@@ -2563,41 +2590,88 @@ function renderDevice(d) {
 }
 
 const _environmentHistory = {};
+function finiteNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+function chartTarget(state) {
+  const smart = finiteNumber(state.smart_effective_target);
+  if (smart !== null && smart >= 10 && smart <= 40) return smart;
+  const climate = finiteNumber(state.ClimateTargetTemperature);
+  if (climate !== null && climate >= 10 && climate <= 40) return climate;
+  const deci = finiteNumber(state.SetDeciTem);
+  if (deci !== null && deci >= 100 && deci <= 400) return deci / 10;
+  const raw = finiteNumber(state.SetTem);
+  return raw !== null && raw >= 10 && raw <= 40 ? raw : null;
+}
 function updateEnvironmentHistory(mac, state) {
   const now = Date.now();
   const point = {
     t: now,
-    room: Number.isFinite(Number(state.RoomTemperature)) ? Number(state.RoomTemperature) : null,
-    target: Number.isFinite(Number(state.smart_effective_target)) ? Number(state.smart_effective_target) : (state.SetDeciTem != null ? Number(state.SetDeciTem) / 10 : Number(state.SetTem)),
-    outdoor: Number.isFinite(Number(state.OutdoorTemperature)) ? Number(state.OutdoorTemperature) : null,
-    humidity: Number.isFinite(Number(state.RoomHumidity)) ? Number(state.RoomHumidity) : null,
-    outdoorHumidity: Number.isFinite(Number(state.OutdoorHumidity)) ? Number(state.OutdoorHumidity) : null,
+    room: finiteNumber(state.RoomTemperature),
+    target: chartTarget(state),
+    outdoor: finiteNumber(state.OutdoorTemperature),
+    humidity: finiteNumber(state.RoomHumidity),
+    outdoorHumidity: finiteNumber(state.OutdoorHumidity),
   };
   const history = _environmentHistory[mac] || (_environmentHistory[mac] = []);
   if (!history.length || now - history[history.length - 1].t >= 9000) history.push(point);
   while (history.length > 180) history.shift();
   return history;
 }
+function showChartTooltip(event, id, label, value, unit, timestamp) {
+  const tip = document.getElementById(id);
+  if (!tip) return;
+  const plot = tip.parentElement.getBoundingClientRect();
+  const marker = event.currentTarget?.getBoundingClientRect();
+  const pointerX = Number.isFinite(event.clientX) && event.clientX > 0 ? event.clientX : marker.left + marker.width / 2;
+  const pointerY = Number.isFinite(event.clientY) && event.clientY > 0 ? event.clientY : marker.top;
+  tip.innerHTML = `<b>${escHtml(label)} · ${Number(value).toFixed(1)} ${unit}</b><small>${new Date(Number(timestamp)).toLocaleString('it-IT')}</small>`;
+  tip.style.left = `${Math.max(85,Math.min(plot.width-85,pointerX-plot.left))}px`;
+  tip.style.top = `${Math.max(70,pointerY-plot.top)}px`;
+  tip.classList.add('visible');
+}
+function hideChartTooltip(id) {
+  document.getElementById(id)?.classList.remove('visible');
+}
+function renderTimeSeriesPanel(mac, history, config) {
+  const width = 1000, height = 300, left = 56, right = 22, top = 18, bottom = 42;
+  const values = history.flatMap(point => config.series.map(item => point[item.key])).filter(Number.isFinite);
+  if (!values.length) return `<section class="chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div></div><div class="chart-empty">Nessun dato disponibile · seleziona il relativo sensore Home Assistant</div></section>`;
+  let min = config.fixedMin ?? Math.floor(Math.min(...values) - config.padding);
+  let max = config.fixedMax ?? Math.ceil(Math.max(...values) + config.padding);
+  if (max - min < config.minimumRange) { const middle = (max + min) / 2; min = middle - config.minimumRange / 2; max = middle + config.minimumRange / 2; }
+  const start = history[0]?.t || Date.now(), endRaw = history[history.length - 1]?.t || start, end = Math.max(endRaw,start + 1);
+  const x = timestamp => left + (timestamp-start) * (width-left-right) / (end-start);
+  const y = value => top + (max-value) * (height-top-bottom) / (max-min);
+  const ticks = Array.from({length:5},(_,index) => ({value:max-index*(max-min)/4,y:top+index*(height-top-bottom)/4}));
+  const times = Array.from({length:4},(_,index) => start+index*(endRaw-start)/3);
+  const timeLabel = timestamp => new Date(timestamp).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+  const tooltipId = `chart-tip-${mac}-${config.id}`;
+  const draw = item => {
+    const points = history.map(point => Number.isFinite(point[item.key]) ? {point,value:point[item.key]} : null).filter(Boolean);
+    if (!points.length) return '';
+    const coords = points.map(entry => `${x(entry.point.t)},${y(entry.value)}`).join(' ');
+    const area = item.area && points.length > 1 ? `<polygon class="chart-area" fill="${item.color}" points="${x(points[0].point.t)},${height-bottom} ${coords} ${x(points[points.length-1].point.t)},${height-bottom}"/>` : '';
+    const line = points.length > 1 ? `<polyline class="chart-series ${item.css || ''}" stroke="${item.color}" points="${coords}"/>` : '';
+    const dots = points.map(entry => `<circle class="chart-point" tabindex="0" cx="${x(entry.point.t)}" cy="${y(entry.value)}" r="4" fill="${item.color}" aria-label="${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit}" onmouseenter="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmousemove="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmouseleave="hideChartTooltip('${tooltipId}')" onfocus="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onblur="hideChartTooltip('${tooltipId}')"><title>${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit} · ${new Date(entry.point.t).toLocaleString('it-IT')}</title></circle>`).join('');
+    return area + line + dots;
+  };
+  return `<section class="chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div><div class="ops-chart-legend">${config.series.map(item => `<span><i style="background:${item.color};${item.css === 'target' ? 'background:repeating-linear-gradient(90deg,'+item.color+' 0 7px,transparent 7px 11px)' : ''}"></i>${item.label}</span>`).join('')}</div></div><div class="ops-chart-plot"><div class="chart-tooltip" id="${tooltipId}"></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${config.title}">${ticks.map(tick => `<line class="chart-grid-line" x1="${left}" y1="${tick.y}" x2="${width-right}" y2="${tick.y}"/><text class="chart-axis-label" x="${left-10}" y="${tick.y+4}" text-anchor="end">${tick.value.toFixed(config.decimals)}${config.unit}</text>`).join('')}<line class="chart-axis-line" x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}"/><line class="chart-axis-line" x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}"/>${times.map((timestamp,index) => `<text class="chart-axis-label" x="${left+index*(width-left-right)/3}" y="${height-12}" text-anchor="${index === 0 ? 'start' : index === 3 ? 'end' : 'middle'}">${timeLabel(timestamp)}</text>`).join('')}${config.series.map(draw).join('')}</svg></div></section>`;
+}
 function renderEnvironmentChart(mac, state, detailed = false) {
   const history = updateEnvironmentHistory(mac, state);
-  const left = 10, right = 94, top = 8, bottom = 86;
-  const x = i => history.length === 1 ? left : left + i * (right-left) / (history.length-1);
-  const y = (value,min,max) => bottom - Math.max(0,Math.min(1,(value-min)/(max-min))) * (bottom-top);
-  const series = [['room','Interna','#22d3ee','°C'],['target','Target','#facc15','°C'],['outdoor','Esterna','#fb7185','°C'],['humidity','Umi. interna','#60a5fa','%'],['outdoorHumidity','Umi. esterna','#a78bfa','%']];
-  const temperatures = history.flatMap(p => [p.room,p.target,p.outdoor]).filter(Number.isFinite);
-  const minT = temperatures.length ? Math.floor(Math.min(...temperatures)-1) : 15;
-  const maxT = temperatures.length ? Math.ceil(Math.max(...temperatures)+1) : 35;
-  const draw = ([key,label,color,unit]) => {
-    const range = unit === '%' ? [0,100] : [minT,maxT];
-    const valid = history.map((p,i) => p[key] == null || !Number.isFinite(p[key]) ? null : {p,i}).filter(Boolean);
-    const line = valid.length > 1 ? `<polyline points="${valid.map(v => `${x(v.i)},${y(v.p[key],...range)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="${detailed ? 1.2 : 2}" vector-effect="non-scaling-stroke"/>` : '';
-    const points = detailed ? valid.map(v => `<circle class="chart-point" cx="${x(v.i)}" cy="${y(v.p[key],...range)}" r="1.25" fill="${color}"><title>${label}: ${Number(v.p[key]).toFixed(1)} ${unit} · ${new Date(v.p.t).toLocaleString('it-IT')}</title></circle>`).join('') : '';
-    return line + points;
-  };
-  const start = history[0]?.t || Date.now(), end = history[history.length-1]?.t || start;
-  const time = t => new Date(t).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  const axes = detailed ? `<path d="M${left} ${top}V${bottom}H${right} M${right} ${top}V${bottom}" stroke="#526177" stroke-width=".5"/><g class="chart-axis"><text x="1" y="${top+1}">${maxT}°</text><text x="1" y="${bottom}">${minT}°</text><text x="95" y="${top+1}">100%</text><text x="97" y="${bottom}">0%</text><text x="${left}" y="96">${time(start)}</text><text x="52" y="96" text-anchor="middle">${time((start+end)/2)}</text><text x="${right}" y="96" text-anchor="end">${time(end)}</text></g>` : '';
-  return `<div class="ops-chart"><div class="ops-chart-legend">${series.map(([,label,color]) => `<span><i style="background:${color}"></i>${label}</span>`).join('')}</div><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M${left} ${top+19.5}H${right} M${left} ${top+39}H${right} M${left} ${top+58.5}H${right}" stroke="#273244" stroke-width=".4"/>${axes}${series.map(draw).join('')}</svg></div>`;
+  if (!detailed) {
+    const values = history.flatMap(point => [point.room,point.target]).filter(Number.isFinite);
+    if (!values.length) return '';
+    const min = Math.floor(Math.min(...values)-1), max = Math.ceil(Math.max(...values)+1), range = Math.max(2,max-min);
+    const x = index => history.length === 1 ? 4 : 4+index*92/(history.length-1);
+    const y = value => 94-(value-min)*88/range;
+    const line = (key,color,dash='') => { const points=history.map((point,index) => Number.isFinite(point[key]) ? `${x(index)},${y(point[key])}` : null).filter(Boolean); return points.length>1 ? `<polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-dasharray="${dash}" vector-effect="non-scaling-stroke"/>` : ''; };
+    return `<div class="ops-chart"><div class="ops-chart-legend"><span><i style="background:#22d3ee"></i>Interna</span><span><i style="background:#facc15"></i>Target</span></div><svg viewBox="0 0 100 100" preserveAspectRatio="none">${line('room','#22d3ee')}${line('target','#facc15','5 4')}</svg></div>`;
+  }
+  return `<div class="chart-panels">${renderTimeSeriesPanel(mac,history,{id:'temperature',title:'Temperatura',subtitle:'Andamento ambiente, setpoint ed esterno',unit:'°C',padding:1,minimumRange:4,decimals:1,series:[{key:'room',label:'Interna',color:'#22d3ee',area:true},{key:'target',label:'Target',color:'#facc15',css:'target'},{key:'outdoor',label:'Esterna',color:'#fb7185',css:'outdoor'}]})}${renderTimeSeriesPanel(mac,history,{id:'humidity',className:'humidity',title:'Umidità relativa',subtitle:'Confronto interno ed esterno',unit:'%',padding:5,minimumRange:20,decimals:0,series:[{key:'humidity',label:'Interna',color:'#60a5fa',area:true},{key:'outdoorHumidity',label:'Esterna',color:'#a78bfa',css:'outdoor'}]})}</div>`;
 }
 
 function toggleChartExpand(mac) {
@@ -2614,7 +2688,7 @@ function renderChartsPage(data) {
   content.innerHTML = data.map(d => {
     const s = d.state || {};
     const value = (number, suffix) => Number.isFinite(Number(number)) ? Number(number).toFixed(1) + suffix : '--';
-    return `<article class="chart-detail-card" id="detail-chart-${escHtml(d.mac)}"><button class="chart-expand" onclick="toggleChartExpand('${escHtml(d.mac)}')">⛶ Espandi</button><h3>${escHtml(__DEVICE_NAMES__[d.mac] || d.name || d.mac)}</h3><p>Profilo ${escHtml(s.ActivePreset || 'manuale')} · ${s.Pow ? 'unità accesa' : 'unità spenta'} · ${escHtml(s.smart_last_action || 'nessuna decisione')}</p>${renderEnvironmentChart(d.mac,s,true)}<div class="chart-values"><div>Interna<b>${value(s.RoomTemperature,'°')}</b></div><div>Target<b>${value(s.smart_effective_target ?? (s.SetDeciTem != null ? s.SetDeciTem/10 : s.SetTem),'°')}</b></div><div>Esterna<b>${value(s.OutdoorTemperature,'°')}</b></div><div>Umi. interna<b>${value(s.RoomHumidity,'%')}</b></div><div>Umi. esterna<b>${value(s.OutdoorHumidity,'%')}</b></div></div></article>`;
+    return `<article class="chart-detail-card" id="detail-chart-${escHtml(d.mac)}"><button class="chart-expand" onclick="toggleChartExpand('${escHtml(d.mac)}')">⛶ Espandi</button><h3>${escHtml(__DEVICE_NAMES__[d.mac] || d.name || d.mac)}</h3><p>Profilo ${escHtml(s.ActivePreset || 'manuale')} · ${s.Pow ? 'unità accesa' : 'unità spenta'} · ${escHtml(s.smart_last_action || 'nessuna decisione')}</p>${renderEnvironmentChart(d.mac,s,true)}<div class="chart-values"><div>Interna<b>${value(s.RoomTemperature,'°')}</b></div><div>Target<b>${value(chartTarget(s),'°')}</b></div><div>Esterna<b>${value(s.OutdoorTemperature,'°')}</b></div><div>Umi. interna<b>${value(s.RoomHumidity,'%')}</b></div><div>Umi. esterna<b>${value(s.OutdoorHumidity,'%')}</b></div></div></article>`;
   }).join('');
 }
 

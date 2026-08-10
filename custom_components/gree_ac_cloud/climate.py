@@ -346,6 +346,39 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             return "Media-Bassa"
         return "Bassa"
 
+    @staticmethod
+    def _temperature_hysteresis_mode(
+        selected_mode: str,
+        current: float,
+        target: float,
+        deadband: float,
+        active_mode: HVACMode,
+    ) -> HVACMode | None:
+        """Return demand using target as stop point and deadband as restart gap.
+
+        Cooling stops when the room reaches the target and restarts only above
+        target + deadband. Heating is the exact inverse. This avoids treating
+        the deadband as a symmetric offset that stops cooling before the target.
+        """
+        if selected_mode == SMART_MODE_COOL:
+            if active_mode == HVACMode.COOL and current > target:
+                return HVACMode.COOL
+            return HVACMode.COOL if current > target + deadband else None
+        if selected_mode == SMART_MODE_HEAT:
+            if active_mode == HVACMode.HEAT and current < target:
+                return HVACMode.HEAT
+            return HVACMode.HEAT if current < target - deadband else None
+        if selected_mode == SMART_MODE_AUTO:
+            if active_mode == HVACMode.COOL and current > target:
+                return HVACMode.COOL
+            if active_mode == HVACMode.HEAT and current < target:
+                return HVACMode.HEAT
+            if current > target + deadband:
+                return HVACMode.COOL
+            if current < target - deadband:
+                return HVACMode.HEAT
+        return None
+
     def _smart_fan_for_profile(
         self,
         preset: dict,
@@ -448,16 +481,14 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         minimum = preset.get(CONF_PRESET_MIN_TEMP)
         maximum = preset.get(CONF_PRESET_MAX_TEMP)
         humidity_limit = preset.get(CONF_PRESET_HUMIDITY)
+        is_on = bool(self.coordinator.data.get("Pow"))
+        active_mode = self.hvac_mode if is_on else HVACMode.OFF
         desired_mode: HVACMode | None = None
 
         if minimum is not None and current < float(minimum):
             desired_mode = HVACMode.HEAT
         elif maximum is not None and current > float(maximum):
             desired_mode = HVACMode.COOL
-        elif selected_mode == SMART_MODE_COOL:
-            desired_mode = HVACMode.COOL if current > target + deadband else None
-        elif selected_mode == SMART_MODE_HEAT:
-            desired_mode = HVACMode.HEAT if current < target - deadband else None
         elif selected_mode == SMART_MODE_DRY:
             desired_mode = (
                 HVACMode.DRY
@@ -466,18 +497,18 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                 and humidity > float(humidity_limit)
                 else None
             )
+        elif (
+            selected_mode == SMART_MODE_AUTO
+            and humidity_limit is not None
+            and humidity is not None
+            and humidity > float(humidity_limit)
+            and current >= target - deadband
+        ):
+            desired_mode = HVACMode.DRY
         else:
-            if (
-                humidity_limit is not None
-                and humidity is not None
-                and humidity > float(humidity_limit)
-                and current >= target - deadband
-            ):
-                desired_mode = HVACMode.DRY
-            elif current > target + deadband:
-                desired_mode = HVACMode.COOL
-            elif current < target - deadband:
-                desired_mode = HVACMode.HEAT
+            desired_mode = self._temperature_hysteresis_mode(
+                selected_mode, current, target, deadband, active_mode
+            )
 
         if not self._smart_profile_enabled:
             self._smart_fan_speed = None
@@ -492,7 +523,6 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
 
         now = time.monotonic()
         can_command = force or now - self._smart_last_command_at >= SMART_COMMAND_COOLDOWN_SECONDS
-        is_on = bool(self.coordinator.data.get("Pow"))
 
         # Explicit user power commands always win. Keep the selected profile and
         # continue monitoring, but do not countermand that choice until the room

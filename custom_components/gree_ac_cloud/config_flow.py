@@ -114,7 +114,7 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
         coordinators = self._coordinators()
         if not coordinators:
             return self.async_abort(reason="devices_not_ready")
-        if user_input is not None and CONF_OUTDOOR_TEMPERATURE_SENSOR in user_input:
+        if user_input is not None:
             self._outdoor_sensor = user_input.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
             self._outdoor_humidity_sensor = user_input.get(CONF_OUTDOOR_HUMIDITY_SENSOR)
             return await self.async_step_device()

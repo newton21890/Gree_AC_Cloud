@@ -81,11 +81,9 @@ def test_panel_javascript_parses_when_node_is_available() -> None:
     assert script_start >= 0 and script_end > script_start
 
     with tempfile.NamedTemporaryFile("w", suffix=".js") as script:
-        script.write(panel_html[script_start + len("<script>"):script_end])
+        script.write(panel_html[script_start + len("<script>") : script_end])
         script.flush()
-        subprocess.run(
-            [node, "--check", script.name], check=True, capture_output=True
-        )
+        subprocess.run([node, "--check", script.name], check=True, capture_output=True)
 
 
 def _load_protocol_module():
@@ -118,10 +116,37 @@ def test_dred_control_keeps_verified_protocol_mapping() -> None:
     assert "RegistryEntryDisabler.INTEGRATION" in select_source
     assert "registry.async_update_entity(entity_id, disabled_by=None)" in select_source
     assert '_attr_translation_key = "dred_level"' in select_source
-    assert 'class GreeStartupDemandResponseSelect' in select_source
+    assert "class GreeStartupDemandResponseSelect" in select_source
     assert '_attr_translation_key = "startup_dred_level"' in select_source
     assert 'STARTUP_DRED_NO_ACTION = "No action"' in const_source
     assert "async_set_startup_dred" in select_source
+
+
+def test_smart_hysteresis_boundaries() -> None:
+    """Cooling reaches target before stopping; deadband only delays restart."""
+
+    def demand(mode: str, current: float, target: float, margin: float, active: str):
+        if mode == "cool":
+            return (
+                "cool"
+                if (active == "cool" and current > target) or current > target + margin
+                else None
+            )
+        if mode == "heat":
+            return (
+                "heat"
+                if (active == "heat" and current < target) or current < target - margin
+                else None
+            )
+        return None
+
+    assert demand("cool", 26.4, 26.0, 0.5, "cool") == "cool"
+    assert demand("cool", 26.0, 26.0, 0.5, "cool") is None
+    assert demand("cool", 26.4, 26.0, 0.5, "off") is None
+    assert demand("cool", 26.6, 26.0, 0.5, "off") == "cool"
+    assert demand("heat", 25.6, 26.0, 0.5, "heat") == "heat"
+    assert demand("heat", 26.0, 26.0, 0.5, "heat") is None
+    assert demand("heat", 25.4, 26.0, 0.5, "off") == "heat"
 
 
 def test_external_sensor_and_preset_options_are_exposed() -> None:
@@ -132,6 +157,8 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "CONF_TEMPERATURE_SENSORS" in flow_source
     assert "CONF_HUMIDITY_SENSORS" in flow_source
     assert "CONF_OUTDOOR_TEMPERATURE_SENSOR" in flow_source
+    assert "CONF_OUTDOOR_HUMIDITY_SENSOR" in flow_source
+    assert "if user_input is not None:" in flow_source
     assert "multiple=True" in flow_source
     assert "PRESET_DAY" in flow_source
     assert "ClimateEntityFeature.PRESET_MODE" in climate_source
@@ -141,6 +168,11 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "SMART_COMMAND_COOLDOWN_SECONDS" in climate_source
     assert "smart_effective_target" in climate_source
     assert "_smart_fan_for_demand" in climate_source
+    assert "_temperature_hysteresis_mode" in climate_source
+    assert "active_mode == HVACMode.COOL and current > target" in climate_source
+    assert "current > target + deadband" in climate_source
+    assert "active_mode == HVACMode.HEAT and current < target" in climate_source
+    assert "current < target - deadband" in climate_source
     assert "smart_manual_power_override" in climate_source
     assert "smart_manual_override_explicit" in climate_source
     assert "_expect_power_echo" in climate_source
@@ -167,7 +199,7 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "dashboard-summary" in panel_source
     assert "Profili ambiente" in panel_source
     assert "Dettagli tecnici e sonde diagnostiche" in panel_source
-    assert "sidebar-action-label\">Configura" in panel_source
+    assert 'sidebar-action-label">Configura' in panel_source
     assert "async function setPreset" in panel_source
     assert "Gree Control operations interface" in panel_source
     assert "Controllo climatizzazione" in panel_source
@@ -182,7 +214,7 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "saveAllRoomSensors" in panel_source
     assert "smart_enabled" in panel_source
     assert "outdoor_compensation" in panel_source
-    assert "Isteresi" in panel_source
+    assert "Margine di riaccensione" in panel_source
     assert "function getAccessToken()" in panel_source
     assert "window.localStorage" in panel_source
     assert "window.parent.localStorage" in panel_source
@@ -191,6 +223,8 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "Smart (profilo)" in panel_source
     assert "Regolazione profili attiva" in panel_source
     assert "renderEnvironmentChart" in panel_source
+    assert "ClimateTargetTemperature" in panel_source
+    assert "outdoorHumiditySensor" in panel_source
     assert "renderChartsPage" in panel_source
     assert "Andamento climatico" in panel_source
     assert "toggleChartExpand" in panel_source
@@ -205,9 +239,7 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
 
 def test_device_command_round_trip() -> None:
     module = _load_protocol_module()
-    device = module.GreeDevice(
-        mac="001122334455", name="Test", key="0123456789abcdef"
-    )
+    device = module.GreeDevice(mac="001122334455", name="Test", key="0123456789abcdef")
     encrypted = device.build_command_pack(["Pow", "Mod"], [1, 2])
     assert device.decrypt_pack(encrypted) == {
         "t": "cmd",
@@ -218,7 +250,5 @@ def test_device_command_round_trip() -> None:
 
 def test_subunit_parent_mac() -> None:
     module = _load_protocol_module()
-    device = module.GreeDevice(
-        mac="00112233445501", name="Test", key="0123456789abcdef"
-    )
+    device = module.GreeDevice(mac="00112233445501", name="Test", key="0123456789abcdef")
     assert device.parent_mac == "001122334455"

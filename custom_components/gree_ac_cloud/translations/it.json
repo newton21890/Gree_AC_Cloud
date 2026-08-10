@@ -24,7 +24,7 @@
     "step": {
       "init": {
         "title": "Sensore esterno",
-        "description": "Scegli un sensore temperatura esterna opzionale, comune a tutto l'impianto.",
+        "description": "Scegli i sensori opzionali di temperatura e umidità esterna, comuni a tutto l'impianto e utilizzati anche nei grafici.",
         "data": {
           "outdoor_temperature_sensor": "Sensore temperatura esterna",
           "outdoor_humidity_sensor": "Sensore umidità esterna"
@@ -52,7 +52,7 @@
           "enabled": "Abilitato",
           "smart_enabled": "Regolazione smart continua",
           "smart_mode": "Strategia climatica",
-          "deadband": "Isteresi comfort (°C)",
+          "deadband": "Margine riaccensione (°C)",
           "outdoor_compensation": "Compensazione temperatura esterna",
           "fan_speed": "Gestione ventilatore (Smart oppure controller Auto)",
           "quiet": "Modalità silenziosa",
@@ -71,7 +71,7 @@
           "enabled": "Abilitato",
           "smart_enabled": "Regolazione smart continua",
           "smart_mode": "Strategia climatica",
-          "deadband": "Isteresi comfort (°C)",
+          "deadband": "Margine riaccensione (°C)",
           "outdoor_compensation": "Compensazione temperatura esterna",
           "fan_speed": "Gestione ventilatore (Smart oppure controller Auto)",
           "quiet": "Modalità silenziosa",
@@ -90,7 +90,7 @@
           "enabled": "Abilitato",
           "smart_enabled": "Regolazione smart continua",
           "smart_mode": "Strategia climatica",
-          "deadband": "Isteresi comfort (°C)",
+          "deadband": "Margine riaccensione (°C)",
           "outdoor_compensation": "Compensazione temperatura esterna",
           "fan_speed": "Gestione ventilatore (Smart oppure controller Auto)",
           "quiet": "Modalità silenziosa",
