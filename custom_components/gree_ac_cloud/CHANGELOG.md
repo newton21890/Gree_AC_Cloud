@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.0
+
+### Profili spiegati, configurazione esterna semplificata e andamento Smart
+
+- Riscritte le spiegazioni dei profili indicando priorità, condizioni reali di intervento, differenza fra target e isteresi, dipendenze fra modalità e soglie ed effetti dei comandi Gree.
+- Documentati esplicitamente algoritmo I-Demand Smart, compensazione esterna, ventola Smart, Quiet e parametro legacy di spegnimento.
+- Il modale Configurazione impianto è diventato Sensori esterni e contiene soltanto temperatura e umidità esterne comuni.
+- Il modale non può più sovrascrivere sensori interni o profili; questi restano gestiti dalle opzioni Home Assistant e dall'editor dedicato.
+- Aggiunto al controllo Smart uno storico live mobile di due ore con calcolo della tendenza termica sull'ultima ora.
+- La tendenza viene usata in modo prudente: mentre l'unità è spenta e la temperatura continua a muoversi verso il target, il margine di riavvio aumenta temporaneamente fino a 0,2 °C per evitare cicli inutili.
+- Esposti negli attributi climate tendenza in °C/h e numero di campioni, mostrati anche nella pagina Profili.
+- Home Assistant Recorder resta lo storico persistente per analisi e grafici; non viene interrogato nel ciclo di controllo, evitando di bloccare le decisioni ogni due minuti.
+
 ## 0.8.3
 
 ### Correzione livello del menu mobile

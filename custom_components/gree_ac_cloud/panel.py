@@ -352,6 +352,8 @@ class GreePanelDataView(HomeAssistantView):
                         "smart_dred_verified",
                         "profile_control_enabled",
                         "smart_effective_target",
+                        "smart_temperature_trend_c_per_hour",
+                        "smart_temperature_trend_samples",
                     ):
                         state[key] = climate_state.attributes.get(key)
                 data.append(
@@ -1525,6 +1527,11 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .config-field { display:grid; gap:6px; min-width:0; }
 .config-help { color:var(--text2); font-size:9px; }
 .config-section-title { margin:18px 0 9px; color:#b9c8da; font-size:9px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
+.outdoor-sensor-settings { display:grid; gap:14px; max-width:760px; margin:0 auto; }
+.outdoor-sensor-card { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr); gap:22px; align-items:center; padding:18px; border:1px solid var(--border); border-radius:12px; background:#101823; }
+.outdoor-sensor-copy .config-section-title { display:block; margin:0 0 7px; color:var(--primary); }
+.outdoor-sensor-copy h3 { margin:0 0 5px; color:#e5eefb; font-size:13px; }
+.outdoor-sensor-copy p { margin:0; color:#8494aa; font-size:10px; line-height:1.55; }
 .preset-table { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
 .preset-head,.preset-row { display:grid; grid-template-columns:100px 55px 65px 100px 165px 70px 75px 75px 82px 88px 110px 60px 86px; gap:1px; min-width:1195px; align-items:center; }
 .profile-master { display:flex; gap:8px; align-items:center; padding:10px 12px; margin-bottom:12px; border:1px solid rgba(255,193,7,.35); border-radius:8px; background:rgba(255,193,7,.08); font-weight:700; }
@@ -1567,7 +1574,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .config-modal { padding:0; }
   .config-dialog { min-height:100vh; margin:0; border:0; border-radius:0; }
   .config-body { padding:14px; }
-  .config-common,.config-sensor-grid { grid-template-columns:1fr; }
+  .config-common,.config-sensor-grid,.outdoor-sensor-card { grid-template-columns:1fr; }
   .config-header { padding:14px; }
   .config-footer { padding:12px 14px; }
   .config-status { display:none; }
@@ -2149,16 +2156,16 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 <div id="sensorSettings" class="config-modal" role="dialog" aria-modal="true" aria-labelledby="configTitle" onclick="if(event.target===this)closeSensorSettings()">
   <div class="config-dialog">
     <header class="config-header">
-      <div class="config-heading"><span class="config-heading-icon"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.95 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.58 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.95a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.05 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.13.61.6 1.08 1.2 1.04H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></span><div><h2 id="configTitle">Configurazione impianto</h2><p>Sensori Home Assistant e profili ambiente</p></div></div>
+      <div class="config-heading"><span class="config-heading-icon"><svg viewBox="0 0 24 24"><path d="M12 3v3"/><path d="M5.6 5.6l2.1 2.1"/><path d="M3 12h3"/><path d="M18 12h3"/><circle cx="12" cy="12" r="4"/><path d="M5 21h14"/></svg></span><div><h2 id="configTitle">Sensori esterni</h2><p>Riferimenti meteo comuni a tutte le unità</p></div></div>
       <button class="config-close" onclick="closeSensorSettings()" aria-label="Chiudi configurazione">×</button>
     </header>
     <div class="config-body">
-      <p class="config-intro">Associa i sensori dell’abitazione alle unità Gree. Selezionando più sensori, il pannello calcola automaticamente la media dei soli valori disponibili. Ventola <b>Smart</b> varia la portata in base alla distanza dal target; <b>Auto</b> lascia la decisione al controller Gree. I comandi manuali On/Off hanno sempre priorità sul profilo.</p>
+      <p class="config-intro">Seleziona temperatura e umidità esterne usate da tutte le unità. Questi valori alimentano la compensazione del target e i grafici; sensori ambiente e profili si configurano nelle rispettive pagine Home Assistant e Profili.</p>
       <div id="sensorSettingsContent" class="config-loading">Caricamento configurazione…</div>
     </div>
     <footer class="config-footer">
-      <span class="config-status" id="sensorSettingsGlobalStatus">Le modifiche vengono applicate ricaricando l’integrazione.</span>
-      <div class="config-actions"><button class="config-btn" onclick="closeSensorSettings()">Annulla</button><button class="config-btn primary" id="saveAllSensorSettings">Salva configurazione</button></div>
+      <span class="config-status" id="sensorSettingsGlobalStatus">La selezione è comune a tutte le unità della stessa integrazione.</span>
+      <div class="config-actions"><button class="config-btn" onclick="closeSensorSettings()">Annulla</button><button class="config-btn primary" id="saveAllSensorSettings">Salva sensori esterni</button></div>
     </footer>
   </div>
 </div>
@@ -2241,53 +2248,19 @@ async function openSensorSettings() {
   const content = document.getElementById('sensorSettingsContent');
   modal.style.display = 'block';
   content.className = 'config-loading';
-  content.textContent = 'Caricamento configurazione…';
+  content.textContent = 'Caricamento sensori esterni…';
   try {
     const data = await apiFetch(PANEL_ROOM_SENSORS_URL);
-    const temperatures = data.sensors.filter(s => s.device_class === 'temperature');
-    const humidities = data.sensors.filter(s => s.device_class === 'humidity');
-    const outdoor = data.devices.find(d => d.outdoor_temperature_sensor)?.outdoor_temperature_sensor || '';
-    const outdoorHumidity = data.devices.find(d => d.outdoor_humidity_sensor)?.outdoor_humidity_sensor || '';
-    let html = `<div class="config-common"><label for="outdoorSensor">Temperatura esterna comune</label><select class="config-select" id="outdoorSensor"><option value="">Nessun sensore esterno</option>${sensorOptions(temperatures, [outdoor])}</select><label for="outdoorHumiditySensor">Umidità esterna comune</label><select class="config-select" id="outdoorHumiditySensor"><option value="">Nessun sensore esterno</option>${sensorOptions(humidities, [outdoorHumidity])}</select></div>`;
-    for (const d of data.devices) {
-      const presets = d.presets || {};
-      const safeMac = escHtml(d.mac);
-      const presetHtml = ['day','night','away'].map(name => {
-        const p = presets[name] || {};
-        const label = {day:'Giorno',night:'Notte',away:'Assente'}[name];
-        const field = (key, value, title, min, max) => `<input class="config-input" id="${key}-${name}-${safeMac}" aria-label="${title} ${label}" title="${title}" type="number" step="0.5" min="${min}" max="${max}" value="${value ?? ''}" placeholder="—">`;
-        const smartMode = p.smart_mode || 'auto';
-        const allowedModes = p.allowed_modes || (smartMode === 'auto' ? ['cool','heat','dry'] : [smartMode]);
-        const fanAliases = {'Low':'Bassa','Med-Low':'Media-Bassa','Medium':'Media','Med-High':'Media-Alta','High':'Alta'};
-        const fanMode = fanAliases[p.fan_speed] || p.fan_speed || 'Smart';
-        return `<div class="preset-row"><div class="preset-name">${label}</div><div class="preset-enable"><input id="enabled-${name}-${safeMac}" aria-label="Abilita profilo ${label}" type="checkbox" ${p.enabled ? 'checked' : ''}></div>
-          <div class="preset-enable" title="Regolazione automatica continua"><input id="smart-${name}-${safeMac}" aria-label="Profilo smart ${label}" type="checkbox" ${p.smart_enabled !== false ? 'checked' : ''}></div>
-          <select class="config-select" id="mode-${name}-${safeMac}" aria-label="Strategia ${label}" title="Auto profilo sceglie dinamicamente fra le modalità consentite">${[['auto','Auto profilo'],['cool','Solo Cool'],['heat','Solo Heat'],['dry','Solo Dry']].map(([v,l]) => `<option value="${v}" ${smartMode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
-          <div class="profile-mode-checks" title="Modalità che Auto profilo può selezionare"><label><input type="checkbox" id="allow-cool-${name}-${safeMac}" ${allowedModes.includes('cool') ? 'checked' : ''}>Cool</label><label><input type="checkbox" id="allow-heat-${name}-${safeMac}" ${allowedModes.includes('heat') ? 'checked' : ''}>Heat</label><label><input type="checkbox" id="allow-dry-${name}-${safeMac}" ${allowedModes.includes('dry') ? 'checked' : ''}>Dry</label></div>
-          ${field('target', p.target_temperature ?? 26, 'Comfort °C', 16, 30)}
-          ${field('deadband', p.deadband ?? 0.5, 'Margine di riaccensione °C', 0.2, 2)}
-          ${field('min', p.min_temperature, 'Soglia minima °C', 10, 30)}
-          ${field('max', p.max_temperature, 'Soglia massima °C', 16, 35)}
-          ${field('humidity', p.humidity_threshold, 'Umidità massima %', 0, 100)}
-          <select class="config-select" id="fan-${name}-${safeMac}" aria-label="Ventola profilo ${label}">${['Smart','Auto','Bassa','Media-Bassa','Media','Media-Alta','Alta'].map(value => `<option ${fanMode === value ? 'selected' : ''}>${value === 'Smart' ? 'Smart (profilo)' : value}</option>`).join('')}</select>
-          <div class="preset-enable" title="Compensazione con temperatura esterna"><input id="adaptive-${name}-${safeMac}" aria-label="Adattivo esterno ${label}" type="checkbox" ${p.outdoor_compensation !== false ? 'checked' : ''}></div>
-          <select class="config-select" id="dred-${name}-${safeMac}" aria-label="I-Demand profilo ${label}">${['Smart','No action','Off','D1','D2','D3'].map(value => `<option ${String(p.dred || 'No action') === value ? 'selected' : ''}>${value === 'No action' ? 'Invariato' : value}</option>`).join('')}</select>
-          <input id="off-${name}-${safeMac}" type="hidden" value="">
-          <input id="quiet-${name}-${safeMac}" type="hidden" value="${name === 'night' ? '1' : '0'}">
-        </div>`;
-      }).join('');
-      html += `<section class="config-device" data-entry-id="${escHtml(d.entry_id)}" data-config-mac="${safeMac}"><header class="config-device-head"><h3>${escHtml(d.name)}</h3><code>${safeMac}</code></header><div class="config-device-body">
-        <label class="profile-master"><input id="profile-control-${safeMac}" type="checkbox" ${d.profile_control_enabled !== false ? 'checked' : ''}> Regolazione profili attiva <small>(disattiva per controllo completamente manuale)</small></label>
-        <div class="config-sensor-grid"><div class="config-field"><label for="temp-${safeMac}">Temperatura ambiente</label><select class="config-select" id="temp-${safeMac}" multiple size="5">${sensorOptions(temperatures, d.temperature_sensors)}</select><span class="config-help">⌘/Ctrl + clic per selezionare più sensori.</span></div>
-        <div class="config-field"><label for="hum-${safeMac}">Umidità ambiente</label><select class="config-select" id="hum-${safeMac}" multiple size="5">${sensorOptions(humidities, d.humidity_sensors)}</select><span class="config-help">I valori validi vengono mediati automaticamente.</span></div></div>
-        <div class="config-section-title">Profili automatici</div><div class="preset-table"><div class="preset-head"><span>Profilo</span><span>On</span><span>Smart</span><span>Strategia</span><span>Modalità</span><span>Comfort</span><span>Riaccensione</span><span>Min</span><span>Max</span><span>Umidità</span><span>Ventola</span><span>Esterno</span><span>I-Demand</span></div>${presetHtml}</div>
-        <span id="sensor-status-${safeMac}" class="config-help"></span></div></section>`;
-    }
-    content.classList.remove('config-loading');
-    content.innerHTML = html;
-    document.getElementById('saveAllSensorSettings').onclick = saveAllRoomSensors;
-  } catch (e) {
-    content.innerHTML = `<p style="color:var(--red);">Errore: ${escHtml(e.message)}</p>`;
+    const temperatures = data.sensors.filter(sensor => sensor.device_class === 'temperature');
+    const humidities = data.sensors.filter(sensor => sensor.device_class === 'humidity');
+    const outdoor = data.devices.find(device => device.outdoor_temperature_sensor)?.outdoor_temperature_sensor || '';
+    const outdoorHumidity = data.devices.find(device => device.outdoor_humidity_sensor)?.outdoor_humidity_sensor || '';
+    content.className = '';
+    content.innerHTML = `<div class="outdoor-sensor-settings"><section class="outdoor-sensor-card"><div class="outdoor-sensor-copy"><span class="config-section-title">TEMPERATURA ESTERNA</span><h3>Riferimento termico esterno</h3><p>Usato dalla compensazione dei profili e dallo storico. Se il dato è più vecchio di tre ore viene ignorato dalla regolazione Smart.</p></div><select class="config-select" id="outdoorSensor"><option value="">Nessun sensore esterno</option>${sensorOptions(temperatures,[outdoor])}</select></section><section class="outdoor-sensor-card"><div class="outdoor-sensor-copy"><span class="config-section-title">UMIDITÀ ESTERNA</span><h3>Riferimento igrometrico esterno</h3><p>Registrato nei grafici per leggere le condizioni meteo. Non sostituisce il sensore di umidità interno usato per decidere Dry.</p></div><select class="config-select" id="outdoorHumiditySensor"><option value="">Nessun sensore esterno</option>${sensorOptions(humidities,[outdoorHumidity])}</select></section><div class="profile-callout"><b>Ambiente interno</b><br>I sensori interni restano associati dalle opzioni dell’integrazione. Giorno, Notte e Assente si modificano esclusivamente nella pagina Profili, così questo modale non può più sovrascriverli.</div></div>`;
+    document.getElementById('saveAllSensorSettings').onclick = () => saveOutdoorSensors(data.devices);
+  } catch (error) {
+    content.className = 'config-loading';
+    content.textContent = `Impossibile caricare i sensori esterni: ${error.message}`;
   }
 }
 
@@ -2295,76 +2268,23 @@ function closeSensorSettings() {
   document.getElementById('sensorSettings').style.display = 'none';
 }
 
-async function saveAllRoomSensors() {
+async function saveOutdoorSensors(devices) {
   const button = document.getElementById('saveAllSensorSettings');
   const globalStatus = document.getElementById('sensorSettingsGlobalStatus');
-  const devices = Array.from(document.querySelectorAll('[data-config-mac]'));
-  if (!devices.length) return;
   button.disabled = true;
-  button.textContent = 'Salvataggio…';
-  globalStatus.textContent = `Salvataggio di ${devices.length} unità…`;
+  globalStatus.textContent = 'Salvataggio sensori esterni…';
+  const outdoor = document.getElementById('outdoorSensor').value;
+  const outdoorHumidity = document.getElementById('outdoorHumiditySensor').value;
   try {
     for (const device of devices) {
-      await saveRoomSensors(device.dataset.entryId, device.dataset.configMac, false);
+      await apiFetch(PANEL_ROOM_SENSORS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entry_id:device.entry_id,mac:device.mac,temperature_sensors:device.temperature_sensors || [],humidity_sensors:device.humidity_sensors || [],outdoor_temperature_sensor:outdoor,outdoor_humidity_sensor:outdoorHumidity})});
     }
-    globalStatus.textContent = 'Configurazione salvata. L’integrazione si sta ricaricando…';
-    button.textContent = 'Salvato ✓';
-    setTimeout(closeSensorSettings, 1400);
-  } catch (e) {
-    globalStatus.textContent = 'Errore: ' + e.message;
-    button.textContent = 'Riprova';
+    globalStatus.textContent = 'Sensori esterni salvati. Ricarica integrazione in corso…';
+    setTimeout(() => { closeSensorSettings(); loadData(); }, 1600);
+  } catch (error) {
+    globalStatus.textContent = `Errore: ${error.message}`;
   } finally {
     button.disabled = false;
-  }
-}
-
-async function saveRoomSensors(entryId, mac, closeAfter = false) {
-  const selected = id => Array.from(document.getElementById(id).selectedOptions).map(o => o.value);
-  const status = document.getElementById(`sensor-status-${mac}`);
-  status.textContent = 'Salvataggio…';
-  try {
-    const num = (id) => {
-      const value = document.getElementById(id).value;
-      return value === '' ? null : Number(value);
-    };
-    const presets = {};
-    for (const name of ['day','night','away']) {
-      presets[name] = {
-        enabled: document.getElementById(`enabled-${name}-${mac}`).checked,
-        smart_enabled: document.getElementById(`smart-${name}-${mac}`).checked,
-        smart_mode: document.getElementById(`mode-${name}-${mac}`).value,
-        allowed_modes: ['cool','heat','dry'].filter(mode => document.getElementById(`allow-${mode}-${name}-${mac}`).checked),
-        target_temperature: num(`target-${name}-${mac}`) ?? 26,
-        deadband: num(`deadband-${name}-${mac}`) ?? 0.5,
-        auto_off_temperature: num(`off-${name}-${mac}`),
-        min_temperature: num(`min-${name}-${mac}`),
-        max_temperature: num(`max-${name}-${mac}`),
-        humidity_threshold: num(`humidity-${name}-${mac}`),
-        outdoor_compensation: document.getElementById(`adaptive-${name}-${mac}`).checked,
-        fan_speed: document.getElementById(`fan-${name}-${mac}`).value,
-        quiet: document.getElementById(`quiet-${name}-${mac}`).value === '1',
-        dred: document.getElementById(`dred-${name}-${mac}`).value,
-      };
-    }
-    await apiFetch(PANEL_ROOM_SENSORS_URL, {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({
-        entry_id: entryId,
-        mac,
-        outdoor_temperature_sensor: document.getElementById('outdoorSensor').value || null,
-        outdoor_humidity_sensor: document.getElementById('outdoorHumiditySensor').value || null,
-        profile_control_enabled: document.getElementById(`profile-control-${mac}`).checked,
-        temperature_sensors: selected(`temp-${mac}`),
-        humidity_sensors: selected(`hum-${mac}`),
-        presets,
-      }),
-    });
-    status.textContent = 'Salvato ✓';
-    if (closeAfter) setTimeout(closeSensorSettings, 900);
-  } catch (e) {
-    status.textContent = 'Errore: ' + e.message;
-    throw e;
   }
 }
 

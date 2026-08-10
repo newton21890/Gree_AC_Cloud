@@ -1,5 +1,6 @@
 import logging
 import time
+from collections import deque
 from datetime import timedelta
 
 from homeassistant.components.climate import (
@@ -106,6 +107,9 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         self._smart_manual_override_explicit = False
         self._smart_fan_speed: str | None = None
         self._smart_dred_level: str | None = None
+        self._smart_samples: deque[tuple[float, float]] = deque(maxlen=180)
+        self._smart_temperature_trend: float | None = None
+        self._smart_temperature_trend_samples = 0
         self._last_observed_power = bool(coordinator.data.get("Pow"))
         self._ignore_power_echo: bool | None = None
         self._ignore_power_echo_until = 0.0
@@ -288,6 +292,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                 self._smart_dred_level is None
                 or self._smart_dred_level == self._effective_dred_label
             ),
+            "smart_temperature_trend_c_per_hour": self._smart_temperature_trend,
+            "smart_temperature_trend_samples": self._smart_temperature_trend_samples,
             "smart_manual_power_override": self._smart_manual_power,
             "smart_manual_override_explicit": self._smart_manual_override_explicit,
             "profile_control_enabled": self._profile_control_enabled,
@@ -364,6 +370,54 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if demand >= 0.6:
             return "Media-Bassa"
         return "Bassa"
+
+    def _record_smart_temperature(self, current: float) -> float | None:
+        """Track a short rolling trend used to damp profile decisions.
+
+        Recorder remains the persistent source for UI analysis. The control
+        loop keeps its own live window so a Recorder query can never block the
+        two-minute profile evaluation.
+        """
+        now = time.monotonic()
+        if not self._smart_samples or now - self._smart_samples[-1][0] >= 45:
+            self._smart_samples.append((now, current))
+        while self._smart_samples and now - self._smart_samples[0][0] > 7200:
+            self._smart_samples.popleft()
+        recent = [sample for sample in self._smart_samples if now - sample[0] <= 3600]
+        self._smart_temperature_trend_samples = len(recent)
+        if len(recent) < 3 or recent[-1][0] - recent[0][0] < 600:
+            self._smart_temperature_trend = None
+            return None
+        elapsed_hours = (recent[-1][0] - recent[0][0]) / 3600
+        trend = (recent[-1][1] - recent[0][1]) / elapsed_hours
+        self._smart_temperature_trend = round(max(-6.0, min(6.0, trend)), 2)
+        return self._smart_temperature_trend
+
+    @staticmethod
+    def _trend_adjusted_deadband(
+        deadband: float,
+        selected_mode: str,
+        active_mode: HVACMode,
+        current: float,
+        target: float,
+        trend: float | None,
+    ) -> float:
+        """Add a small restart guard while temperature is moving correctly."""
+        if trend is None or active_mode != HVACMode.OFF:
+            return deadband
+        cooling_toward_target = (
+            selected_mode in (SMART_MODE_AUTO, SMART_MODE_COOL)
+            and current > target
+            and trend <= -0.2
+        )
+        heating_toward_target = (
+            selected_mode in (SMART_MODE_AUTO, SMART_MODE_HEAT)
+            and current < target
+            and trend >= 0.2
+        )
+        return (
+            min(2.0, deadband + 0.2) if cooling_toward_target or heating_toward_target else deadband
+        )
 
     @staticmethod
     def _temperature_hysteresis_mode(
@@ -506,6 +560,10 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         self._smart_effective_target = target
         deadband = max(0.2, min(2.0, float(preset.get(CONF_PRESET_DEADBAND, 0.5))))
         selected_mode = preset.get(CONF_PRESET_MODE, SMART_MODE_AUTO)
+        trend = self._record_smart_temperature(current)
+        decision_deadband = self._trend_adjusted_deadband(
+            deadband, selected_mode, self.hvac_mode, current, target, trend
+        )
         minimum = preset.get(CONF_PRESET_MIN_TEMP)
         maximum = preset.get(CONF_PRESET_MAX_TEMP)
         humidity_limit = preset.get(CONF_PRESET_HUMIDITY)
@@ -547,7 +605,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             desired_mode = HVACMode.DRY
         else:
             desired_mode = self._temperature_hysteresis_mode(
-                selected_mode, current, target, deadband, active_mode
+                selected_mode, current, target, decision_deadband, active_mode
             )
         mode_names = {
             HVACMode.COOL: SMART_MODE_COOL,

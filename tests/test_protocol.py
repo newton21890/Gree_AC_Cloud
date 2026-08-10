@@ -236,8 +236,15 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "temperature_sensors" in panel_source
     assert 'state["RoomTemperature"]' in panel_source
     assert "Temperatura ambiente${externalRoomTemp" in panel_source
-    assert "Profili automatici" in panel_source
-    assert "Salva configurazione" in panel_source
+    assert (
+        "Profili automatici"
+        not in panel_source[
+            panel_source.index("async function openSensorSettings") : panel_source.index(
+                "async function sendCommand"
+            )
+        ]
+    )
+    assert "Salva sensori esterni" in panel_source
     assert "dashboard-summary" in panel_source
     assert "Profili ambiente" in panel_source
     assert "Dettagli tecnici e sonde diagnostiche" in panel_source
@@ -249,21 +256,29 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "renderOperationsDevice" in panel_source
     assert "APRI CONTROLLI AVANZATI" in panel_source
     assert "sidebar-connection" in panel_source
+    assert "Riferimento termico esterno" in panel_source
     assert "nav-icon" in panel_source
     assert "Aggiorna ora" in panel_source
     assert "value.name" in panel_source
     assert "config-dialog" in panel_source
-    assert "saveAllRoomSensors" in panel_source
-    assert "smart_enabled" in panel_source
-    assert "outdoor_compensation" in panel_source
-    assert "Margine di riaccensione" in panel_source
+    assert "saveOutdoorSensors" in panel_source
+    assert "outdoor-sensor-settings" in panel_source
+    assert "Giorno, Notte e Assente si modificano esclusivamente" in panel_source
+    sensor_modal_source = panel_source[
+        panel_source.index("async function openSensorSettings") : panel_source.index(
+            "async function sendCommand"
+        )
+    ]
+    assert "smart_enabled" not in sensor_modal_source
+    assert "const presets" not in sensor_modal_source
+    assert "profile_control_enabled" not in sensor_modal_source
     assert "function getAccessToken()" in panel_source
     assert "window.localStorage" in panel_source
     assert "window.parent.localStorage" in panel_source
     assert "opts.credentials = 'same-origin'" in panel_source
     assert "Sessione non disponibile" in panel_source
-    assert "Smart (profilo)" in panel_source
-    assert "Regolazione profili attiva" in panel_source
+    assert "Smart (profilo)" not in sensor_modal_source
+    assert "Regolazione profili attiva" not in sensor_modal_source
     history_source = (COMPONENT / "frontend" / "panel_history.js").read_text()
     assert "renderEnvironmentChart" in history_source
     assert "ClimateTargetTemperature" in history_source
@@ -292,6 +307,13 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert 'data-tab="profiles"' in panel_source
     assert "Auto profilo non è Auto Gree" in profiles_source
     assert "allowed_modes" in profiles_source
+    assert "È isteresi di riavvio, non tolleranza" in profiles_source
+    assert "ogni due minuti e a ogni variazione" in profiles_source
+    assert "smart_temperature_trend_c_per_hour" in profiles_source
+    climate_source = (COMPONENT / "climate.py").read_text()
+    assert "_record_smart_temperature" in climate_source
+    assert "Recorder remains the persistent source" in climate_source
+    assert "_trend_adjusted_deadband" in climate_source
     assert "Andamento climatico" in panel_source
     assert "toggleChartExpand" in history_source
     assert "chart-point-group" in panel_source
