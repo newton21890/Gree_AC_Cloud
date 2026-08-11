@@ -118,6 +118,9 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         self._smart_samples: deque[tuple[float, float]] = deque(maxlen=180)
         self._smart_temperature_trend: float | None = None
         self._smart_temperature_trend_samples = 0
+        self._smart_unmet_since = 0.0
+        self._smart_unmet_minutes = 0.0
+        self._smart_stall_boost = 0.0
         self._last_observed_power = bool(coordinator.data.get("Pow"))
         self._ignore_power_echo: bool | None = None
         self._ignore_power_echo_until = 0.0
@@ -305,6 +308,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             ),
             "smart_temperature_trend_c_per_hour": self._smart_temperature_trend,
             "smart_temperature_trend_samples": self._smart_temperature_trend_samples,
+            "smart_unmet_minutes": round(self._smart_unmet_minutes, 1),
+            "smart_stall_boost": self._smart_stall_boost,
             "smart_manual_power_override": self._smart_manual_power,
             "smart_manual_override_explicit": self._smart_manual_override_explicit,
             "profile_control_enabled": self._profile_control_enabled,
@@ -387,13 +392,17 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
     def _smart_fan_for_demand(
         error: float, deadband: float, curve: str = PRESET_WORK_CURVE_BALANCED
     ) -> str:
-        """Map thermal demand to airflow according to the approach curve."""
-        demand = max(0.0, error - deadband)
+        """Map absolute thermal demand to airflow according to the curve.
+
+        Deadband controls only when an idle unit restarts. Subtracting it from
+        an active demand made the controller settle above target with low fan.
+        """
+        demand = max(0.0, error)
         thresholds = {
-            PRESET_WORK_CURVE_GENTLE: (4.0, 3.0, 2.0, 1.0),
-            PRESET_WORK_CURVE_BALANCED: (3.0, 2.0, 1.2, 0.6),
-            PRESET_WORK_CURVE_RAPID: (2.0, 1.2, 0.6, 0.2),
-        }.get(curve, (3.0, 2.0, 1.2, 0.6))
+            PRESET_WORK_CURVE_GENTLE: (3.5, 2.6, 1.8, 0.9),
+            PRESET_WORK_CURVE_BALANCED: (2.6, 1.7, 1.0, 0.4),
+            PRESET_WORK_CURVE_RAPID: (1.5, 0.9, 0.5, 0.15),
+        }.get(curve, (2.6, 1.7, 1.0, 0.4))
         if demand >= thresholds[0]:
             return "Alta"
         if demand >= thresholds[1]:
@@ -403,6 +412,48 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if demand >= thresholds[3]:
             return "Media-Bassa"
         return "Bassa"
+
+    def _smart_stall_demand_boost(
+        self,
+        desired_mode: HVACMode | None,
+        current: float,
+        target: float,
+        trend: float | None,
+    ) -> float:
+        """Escalate capacity when an active demand stops approaching target."""
+        now = time.monotonic()
+        error = (
+            current - target
+            if desired_mode == HVACMode.COOL
+            else target - current
+            if desired_mode == HVACMode.HEAT
+            else 0.0
+        )
+        moving_toward_target = (
+            desired_mode == HVACMode.COOL and trend is not None and trend <= -0.12
+        ) or (desired_mode == HVACMode.HEAT and trend is not None and trend >= 0.12)
+        if desired_mode not in (HVACMode.COOL, HVACMode.HEAT) or error <= 0.15:
+            self._smart_unmet_since = 0.0
+            self._smart_unmet_minutes = 0.0
+            self._smart_stall_boost = 0.0
+            return 0.0
+        if self._smart_unmet_since <= 0 or moving_toward_target:
+            self._smart_unmet_since = now
+        self._smart_unmet_minutes = max(0.0, (now - self._smart_unmet_since) / 60)
+        curve = self._profile_work_curve(self._active_preset())
+        first_stage, second_stage = {
+            PRESET_WORK_CURVE_GENTLE: (90, 180),
+            PRESET_WORK_CURVE_BALANCED: (45, 90),
+            PRESET_WORK_CURVE_RAPID: (20, 45),
+        }[curve]
+        self._smart_stall_boost = (
+            1.2
+            if self._smart_unmet_minutes >= second_stage
+            else 0.6
+            if self._smart_unmet_minutes >= first_stage
+            else 0.0
+        )
+        return self._smart_stall_boost
 
     def _record_smart_temperature(self, current: float) -> float | None:
         """Track a short rolling trend used to damp profile decisions.
@@ -492,15 +543,16 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         current: float,
         target: float,
         deadband: float,
+        demand_boost: float = 0.0,
     ) -> str:
         configured = self._normalize_preset_fan(preset.get(CONF_PRESET_FAN))
         if configured != PRESET_FAN_SMART:
             return configured
         curve = self._profile_work_curve(preset)
         if desired_mode == HVACMode.COOL:
-            return self._smart_fan_for_demand(current - target, deadband, curve)
+            return self._smart_fan_for_demand(current - target + demand_boost, deadband, curve)
         if desired_mode == HVACMode.HEAT:
-            return self._smart_fan_for_demand(target - current, deadband, curve)
+            return self._smart_fan_for_demand(target - current + demand_boost, deadband, curve)
         return "Bassa"
 
     def _smart_dred_for_profile(
@@ -510,6 +562,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         current: float,
         target: float,
         deadband: float,
+        demand_boost: float = 0.0,
     ) -> str | None:
         """Choose I-Demand from thermal demand while preserving comfort."""
         configured = PRESET_DRED_ALIASES.get(
@@ -522,7 +575,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         # D1 disables the compressor, so Smart must never request it while
         # cooling is needed. High thermal demand runs without I-Demand;
         # D3/D2 are introduced only as the room approaches its target.
-        demand = current - target
+        demand = current - target + demand_boost
         humidity = self.current_humidity
         humidity_limit = preset.get(CONF_PRESET_HUMIDITY)
         humidity_pressure = (
@@ -532,7 +585,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         full_power_at, reduced_at = {
             PRESET_WORK_CURVE_GENTLE: (2.2, 1.3),
             PRESET_WORK_CURVE_BALANCED: (1.5, 0.8),
-            PRESET_WORK_CURVE_RAPID: (0.9, 0.4),
+            PRESET_WORK_CURVE_RAPID: (0.5, 0.2),
         }[curve]
         if demand >= full_power_at or humidity_pressure:
             return "Off"
@@ -687,7 +740,10 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             self.async_write_ha_state()
             return
 
-        dred = self._smart_dred_for_profile(preset, desired_mode, current, target, deadband)
+        demand_boost = self._smart_stall_demand_boost(desired_mode, current, target, trend)
+        dred = self._smart_dred_for_profile(
+            preset, desired_mode, current, target, deadband, demand_boost
+        )
         self._smart_dred_level = dred
 
         if desired_mode is None:
@@ -741,7 +797,9 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                 finally:
                     self._preset_action_lock = False
         else:
-            fan = self._smart_fan_for_profile(preset, desired_mode, current, target, deadband)
+            fan = self._smart_fan_for_profile(
+                preset, desired_mode, current, target, deadband, demand_boost
+            )
             self._smart_fan_speed = fan
             self._smart_last_action = f"request_{desired_mode.value}"
             if can_command:

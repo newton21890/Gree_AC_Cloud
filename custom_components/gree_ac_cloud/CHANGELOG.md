@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.1
+
+### Recupero automatico delle richieste termiche in stallo
+
+- Corretto il calcolo della ventola Smart: il margine di riaccensione non viene più sottratto dalla distanza dal target mentre l'unità è già attiva. Il margine resta esclusivamente un'isteresi di riavvio.
+- Con curva Rapida, una distanza di circa 0,6 °C dal target richiede ora almeno ventola Media invece di Bassa.
+- Aggiunto un rilevatore di richiesta insoddisfatta: se la temperatura non procede verso il target, la capacità viene aumentata progressivamente in base alla curva selezionata.
+- L'aumento anti-stallo agisce congiuntamente su ventola Smart e I-Demand Smart, rimuovendo gradualmente le limitazioni energetiche fino al recupero dell'andamento corretto.
+- Esposti gli attributi diagnostici `smart_unmet_minutes` e `smart_stall_boost` per rendere verificabile l'intervento del regolatore.
+
 ## 0.13.0
 
 ### Curve di lavoro dei profili

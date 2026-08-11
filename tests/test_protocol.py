@@ -237,6 +237,11 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "CONF_PRESET_WORK_CURVE" in climate_source
     assert "PRESET_WORK_CURVE_RAPID" in climate_source
     assert "thresholds =" in climate_source
+    assert "demand = max(0.0, error)" in climate_source
+    assert "Subtracting it from" in climate_source
+    assert "_smart_stall_demand_boost" in climate_source
+    assert "smart_unmet_minutes" in climate_source
+    assert "demand_boost" in climate_source
     assert "full_power_at, reduced_at" in climate_source
     assert '"smart_work_curve"' in climate_source
     assert '"smart_work_curve",' in (COMPONENT / "panel.py").read_text()

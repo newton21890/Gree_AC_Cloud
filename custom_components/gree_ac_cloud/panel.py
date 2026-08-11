@@ -374,6 +374,8 @@ class GreePanelDataView(HomeAssistantView):
                         "smart_effective_target",
                         "smart_temperature_trend_c_per_hour",
                         "smart_temperature_trend_samples",
+                        "smart_unmet_minutes",
+                        "smart_stall_boost",
                     ):
                         state[key] = climate_state.attributes.get(key)
                 state["EstimatedBaselinePowerW"] = state.get("estimated_baseline_power_w")
