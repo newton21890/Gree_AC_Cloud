@@ -29,6 +29,7 @@ from .const import (
     CONF_PRESET_QUIET,
     CONF_PRESET_SMART,
     CONF_PRESET_TARGET,
+    CONF_PRESET_WORK_CURVE,
     CONF_PRESETS,
     CONF_SERVER,
     CONF_TEMPERATURE_SENSOR,
@@ -42,6 +43,8 @@ from .const import (
     PRESET_HOLD_OFF,
     PRESET_HOLD_OPTIONS,
     PRESET_NIGHT,
+    PRESET_WORK_CURVE_BALANCED,
+    PRESET_WORK_CURVE_OPTIONS,
     SMART_MODES,
 )
 from .gree_api import api_login
@@ -265,6 +268,10 @@ class GreeACCloudOptionsFlow(config_entries.OptionsFlow):
                     CONF_PRESET_ADAPTIVE,
                     default=defaults.get(CONF_PRESET_ADAPTIVE, True),
                 ): bool,
+                vol.Required(
+                    CONF_PRESET_WORK_CURVE,
+                    default=defaults.get(CONF_PRESET_WORK_CURVE, PRESET_WORK_CURVE_BALANCED),
+                ): vol.In(PRESET_WORK_CURVE_OPTIONS),
                 vol.Required(
                     CONF_PRESET_FAN,
                     default=defaults.get(CONF_PRESET_FAN, "Smart"),

@@ -234,6 +234,12 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "SMART_COMMAND_COOLDOWN_SECONDS" in climate_source
     assert "smart_effective_target" in climate_source
     assert "_smart_fan_for_demand" in climate_source
+    assert "CONF_PRESET_WORK_CURVE" in climate_source
+    assert "PRESET_WORK_CURVE_RAPID" in climate_source
+    assert "thresholds =" in climate_source
+    assert "full_power_at, reduced_at" in climate_source
+    assert '"smart_work_curve"' in climate_source
+    assert '"smart_work_curve",' in (COMPONENT / "panel.py").read_text()
     assert "_temperature_hysteresis_mode" in climate_source
     assert "CONF_PRESET_ALLOWED_MODES" in climate_source
     assert "mode_names.get(desired_mode) not in allowed_modes" in climate_source
@@ -374,6 +380,10 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "Solo ventola" in profiles_source
     assert "Cool + D1" in profiles_source
     assert "CONF_PRESET_HOLD_ACTION" in profile_api_source
+    assert "PRESET_WORK_CURVE_OPTIONS" in profile_api_source
+    assert "invalid work curve" in profile_api_source
+    assert "pe-work-curve" in profiles_source
+    assert "work_curve:document.getElementById('pe-work-curve').value" in profiles_source
     assert "È isteresi di riavvio, non tolleranza" in profiles_source
     assert "ogni due minuti e a ogni variazione" in profiles_source
     assert "smart_temperature_trend_c_per_hour" in profiles_source

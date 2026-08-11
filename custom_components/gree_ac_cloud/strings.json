@@ -63,7 +63,8 @@
           "min_temperature": "Minimum room temperature",
           "max_temperature": "Maximum room temperature",
           "dred": "I-Demand level while cooling",
-          "hold_action": "Action when comfort is reached"
+          "hold_action": "Action when comfort is reached",
+          "work_curve": "Work curve (Gentle, Balanced or Rapid)"
         }
       },
       "night": {
@@ -84,7 +85,8 @@
           "min_temperature": "Minimum room temperature",
           "max_temperature": "Maximum room temperature",
           "dred": "I-Demand level while cooling",
-          "hold_action": "Action when comfort is reached"
+          "hold_action": "Action when comfort is reached",
+          "work_curve": "Work curve (Gentle, Balanced or Rapid)"
         }
       },
       "away": {
@@ -105,7 +107,8 @@
           "min_temperature": "Minimum room temperature",
           "max_temperature": "Maximum room temperature",
           "dred": "I-Demand level while cooling",
-          "hold_action": "Action when comfort is reached"
+          "hold_action": "Action when comfort is reached",
+          "work_curve": "Work curve (Gentle, Balanced or Rapid)"
         }
       }
     },

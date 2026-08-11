@@ -366,6 +366,7 @@ class GreePanelDataView(HomeAssistantView):
                         "smart_manual_power_override",
                         "smart_last_action",
                         "smart_fan_speed",
+                        "smart_work_curve",
                         "smart_dred_level",
                         "smart_dred_applied",
                         "smart_dred_verified",

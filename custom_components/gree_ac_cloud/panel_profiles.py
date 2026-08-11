@@ -24,6 +24,7 @@ from .const import (
     CONF_PRESET_QUIET,
     CONF_PRESET_SMART,
     CONF_PRESET_TARGET,
+    CONF_PRESET_WORK_CURVE,
     CONF_PRESETS,
     DOMAIN,
     PRESET_DRED_ALIASES,
@@ -33,6 +34,8 @@ from .const import (
     PRESET_HOLD_OFF,
     PRESET_HOLD_OPTIONS,
     PRESET_NAMES,
+    PRESET_WORK_CURVE_BALANCED,
+    PRESET_WORK_CURVE_OPTIONS,
     SMART_MODES,
 )
 
@@ -98,6 +101,12 @@ def _clean_profile(profile: dict, current: dict) -> dict:
     )
     if hold_action not in PRESET_HOLD_OPTIONS:
         raise ValueError("invalid comfort hold action")
+    work_curve = profile.get(
+        CONF_PRESET_WORK_CURVE,
+        current.get(CONF_PRESET_WORK_CURVE, PRESET_WORK_CURVE_BALANCED),
+    )
+    if work_curve not in PRESET_WORK_CURVE_OPTIONS:
+        raise ValueError("invalid work curve")
 
     cleaned.update(
         {
@@ -114,6 +123,7 @@ def _clean_profile(profile: dict, current: dict) -> dict:
             CONF_PRESET_QUIET: bool(profile.get(CONF_PRESET_QUIET, False)),
             CONF_PRESET_DRED: dred,
             CONF_PRESET_HOLD_ACTION: hold_action,
+            CONF_PRESET_WORK_CURVE: work_curve,
         }
     )
     limits = {

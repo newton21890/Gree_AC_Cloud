@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.0
+
+### Curve di lavoro dei profili
+
+- Aggiunta a ogni profilo la scelta della curva di avvicinamento al target: **Graduale**, **Bilanciata** o **Rapida**.
+- La curva modula realmente le soglie della ventola Smart sia in raffrescamento sia in riscaldamento: Rapida anticipa le portate elevate, Graduale le introduce solo con una distanza maggiore dal target.
+- In raffrescamento con I-Demand Smart, la curva controlla anche quanto a lungo mantenere piena capacità prima di passare progressivamente a D3 e D2.
+- Aggiunti configurazione e validazione sia nell'editor Profili del pannello sia nelle opzioni native Home Assistant.
+- I profili esistenti senza una curva salvata continuano a funzionare come prima usando automaticamente **Bilanciata**.
+- Esposto l'attributo diagnostico `smart_work_curve` sull'entità climate attiva.
+
 ## 0.12.1
 
 ### Leggibilità dei valori esterni

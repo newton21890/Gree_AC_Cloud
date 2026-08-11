@@ -43,6 +43,7 @@ from .const import (
     CONF_PRESET_QUIET,
     CONF_PRESET_SMART,
     CONF_PRESET_TARGET,
+    CONF_PRESET_WORK_CURVE,
     CONF_PRESETS,
     CONF_PROFILE_CONTROL_ENABLED,
     CONF_TEMPERATURE_SENSOR,
@@ -63,6 +64,9 @@ from .const import (
     PRESET_HOLD_OFF,
     PRESET_MANUAL,
     PRESET_NAMES,
+    PRESET_WORK_CURVE_BALANCED,
+    PRESET_WORK_CURVE_GENTLE,
+    PRESET_WORK_CURVE_RAPID,
     SMART_COMMAND_COOLDOWN_SECONDS,
     SMART_MODE_AUTO,
     SMART_MODE_COOL,
@@ -290,6 +294,9 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             "smart_effective_target": self._smart_effective_target,
             "smart_last_action": self._smart_last_action,
             "smart_fan_speed": self._smart_fan_speed,
+            "smart_work_curve": self._profile_work_curve(self._active_preset())
+            if self._preset_mode and self._preset_mode != PRESET_MANUAL
+            else None,
             "smart_dred_level": self._smart_dred_level,
             "smart_dred_applied": self._effective_dred_label,
             "smart_dred_verified": (
@@ -362,16 +369,38 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         return PRESET_FAN_ALIASES.get(fan, fan or PRESET_FAN_SMART)
 
     @staticmethod
-    def _smart_fan_for_demand(error: float, deadband: float) -> str:
-        """Choose a quiet but responsive fan speed from room demand."""
+    def _profile_work_curve(preset: dict) -> str:
+        """Return a supported approach curve, including legacy profiles."""
+        curve = preset.get(CONF_PRESET_WORK_CURVE, PRESET_WORK_CURVE_BALANCED)
+        return (
+            curve
+            if curve
+            in (
+                PRESET_WORK_CURVE_GENTLE,
+                PRESET_WORK_CURVE_BALANCED,
+                PRESET_WORK_CURVE_RAPID,
+            )
+            else PRESET_WORK_CURVE_BALANCED
+        )
+
+    @staticmethod
+    def _smart_fan_for_demand(
+        error: float, deadband: float, curve: str = PRESET_WORK_CURVE_BALANCED
+    ) -> str:
+        """Map thermal demand to airflow according to the approach curve."""
         demand = max(0.0, error - deadband)
-        if demand >= 3.0:
+        thresholds = {
+            PRESET_WORK_CURVE_GENTLE: (4.0, 3.0, 2.0, 1.0),
+            PRESET_WORK_CURVE_BALANCED: (3.0, 2.0, 1.2, 0.6),
+            PRESET_WORK_CURVE_RAPID: (2.0, 1.2, 0.6, 0.2),
+        }.get(curve, (3.0, 2.0, 1.2, 0.6))
+        if demand >= thresholds[0]:
             return "Alta"
-        if demand >= 2.0:
+        if demand >= thresholds[1]:
             return "Media-Alta"
-        if demand >= 1.2:
+        if demand >= thresholds[2]:
             return "Media"
-        if demand >= 0.6:
+        if demand >= thresholds[3]:
             return "Media-Bassa"
         return "Bassa"
 
@@ -467,10 +496,11 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         configured = self._normalize_preset_fan(preset.get(CONF_PRESET_FAN))
         if configured != PRESET_FAN_SMART:
             return configured
+        curve = self._profile_work_curve(preset)
         if desired_mode == HVACMode.COOL:
-            return self._smart_fan_for_demand(current - target, deadband)
+            return self._smart_fan_for_demand(current - target, deadband, curve)
         if desired_mode == HVACMode.HEAT:
-            return self._smart_fan_for_demand(target - current, deadband)
+            return self._smart_fan_for_demand(target - current, deadband, curve)
         return "Bassa"
 
     def _smart_dred_for_profile(
@@ -498,9 +528,15 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         humidity_pressure = (
             humidity is not None and humidity_limit is not None and humidity > float(humidity_limit)
         )
-        if demand >= 1.5 or humidity_pressure:
+        curve = self._profile_work_curve(preset)
+        full_power_at, reduced_at = {
+            PRESET_WORK_CURVE_GENTLE: (2.2, 1.3),
+            PRESET_WORK_CURVE_BALANCED: (1.5, 0.8),
+            PRESET_WORK_CURVE_RAPID: (0.9, 0.4),
+        }[curve]
+        if demand >= full_power_at or humidity_pressure:
             return "Off"
-        if demand >= 0.8:
+        if demand >= reduced_at:
             return "D3"
         return "D2"
 

@@ -63,7 +63,8 @@
           "min_temperature": "Temperatura ambiente minima",
           "max_temperature": "Temperatura ambiente massima",
           "dred": "I-Demand durante il raffrescamento",
-          "hold_action": "Azione al raggiungimento del comfort"
+          "hold_action": "Azione al raggiungimento del comfort",
+          "work_curve": "Curva di lavoro (Graduale, Bilanciata o Rapida)"
         }
       },
       "night": {
@@ -84,7 +85,8 @@
           "min_temperature": "Temperatura ambiente minima",
           "max_temperature": "Temperatura ambiente massima",
           "dred": "I-Demand durante il raffrescamento",
-          "hold_action": "Azione al raggiungimento del comfort"
+          "hold_action": "Azione al raggiungimento del comfort",
+          "work_curve": "Curva di lavoro (Graduale, Bilanciata o Rapida)"
         }
       },
       "away": {
@@ -105,7 +107,8 @@
           "min_temperature": "Temperatura ambiente minima",
           "max_temperature": "Temperatura ambiente massima",
           "dred": "I-Demand durante il raffrescamento",
-          "hold_action": "Azione al raggiungimento del comfort"
+          "hold_action": "Azione al raggiungimento del comfort",
+          "work_curve": "Curva di lavoro (Graduale, Bilanciata o Rapida)"
         }
       }
     },
