@@ -194,6 +194,18 @@ def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
     assert "toggleNativeSensor" in panel_source
 
 
+def test_manual_fan_override_and_turbo_are_exposed() -> None:
+    climate_source = (COMPONENT / "climate.py").read_text()
+    panel_source = (COMPONENT / "panel.py").read_text()
+    assert "self._smart_manual_fan" in climate_source
+    assert "smart_manual_fan_override" in climate_source
+    assert "if self._smart_manual_fan in FAN_MAP_REV" in climate_source
+    assert "ClimateEntityId" in panel_source
+    assert "/api/services/climate/set_fan_mode" in panel_source
+    assert "🚀 TURBO" in panel_source
+    assert "toggleSwitch('${safeMac}','Tur')" in panel_source
+
+
 def test_gree_mode_mapping_matches_wire_protocol() -> None:
     const_source = (COMPONENT / "const.py").read_text()
     coordinator_source = (COMPONENT / "coordinator.py").read_text()

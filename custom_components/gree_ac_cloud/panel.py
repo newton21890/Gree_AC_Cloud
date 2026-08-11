@@ -3036,6 +3036,12 @@ function renderOperationsDevice(d) {
         <div class="ops-modes">
           ${[0,1,2,3,4].map(value => `<button class="btn mode-${modeClasses[value]} ${mod === value && pow ? 'active' : ''}" onclick="setMode('${safeMac}',${value})" title="${modeNames[value]}"><span style="display:block;font-size:15px">${modeIcons[value]}</span>${modeShort[value]}</button>`).join('')}
         </div>
+        <div class="ops-section-label" style="margin-top:12px">Ventilazione e potenza</div>
+        <div class="btn-group">
+          ${[0,1,2,3,4,5].map(value => `<button class="btn ${Number(s.WdSpd) === value ? 'active' : ''}" onclick="setFan('${safeMac}',${value})">${fanLabels[value]}</button>`).join('')}
+          ${s.Tur !== undefined ? `<button class="btn ${Number(s.Tur) === 1 ? 'active' : ''}" onclick="toggleSwitch('${safeMac}','Tur')">🚀 TURBO</button>` : ''}
+        </div>
+        ${s.smart_manual_fan_override ? `<div class="state-line">Override manuale ventola: ${escHtml(s.smart_manual_fan_override)} · resta attivo finché non selezioni un altro profilo</div>` : ''}
         <div class="ops-section-label" style="margin-top:12px">Profili ambiente</div>
         <div class="ops-presets"><button class="btn ${activePreset === 'manual' || !profileEnabled ? 'active' : ''}" onclick="setPreset('${safeMac}','manual')">MANUALE</button>${enabledPresets.map(([name]) => `<button class="btn ${activePreset === name ? 'active' : ''}" onclick="setPreset('${safeMac}','${escHtml(name)}')">${presetLabels[name] || escHtml(name).toUpperCase()}</button>`).join('')}</div>
         <div class="ops-alerts">${alerts}</div>
@@ -3213,7 +3219,22 @@ async function setTemp(mac, delta) {
 }
 
 async function setFan(mac, val) {
-  await sendCommand(mac, ['WdSpd'], [val]);
+  const fanModes = ['Auto','Bassa','Media-Bassa','Media','Media-Alta','Alta'];
+  if (!Number.isInteger(val) || val < 0 || val >= fanModes.length) return;
+  try {
+    const devices = await apiFetch(PANEL_DATA_URL);
+    const device = devices.find(item => item.mac === mac);
+    const entityId = device && device.state && device.state.ClimateEntityId;
+    if (!entityId) throw new Error('Entità climate non trovata');
+    await apiFetch(HA_BASE + '/api/services/climate/set_fan_mode', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ entity_id: entityId, fan_mode: fanModes[val] }),
+    });
+  } catch (error) {
+    console.error('Fan command failed:', error);
+    alert('Velocità ventola non applicata: ' + error.message);
+  }
   setTimeout(loadData, 1000);
 }
 

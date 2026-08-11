@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.7
+
+### Override manuale ventola e Turbo visibile
+
+- La velocità ventola impostata manualmente tramite l'entità climate o il pannello viene mantenuta anche con un profilo Smart attivo, invece di essere ricalcolata e riportata automaticamente a Media/Bassa.
+- L'override manuale resta valido fino al cambio di profilo; selezionando nuovamente un profilo, la ventola torna alla gestione configurata (Smart o velocità fissa).
+- I pulsanti ventola del pannello ora usano il servizio Home Assistant `climate.set_fan_mode`, così l'override viene registrato correttamente dall'integrazione.
+- Aggiunto un pulsante **🚀 TURBO** direttamente nella sezione principale “Ventilazione e potenza”; resta disponibile anche lo switch Home Assistant `Turbo Mode` e il comando nei controlli avanzati.
+
 ## 0.13.6
 
 ### InTem sempre disponibile e correzione sonde IDU/ODU

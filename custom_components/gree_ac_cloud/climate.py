@@ -114,6 +114,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         self._smart_manual_power: bool | None = None
         self._smart_manual_override_explicit = False
         self._smart_fan_speed: str | None = None
+        self._smart_manual_fan: str | None = None
         self._smart_dred_level: str | None = None
         self._smart_samples: deque[tuple[float, float]] = deque(maxlen=180)
         self._smart_temperature_trend: float | None = None
@@ -313,6 +314,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             "smart_effective_target": self._smart_effective_target,
             "smart_last_action": self._smart_last_action,
             "smart_fan_speed": self._smart_fan_speed,
+            "smart_manual_fan_override": self._smart_manual_fan,
             "smart_work_curve": self._profile_work_curve(self._active_preset())
             if self._preset_mode and self._preset_mode != PRESET_MANUAL
             else None,
@@ -364,6 +366,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         self._preset_mode = preset_mode
         self._smart_manual_power = None
         self._smart_manual_override_explicit = False
+        self._smart_manual_fan = None
         self._smart_holding = False
         if preset_mode == PRESET_MANUAL:
             self._smart_effective_target = None
@@ -561,6 +564,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         deadband: float,
         demand_boost: float = 0.0,
     ) -> str:
+        if self._smart_manual_fan in FAN_MAP_REV:
+            return self._smart_manual_fan
         configured = self._normalize_preset_fan(preset.get(CONF_PRESET_FAN))
         if configured != PRESET_FAN_SMART:
             return configured
@@ -991,11 +996,16 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         return FAN_MAP.get(speed, FAN_AUTO)
 
     async def async_set_fan_mode(self, fan_mode: str):
-        speed = FAN_MAP_REV.get(fan_mode, 0)
+        if fan_mode not in FAN_MAP_REV:
+            raise ValueError(f"Unsupported fan mode: {fan_mode}")
+        speed = FAN_MAP_REV[fan_mode]
         mqtt = self.coordinator._mqtt
         if await mqtt.send_command(self._device.mac, ["WdSpd"], [speed]):
             self._device.properties["WdSpd"] = speed
+            self._smart_manual_fan = fan_mode if self._smart_profile_enabled else None
+            self._smart_fan_speed = fan_mode if self._smart_profile_enabled else None
             self._sync_data()
+            self.async_write_ha_state()
 
     # ── swing ─────────────────────────────────────────
 
