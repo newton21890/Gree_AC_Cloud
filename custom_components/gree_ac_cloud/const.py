@@ -203,6 +203,7 @@ FAN_MAP = {
     3: "Media",
     4: "Media-Alta",
     5: "Alta",
+    6: "Turbo",
 }
 
 FAN_MAP_REV = {v: k for k, v in FAN_MAP.items()}

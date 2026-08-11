@@ -33,16 +33,33 @@ class GreeSwitch(GreeDeviceEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         mqtt = self.coordinator._mqtt
-        if await mqtt.send_command(self.coordinator.device.mac, [self._key], [1]):
-            self.coordinator.device.properties[self._key] = 1
-            self.coordinator.async_set_updated_data(
-                dict(self.coordinator.device.properties)
-            )
+        options = [self._key]
+        values = [1]
+        if self._key == "Tur":
+            # U-Match controllers enter Turbo with fan protocol value 6.  Tur=1
+            # alone may be echoed by the cloud without changing the wired
+            # controller display or actual airflow.
+            options = ["Tur", "WdSpd"]
+            values = [1, 6]
+            if "Quiet" in self.coordinator.data:
+                options.append("Quiet")
+                values.append(0)
+            if self.coordinator.data.get("DREDEn") == 1:
+                options.append("DRED")
+                values.append(0)
+        if await mqtt.send_command(self.coordinator.device.mac, options, values):
+            for option, value in zip(options, values):
+                self.coordinator.device.properties[option] = value
+            self.coordinator.async_set_updated_data(dict(self.coordinator.device.properties))
 
     async def async_turn_off(self, **kwargs):
         mqtt = self.coordinator._mqtt
-        if await mqtt.send_command(self.coordinator.device.mac, [self._key], [0]):
-            self.coordinator.device.properties[self._key] = 0
-            self.coordinator.async_set_updated_data(
-                dict(self.coordinator.device.properties)
-            )
+        options = [self._key]
+        values = [0]
+        if self._key == "Tur":
+            options = ["Tur", "WdSpd"]
+            values = [0, 5]
+        if await mqtt.send_command(self.coordinator.device.mac, options, values):
+            for option, value in zip(options, values):
+                self.coordinator.device.properties[option] = value
+            self.coordinator.async_set_updated_data(dict(self.coordinator.device.properties))

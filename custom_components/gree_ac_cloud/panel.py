@@ -2743,7 +2743,8 @@ function renderDevice(d) {
     'Media-Bassa: leggermente più potente',
     'Media: ventilazione media, bilanciato',
     'Media-Alta: ventilazione sostenuta',
-    'Alta: massima potenza ventilazione'
+    'Alta: massima velocità ordinaria',
+    'Turbo: massima portata, WdSpd=6 e Tur=1'
   ];
   const modeName = modeLabels[Number(mod)] || 'Sconosciuta';
   const activePreset = s.ActivePreset || null;
@@ -2978,7 +2979,7 @@ function renderOperationsDevice(d) {
     override === true ? '<span class="ops-alert">Override manuale: acceso</span>' : '',
     s.smart_dred_level ? `<span class="ops-alert ${s.smart_dred_verified === false ? '' : 'manual'}">I-Demand Smart: ${escHtml(s.smart_dred_level)} · applicato ${escHtml(s.smart_dred_applied || '?')}${s.smart_dred_verified === false ? ' ⚠' : ' ✓'}</span>` : '',
   ].filter(Boolean).join('');
-  const fanLabels = ['Auto', 'Bassa', 'Medio-bassa', 'Media', 'Medio-alta', 'Alta'];
+  const fanLabels = ['Auto', 'Bassa', 'Medio-bassa', 'Media', 'Medio-alta', 'Alta', 'Turbo'];
 
   if (pow && modelKey && estPower > 0) {
     if (!_kwhTracker[d.mac]) _kwhTracker[d.mac] = { lastRender: Date.now(), kwh: 0 };
@@ -3039,7 +3040,7 @@ function renderOperationsDevice(d) {
         <div class="ops-section-label" style="margin-top:12px">Ventilazione e potenza</div>
         <div class="btn-group">
           ${[0,1,2,3,4,5].map(value => `<button class="btn ${Number(s.WdSpd) === value ? 'active' : ''}" onclick="setFan('${safeMac}',${value})">${fanLabels[value]}</button>`).join('')}
-          ${s.Tur !== undefined ? `<button class="btn ${Number(s.Tur) === 1 ? 'active' : ''}" onclick="toggleSwitch('${safeMac}','Tur')">🚀 TURBO</button>` : ''}
+          ${s.Tur !== undefined ? `<button class="btn ${Number(s.Tur) === 1 || Number(s.WdSpd) === 6 ? 'active' : ''}" onclick="setTurbo('${safeMac}',${Number(s.Tur) === 1 || Number(s.WdSpd) === 6 ? 0 : 1})">🚀 TURBO</button>` : ''}
         </div>
         ${s.smart_manual_fan_override ? `<div class="state-line">Override manuale ventola: ${escHtml(s.smart_manual_fan_override)} · resta attivo finché non selezioni un altro profilo</div>` : ''}
         <div class="ops-section-label" style="margin-top:12px">Profili ambiente</div>
@@ -3059,7 +3060,7 @@ function renderOperationsDevice(d) {
         <details class="ops-details"><summary>APRI CONTROLLI AVANZATI ↓</summary>
           <div class="control-row"><label>Ventilatore</label><div class="btn-group">${[0,1,2,3,4,5].map(value => `<button class="btn ${Number(s.WdSpd) === value ? 'active' : ''}" onclick="setFan('${safeMac}',${value})">${fanLabels[value]}</button>`).join('')}</div></div>
           <div class="control-row"><label>Oscillazione</label><div class="btn-group"><button class="btn ${!s.SwUpDn && !s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','off')">Off</button><button class="btn ${s.SwUpDn && !s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','v')">Verticale</button><button class="btn ${!s.SwUpDn && s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','h')">Orizzontale</button><button class="btn ${s.SwUpDn && s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','both')">Entrambi</button></div></div>
-          <div class="control-row"><label>Funzioni</label><div class="btn-group">${[['Quiet','Silenzioso'],['Tur','Turbo'],['Health','Purifica'],['Blo','X-Fan'],['SvSt','Eco'],['StHt','Strong Heat'],['StCold','Strong Cool'],['HtSp','Heat Support'],['Air','Aria'],['FreshAir','Aria fresca'],['AutoClean','Auto Clean'],['XFA','XFA']].filter(([key]) => s[key] !== undefined).map(([key,label]) => `<button class="btn ${s[key] ? 'active' : ''}" onclick="toggleSwitch('${safeMac}','${key}')">${label}</button>`).join('')}</div></div>
+          <div class="control-row"><label>Funzioni</label><div class="btn-group">${[['Quiet','Silenzioso'],['Health','Purifica'],['Blo','X-Fan'],['SvSt','Eco'],['StHt','Strong Heat'],['StCold','Strong Cool'],['HtSp','Heat Support'],['Air','Aria'],['FreshAir','Aria fresca'],['AutoClean','Auto Clean'],['XFA','XFA']].filter(([key]) => s[key] !== undefined).map(([key,label]) => `<button class="btn ${s[key] ? 'active' : ''}" onclick="toggleSwitch('${safeMac}','${key}')">${label}</button>`).join('')}${s.Tur !== undefined ? `<button class="btn ${Number(s.Tur) === 1 || Number(s.WdSpd) === 6 ? 'active' : ''}" onclick="setTurbo('${safeMac}',${Number(s.Tur) === 1 || Number(s.WdSpd) === 6 ? 0 : 1})">Turbo</button>` : ''}</div></div>
           ${s.DREDEn === 1 && s.DRED !== undefined ? `<div class="control-row"><label>I-Demand attuale</label><div class="btn-group">${[[0,'Off'],[1,'100%'],[2,'50%'],[3,'75%']].map(([value,label]) => `<button class="btn ${effectiveDred === value ? 'active' : ''}" onclick="setDred('${safeMac}',${value})">${label}</button>`).join('')}</div></div><div class="control-row"><label>All’avvio in Cool</label><div class="btn-group">${[['none','Nessuno'],['1','100%'],['2','50%'],['3','75%']].map(([value,label]) => `<button class="btn ${startupDred === value ? 'active' : ''}" onclick="setStartupDred('${safeMac}','${value}')">${label}</button>`).join('')}</div></div>` : ''}
           <div class="state-line">Codice errore: ${errorCode}${s.ErrType !== undefined ? ' · tipo ' + escHtml(String(s.ErrType)) : ''} · perdita refrigerante: ${Number(s.RefLeak || 0) ? 'ATTENZIONE' : 'OK'} · stato sistema: ${escHtml(String(s.MSysStatus ?? '--'))}</div>
           <div class="state-line">InTem: ${escHtml(String(s.InTem ?? '--'))} · OutTem: ${escHtml(String(s.OutTem ?? '--'))} · pulizia: ${escHtml(String(s.CleanState ?? '--'))} · filtro: ${escHtml(String(s.FClTime ?? '--'))}</div>
@@ -3219,7 +3220,7 @@ async function setTemp(mac, delta) {
 }
 
 async function setFan(mac, val) {
-  const fanModes = ['Auto','Bassa','Media-Bassa','Media','Media-Alta','Alta'];
+  const fanModes = ['Auto','Bassa','Media-Bassa','Media','Media-Alta','Alta','Turbo'];
   if (!Number.isInteger(val) || val < 0 || val >= fanModes.length) return;
   try {
     const devices = await apiFetch(PANEL_DATA_URL);
@@ -3236,6 +3237,25 @@ async function setFan(mac, val) {
     alert('Velocità ventola non applicata: ' + error.message);
   }
   setTimeout(loadData, 1000);
+}
+
+async function setTurbo(mac, enabled) {
+  try {
+    const devices = await apiFetch(PANEL_DATA_URL);
+    const device = devices.find(item => item.mac === mac);
+    const state = device && device.state;
+    const entityId = state && state.ClimateEntityId;
+    if (!state || !entityId) throw new Error('Entità climate non trovata');
+    if (enabled) {
+      await sendCommand(mac, ['Tur','WdSpd','Quiet','DRED'], [1,6,0,0]);
+    } else {
+      await sendCommand(mac, ['Tur','WdSpd'], [0,5]);
+    }
+  } catch (error) {
+    console.error('Turbo command failed:', error);
+    alert('Turbo non applicato: ' + error.message);
+  }
+  setTimeout(loadData, 1500);
 }
 
 async function setDred(mac, val) {

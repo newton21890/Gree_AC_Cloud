@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.8
+
+### Correzione comando Turbo U-Match
+
+- Verificato dal feedback del controller che il solo comando `Tur=1` può essere accettato dal cloud senza attivare realmente Turbo sul display cablato.
+- Turbo ora invia la combinazione U-Match `Tur=1` e `WdSpd=6`; disattiva inoltre `Quiet` e, quando supportato, rimuove il limite `DRED` impostandolo a `0`.
+- Aggiunto `WdSpd=6` come modalità ventola Home Assistant **Turbo**. Se si seleziona un'altra velocità mentre Turbo è attivo, viene inviato anche `Tur=0`.
+- Lo switch Home Assistant `Turbo Mode` e i pulsanti Turbo del pannello usano la stessa sequenza completa.
+- La disattivazione di Turbo riporta la ventola ad Alta (`WdSpd=5`).
+
 ## 0.13.7
 
 ### Override manuale ventola e Turbo visibile

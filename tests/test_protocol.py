@@ -203,7 +203,12 @@ def test_manual_fan_override_and_turbo_are_exposed() -> None:
     assert "ClimateEntityId" in panel_source
     assert "/api/services/climate/set_fan_mode" in panel_source
     assert "🚀 TURBO" in panel_source
-    assert "toggleSwitch('${safeMac}','Tur')" in panel_source
+    assert "setTurbo('${safeMac}'" in panel_source
+    assert "['Tur','WdSpd','Quiet','DRED']" in panel_source
+    assert '6: "Turbo"' in (COMPONENT / "const.py").read_text()
+    switch_source = (COMPONENT / "switch.py").read_text()
+    assert 'options = ["Tur", "WdSpd"]' in switch_source
+    assert "values = [1, 6]" in switch_source
 
 
 def test_gree_mode_mapping_matches_wire_protocol() -> None:

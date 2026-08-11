@@ -564,6 +564,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         deadband: float,
         demand_boost: float = 0.0,
     ) -> str:
+        if self.coordinator.data.get("Tur") == 1:
+            return "Turbo"
         if self._smart_manual_fan in FAN_MAP_REV:
             return self._smart_manual_fan
         configured = self._normalize_preset_fan(preset.get(CONF_PRESET_FAN))
@@ -999,9 +1001,24 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if fan_mode not in FAN_MAP_REV:
             raise ValueError(f"Unsupported fan mode: {fan_mode}")
         speed = FAN_MAP_REV[fan_mode]
+        options = ["WdSpd"]
+        values = [speed]
+        if fan_mode == "Turbo":
+            options = ["Tur", "WdSpd"]
+            values = [1, speed]
+            if "Quiet" in self.coordinator.data:
+                options.extend(["Quiet"])
+                values.extend([0])
+            if self.coordinator.data.get("DREDEn") == 1:
+                options.extend(["DRED"])
+                values.extend([0])
+        elif self.coordinator.data.get("Tur") == 1:
+            options = ["Tur", "WdSpd"]
+            values = [0, speed]
         mqtt = self.coordinator._mqtt
-        if await mqtt.send_command(self._device.mac, ["WdSpd"], [speed]):
-            self._device.properties["WdSpd"] = speed
+        if await mqtt.send_command(self._device.mac, options, values):
+            for option, value in zip(options, values):
+                self._device.properties[option] = value
             self._smart_manual_fan = fan_mode if self._smart_profile_enabled else None
             self._smart_fan_speed = fan_mode if self._smart_profile_enabled else None
             self._sync_data()
