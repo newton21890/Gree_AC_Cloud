@@ -76,9 +76,11 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
             return False
         raw = self.coordinator.data.get(self._key)
         if self._key == "TemSen":
-            return isinstance(raw, (int, float)) and raw != 0
+            enabled = self.coordinator.data.get("InTemEn")
+            return enabled == 1 and isinstance(raw, (int, float)) and raw != 0
         if self._key == "InHumi":
-            return isinstance(raw, (int, float)) and 0 < raw <= 100
+            enabled = self.coordinator.data.get("InHumiEn")
+            return enabled == 1 and isinstance(raw, (int, float)) and 0 < raw <= 100
         return raw is not None
 
     @property
@@ -107,8 +109,16 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
         if self._key == "TemSen":
             return {
                 "protocol_property": "TemSen",
+                "enable_property": "InTemEn",
+                "enable_value": self.coordinator.data.get("InTemEn"),
                 "source": "indoor-unit air sensor",
                 "encoding": "raw value minus 40 °C",
+            }
+        if self._key == "InHumi":
+            return {
+                "protocol_property": "InHumi",
+                "enable_property": "InHumiEn",
+                "enable_value": self.coordinator.data.get("InHumiEn"),
             }
         if self._key in ("InTem", "OutTem"):
             return {

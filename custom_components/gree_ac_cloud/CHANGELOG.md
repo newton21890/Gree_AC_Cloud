@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.4
+
+### Flag espliciti InTemEn e InHumiEn
+
+- La disponibilità della temperatura interna nativa viene ora subordinata esplicitamente a `InTemEn=1`; il valore associato letto resta `TemSen` con codifica `raw−40 °C`.
+- La disponibilità dell'umidità interna nativa viene subordinata esplicitamente a `InHumiEn=1`; il valore associato è `InHumi` nell'intervallo valido 1–100%.
+- Con `InTemEn=0` o `InHumiEn=0`, il relativo valore non viene utilizzato anche se il cloud continua a inviare le colonne `InTem`, `TemSen` o `InHumi`.
+- I valori grezzi dei due flag enable vengono esposti nell'entità climate, nel pannello e negli attributi delle entità sensore per una diagnosi non ambigua.
+- Sulle due unità U-Match verificate entrambi i flag sono `0`: le sonde ambiente native risultano quindi disabilitate; la regolazione usa correttamente i sensori Home Assistant associati.
+
 ## 0.13.3
 
 ### Validazione delle sonde ambiente Gree

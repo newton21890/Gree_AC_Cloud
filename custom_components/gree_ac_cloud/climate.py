@@ -265,7 +265,12 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if value is not None:
             return value
         raw = self.coordinator.data.get("TemSen")
-        if raw is None or not isinstance(raw, (int, float)) or raw == 0:
+        if (
+            self.coordinator.data.get("InTemEn") != 1
+            or raw is None
+            or not isinstance(raw, (int, float))
+            or raw == 0
+        ):
             return None
         return float(raw - 40)
 
@@ -280,12 +285,10 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             "humidity_sensors": self._external_humidity_entities,
             "temperature_average_sources": len(self._external_temperature_entities),
             "humidity_average_sources": len(self._external_humidity_entities),
-            "gree_indoor_temperature_sensor_enabled": self.coordinator.data.get("TemSen")
-            not in (None, 0),
-            "gree_indoor_humidity_sensor_enabled": isinstance(
-                self.coordinator.data.get("InHumi"), (int, float)
-            )
-            and 0 < self.coordinator.data.get("InHumi", 0) <= 100,
+            "gree_indoor_temperature_sensor_enabled": self.coordinator.data.get("InTemEn") == 1,
+            "gree_indoor_temperature_sensor_enable_raw": self.coordinator.data.get("InTemEn"),
+            "gree_indoor_humidity_sensor_enabled": self.coordinator.data.get("InHumiEn") == 1,
+            "gree_indoor_humidity_sensor_enable_raw": self.coordinator.data.get("InHumiEn"),
             "gree_indoor_probe_raw": self.coordinator.data.get("InTem"),
             "gree_outdoor_probe_raw": self.coordinator.data.get("OutTem"),
             "outdoor_temperature_sensor": self._outdoor_temperature_entity,

@@ -328,9 +328,17 @@ class GreePanelDataView(HomeAssistantView):
                 state["RoomHumiditySensors"] = humidity_ids
                 raw_tem_sen = state.get("TemSen")
                 raw_in_humi = state.get("InHumi")
-                state["TemSenEnabled"] = isinstance(raw_tem_sen, (int, float)) and raw_tem_sen != 0
+                state["InTemEnableRaw"] = state.get("InTemEn")
+                state["InHumiEnableRaw"] = state.get("InHumiEn")
+                state["TemSenEnabled"] = (
+                    state.get("InTemEn") == 1
+                    and isinstance(raw_tem_sen, (int, float))
+                    and raw_tem_sen != 0
+                )
                 state["InHumiEnabled"] = (
-                    isinstance(raw_in_humi, (int, float)) and 0 < raw_in_humi <= 100
+                    state.get("InHumiEn") == 1
+                    and isinstance(raw_in_humi, (int, float))
+                    and 0 < raw_in_humi <= 100
                 )
                 state["RoomTemperatureEnabled"] = state["RoomTemperature"] is not None
                 state["RoomHumidityEnabled"] = state["RoomHumidity"] is not None
