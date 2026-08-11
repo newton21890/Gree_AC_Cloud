@@ -203,12 +203,14 @@ FAN_MAP = {
 
 FAN_MAP_REV = {v: k for k, v in FAN_MAP.items()}
 
+# Gree protocol Mod values. These are wire-level values, not the order used by
+# Home Assistant's HVACMode enum. In particular, 2 is Dry and 4 is Heat.
 HVAC_MAP = {
     0: "auto",
     1: "cool",
-    2: "heat",
+    2: "dry",
     3: "fan_only",
-    4: "dry",
+    4: "heat",
 }
 HVAC_MAP_REV = {v: k for k, v in HVAC_MAP.items()}
 

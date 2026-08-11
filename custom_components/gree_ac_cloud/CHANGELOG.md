@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.2
+
+### Allineamento della modalità al protocollo Gree
+
+- Corretta la mappatura wire-level di `Mod`: `0=Auto`, `1=Cool`, `2=Dry`, `3=Fan`, `4=Heat`.
+- In precedenza i valori 2 e 4 erano invertiti: un comando Heat poteva quindi richiedere Dry e viceversa, mentre la lettura dello stato poteva mostrare la modalità errata.
+- Allineato anche il modello di potenza stimata: `Mod=4` usa ora il riferimento Heat e `Mod=2` il duty-cycle Dry.
+- Aggiunto un test di regressione esplicito sui cinque valori del protocollo per impedire future inversioni.
+- Confermate le mappature già corrette di `Pow`, `WdSpd`, `SetDeciTem`, swing, Quiet/Turbo e dei livelli I-Demand verificati sui controller U-Match.
+
 ## 0.13.1
 
 ### Recupero automatico delle richieste termiche in stallo

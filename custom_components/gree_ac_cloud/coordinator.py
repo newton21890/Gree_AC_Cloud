@@ -194,8 +194,8 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         mode = state.get("Mod")
         if mode == 3:
             return round(model["cool"] * 0.05 * 1000)
-        base = model["heat"] if mode == 2 else model["cool"]
-        duty_factor = 0.55 if mode == 4 else 0.70
+        base = model["heat"] if mode == 4 else model["cool"]
+        duty_factor = 0.55 if mode == 2 else 0.70
         if state.get("Tur"):
             duty_factor = min(1.0, duty_factor * 1.20)
         return round(min(base * duty_factor, model["max"]) * 1000)
@@ -234,9 +234,9 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         if dred == 1:
             return round(model["cool"] * 0.05 * 1000)
 
-        base = model["heat"] if mode == 2 else model["cool"]
+        base = model["heat"] if mode == 4 else model["cool"]
         duty_factor = 0.70
-        if mode == 4:
+        if mode == 2:
             duty_factor = 0.55
         if dred == 2:
             duty_factor = min(duty_factor, 0.50)

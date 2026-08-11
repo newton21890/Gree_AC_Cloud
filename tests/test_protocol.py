@@ -164,6 +164,18 @@ def _load_protocol_module():
     return module
 
 
+def test_gree_mode_mapping_matches_wire_protocol() -> None:
+    const_source = (COMPONENT / "const.py").read_text()
+    coordinator_source = (COMPONENT / "coordinator.py").read_text()
+    assert '0: "auto"' in const_source
+    assert '1: "cool"' in const_source
+    assert '2: "dry"' in const_source
+    assert '3: "fan_only"' in const_source
+    assert '4: "heat"' in const_source
+    assert 'model["heat"] if mode == 4' in coordinator_source
+    assert "if mode == 2:" in coordinator_source
+
+
 def test_dred_control_keeps_verified_protocol_mapping() -> None:
     const_source = (COMPONENT / "const.py").read_text()
     select_source = (COMPONENT / "select.py").read_text()
