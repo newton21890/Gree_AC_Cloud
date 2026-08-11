@@ -2,10 +2,17 @@ const PROFILE_NAMES = ['day','night','away'];
 const PROFILE_LABELS = {day:'Giorno',night:'Notte',away:'Assente'};
 const PROFILE_MODE_LABELS = {auto:'Auto profilo',cool:'Solo Cool',heat:'Solo Heat',dry:'Solo Dry'};
 const PROFILE_CURVE_LABELS = {gentle:'Graduale',balanced:'Bilanciata',rapid:'Rapida'};
+const PROFILE_MODE_ICONS = {
+  cool: '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h20M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="M4 8l4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>',
+  heat: '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>',
+  dry: '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>',
+};
 let _profileEditor = null;
 
 function profileModeChip(mode) {
-  return `<span class="profile-mode-chip">${{cool:'❄ Cool',heat:'☀ Heat',dry:'◇ Dry'}[mode] || escHtml(mode)}</span>`;
+  const icon = PROFILE_MODE_ICONS[mode] || '';
+  const label = mode === 'cool' || mode === 'heat' || mode === 'dry' ? ({cool:'Cool',heat:'Heat',dry:'Dry'})[mode] : escHtml(mode);
+  return `<span class="profile-mode-chip">${icon}${label}</span>`;
 }
 function renderProfilesPage(data) {
   const content = document.getElementById('profilesContent');

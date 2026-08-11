@@ -210,8 +210,8 @@ def test_manual_fan_override_and_turbo_are_exposed() -> None:
     assert "if self._smart_manual_fan in FAN_MAP_REV" in climate_source
     assert "ClimateEntityId" in panel_source
     assert "/api/services/climate/set_fan_mode" in panel_source
-    assert "🚀 TURBO" in panel_source
     assert "setTurbo('${safeMac}'" in panel_source
+    assert ">TURBO</button>" in panel_source
     assert "['Tur','WdSpd','Quiet','DRED']" in panel_source
     assert '6: "Turbo"' in (COMPONENT / "const.py").read_text()
     switch_source = (COMPONENT / "switch.py").read_text()

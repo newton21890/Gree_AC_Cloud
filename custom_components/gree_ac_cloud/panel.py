@@ -925,7 +925,7 @@ class GreePanelDevicesInfoView(HomeAssistantView):
 # ── Panel HTML ────────────────────────────────────────
 
 PANEL_HTML = r"""<!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -962,6 +962,13 @@ body {
   max-width: 100vw;
 }
 
+/* Keyboard focus must stay visible on the custom dark theme. */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* ── header ─────────────────────────────────── */
 .header {
   display: flex;
@@ -986,6 +993,7 @@ body {
   padding: 3px 10px;
   border-radius: 20px;
   background: var(--green);
+  color: #0b1515;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1020,7 +1028,7 @@ body.desktop .header-controls { margin: 6px 0 4px; }
   -webkit-tap-highlight-color: transparent;
 }
 .tab-btn:active { background: rgba(255,255,255,0.08); }
-.tab-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.tab-btn.active { background: var(--primary); border-color: var(--primary); color: #0b1515; }
 
 /* ── device cards ────────────────────────────── */
 .devices { display: grid; gap: 12px; }
@@ -1153,7 +1161,7 @@ body.desktop .header-row2 { padding-left: 0; }
   background: transparent;
   color: var(--text2);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   transition: all .15s;
   -webkit-tap-highlight-color: transparent;
@@ -1162,7 +1170,7 @@ body.desktop .header-row2 { padding-left: 0; }
 .btn.active {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: #0b1515;
   box-shadow: 0 0 10px var(--primary-glow);
 }
 .btn.danger.active { background: var(--red); border-color: var(--red); box-shadow: 0 0 10px rgba(239,83,80,0.3); }
@@ -1413,12 +1421,12 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-unit-layout { display:grid; grid-template-columns:240px minmax(410px,1fr) 265px; }
 .ops-reading,.ops-controls,.ops-telemetry { min-width:0; padding:16px; }
 .ops-reading,.ops-controls { border-right:1px solid var(--border); }
-.ops-reading-label,.ops-section-label { color:var(--text2); font-size:9px; letter-spacing:.09em; text-transform:uppercase; }
+.ops-reading-label,.ops-section-label { color:var(--text2); font-size:10px; letter-spacing:.09em; text-transform:uppercase; }
 .ops-room-temp { margin:15px 0 10px; font-size:45px; line-height:1; font-weight:700; letter-spacing:-.06em; }
 .ops-reading-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px; }
 .ops-mini { padding:10px; border:1px solid #202b3a; border-radius:8px; background:#0e151f; }
 .ops-mini b { display:block; font-size:14px; }
-.ops-mini span { color:var(--text2); font-size:9px; }
+.ops-mini span { color:var(--text2); font-size:10px; }
 .ops-power-row { display:flex; justify-content:space-between; align-items:center; min-height:38px; }
 .ops-state { color:var(--green); font-size:10px; font-weight:800; }
 .ops-power { width:42px; height:42px; display:grid; place-items:center; flex:0 0 42px; padding:0; border:1px solid #256978; border-radius:10px; background:#143942; color:var(--primary); cursor:pointer; }
@@ -1429,10 +1437,10 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .temp-control .temp-value { min-width:55px; font-size:24px; }
 .temp-control .temp-btn { width:34px; height:34px; border-color:var(--border); border-radius:8px; background:#151d29; }
 .ops-modes { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:5px; }
-.ops-modes .btn { min-height:47px; padding:5px 2px; border-color:var(--border); border-radius:8px; background:#151d29; color:#8490a1; font-size:9px; }
+.ops-modes .btn { min-height:47px; padding:5px 2px; border-color:var(--border); border-radius:8px; background:#151d29; color:#8490a1; font-size:10px; }
 .ops-modes .btn.active { color:#aef6ff; border-color:#28778a; background:#11353e; box-shadow:none; }
 .ops-presets { display:flex; gap:5px; margin-top:10px; }
-.ops-presets .btn { flex:1; min-height:32px; border-radius:7px; font-size:9px; }
+.ops-presets .btn { flex:1; min-height:32px; border-radius:7px; font-size:10px; }
 .ops-presets .btn.active { color:#10151c; border-color:var(--yellow); background:var(--yellow); box-shadow:none; }
 .ops-alerts { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0 0; }
 .ops-alert { padding:5px 8px; border-radius:7px; border:1px solid rgba(255,193,7,.4); background:rgba(255,193,7,.12); color:#ffd966; font-size:9px; font-weight:800; text-transform:uppercase; }
@@ -1440,7 +1448,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-chart { margin-top:12px; padding:10px; border:1px solid var(--border); border-radius:10px; background:#0b111a; }
 .ops-chart svg { width:100%; height:210px; display:block; overflow:visible; }
 .chart-panel.control-chart { margin-top:12px; padding:12px 10px 8px; }
-.chart-panel.control-chart svg { height:230px; }
+.chart-panel.control-chart:not(.apex-chart-panel) svg { height:230px; }
 .control-chart-loading .chart-empty { height:190px; }
 .ops-chart-legend { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; font-size:10px; color:#a7b3c5; }
 .ops-chart-legend span { display:inline-flex; align-items:center; gap:5px; }
@@ -1461,12 +1469,15 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .chart-panel { min-width:0; padding:14px 14px 10px; border:1px solid #202d40; border-radius:12px; background:#0b111a; }
 .chart-panel-header { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:6px; }
 .chart-panel-title { color:#eef6ff; font-size:12px; font-weight:800; letter-spacing:.02em; }
-.chart-panel-subtitle { display:block; margin-top:2px; color:#718097; font-size:9px; font-weight:500; }
+.chart-panel-subtitle { display:block; margin-top:2px; color:#718097; font-size:10px; font-weight:500; }
 .ops-chart-plot { position:relative; }
-.chart-panel svg { width:100%; height:clamp(280px,34vw,390px); display:block; touch-action:pan-y; }
-.chart-panel.humidity svg { height:clamp(280px,34vw,390px); }
+.chart-panel:not(.apex-chart-panel) svg { width:100%; height:clamp(280px,34vw,390px); display:block; touch-action:pan-y; }
+.chart-panel:not(.apex-chart-panel).humidity svg { height:clamp(280px,34vw,390px); }
 .apex-chart-panel { overflow:hidden; }
 .apex-chart-host { width:100%; min-height:230px; }
+.apex-chart-panel .apexcharts-canvas { width:100% !important; touch-action:pan-y; }
+.apex-chart-panel .apexcharts-svg { width:100% !important; }
+.chart-missing-note { margin-top:6px; padding:5px 8px; border-radius:6px; background:rgba(255,167,38,.06); border:1px dashed rgba(255,167,38,.35); color:#c9a35f; font-size:10px; line-height:1.5; }
 .apexcharts-canvas,.apexcharts-svg { background:transparent !important; }
 .apexcharts-tooltip,.apexcharts-xaxistooltip { border-color:#42536c !important; background:rgba(13,20,31,.97) !important; color:#eef6ff !important; box-shadow:0 8px 30px rgba(0,0,0,.45) !important; }
 .apexcharts-tooltip-title { border-bottom-color:#34445a !important; background:#151e2b !important; }
@@ -1491,11 +1502,11 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .chart-tooltip small { color:#96a5ba; }
 .chart-empty { display:grid; place-items:center; height:250px; color:#75849a; font-size:11px; }
 .chart-detail-card.expanded { position:fixed; inset:10px; z-index:1100; overflow:auto; background:#0d141f; box-shadow:0 20px 80px #000; }
-.chart-detail-card.expanded .chart-panel svg { height:calc(100vh - 275px); min-height:430px; }
+.chart-detail-card.expanded .chart-panel:not(.apex-chart-panel) svg { height:calc(100vh - 275px); min-height:430px; }
 .chart-expand { float:right; min-height:34px; padding:6px 11px; border:1px solid #33435a; border-radius:8px; background:#172131; color:var(--text); cursor:pointer; }
 .chart-expand:hover { border-color:#4f6685; background:#1c293b; }
 .chart-values { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; margin-top:14px; }
-.chart-values div { padding:7px; border-radius:7px; background:#0d131d; text-align:center; font-size:9px; color:var(--text2); }
+.chart-values div { padding:7px; border-radius:7px; background:#0d131d; text-align:center; font-size:10px; color:var(--text2); }
 .chart-values b { display:block; margin-top:2px; color:var(--text); font-size:12px; }
 .energy-section { margin-top:22px; padding-top:20px; border-top:1px solid #2a384b; }
 .energy-section-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:13px; }
@@ -1532,8 +1543,9 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .profile-badge { padding:3px 6px; border-radius:10px; background:#182437; color:#91a1b8; font-size:8px; font-weight:800; }
 .profile-card.active .profile-badge { background:#123943; color:#aef6ff; }
 .profile-mode-path { margin:10px 0; color:#dce8f7; font-size:11px; font-weight:700; }
-.profile-mode-chip { display:inline-block; margin:2px 2px 2px 0; padding:3px 6px; border:1px solid #33445d; border-radius:6px; color:#a8b7ca; font-size:8px; }
-.profile-rule { display:flex; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px solid #202b3c; color:#8493a8; font-size:9px; }
+.profile-mode-chip { display:inline-flex; align-items:center; gap:4px; margin:2px 2px 2px 0; padding:3px 7px; border:1px solid #33445d; border-radius:6px; color:#a8b7ca; font-size:9px; }
+.profile-mode-chip svg { flex-shrink:0; }
+.profile-rule { display:flex; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px solid #202b3c; color:#8493a8; font-size:10px; }
 .profile-rule b { color:#e2eaf5; text-align:right; }
 .profile-actions { display:flex; gap:6px; margin-top:10px; }
 .profile-actions button { flex:1; }
@@ -1576,7 +1588,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-details .control-row { display:grid; grid-template-columns:1fr; align-items:start; margin-top:10px; }
 .ops-details .control-row label { width:auto; }
 .ops-details .btn-group { max-width:none; }
-.ops-details .btn { font-size:9px; }
+.ops-details .btn { font-size:10px; }
 .server-info { margin:0; padding:8px 24px; border-top:1px solid var(--border); color:var(--text2); }
 .setup-msg { border:1px solid var(--border); border-radius:13px; background:#111722; }
 /* ── configuration dialog ────────────────────── */
@@ -1683,6 +1695,12 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .chart-panels { grid-template-columns:1fr; }
 }
 @media (max-width:720px) {
+  /* Touch targets: 40-44px minimo per i controlli principali su mobile. */
+  .btn { min-height:40px; }
+  .ops-presets .btn { min-height:40px; }
+  .temp-control button { width:44px; height:44px; }
+  .config-btn { min-height:42px; }
+  .interval-label select, .config-select { min-height:40px; }
   .config-modal { padding:0; }
   .config-dialog { min-height:100vh; margin:0; border:0; border-radius:0; }
   .config-body { padding:14px; }
@@ -1701,8 +1719,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .header .icon-ac { width:30px; height:30px; }
   .chart-detail-card { padding:13px 8px; border-radius:12px; }
   .chart-panel { padding:11px 4px 8px; }
-  .chart-panel svg,.chart-panel.humidity svg { height:auto; min-height:0; aspect-ratio:460 / 580; }
-  .chart-panel.control-chart svg { height:auto; aspect-ratio:460 / 300; }
+  .chart-panel:not(.apex-chart-panel) svg,.chart-panel:not(.apex-chart-panel).humidity svg { height:auto; min-height:0; aspect-ratio:460 / 580; }
+  .chart-panel:not(.apex-chart-panel).control-chart svg { height:auto; aspect-ratio:460 / 300; }
   .chart-panels { gap:12px; }
   .chart-axis-label { font-size:13px; }
   .chart-series { stroke-width:3; }
@@ -1747,9 +1765,9 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   .header h1 { font-size:13px; }
   .nav-label { font-size:13px; }
   .tab-btn { padding-inline:14px; }
-  .chart-panel svg,.chart-panel.humidity svg { height:auto; min-height:0; aspect-ratio:460 / 580; }
+  .chart-panel:not(.apex-chart-panel) svg,.chart-panel:not(.apex-chart-panel).humidity svg { height:auto; min-height:0; aspect-ratio:460 / 580; }
   .chart-detail-card.expanded { inset:0; border-radius:0; }
-  .chart-detail-card.expanded .chart-panel svg { height:65vh; min-height:430px; }
+  .chart-detail-card.expanded .chart-panel:not(.apex-chart-panel) svg { height:65vh; min-height:430px; }
   .ops-overview { grid-template-columns:1fr 1fr; }
   .ops-kpi b { font-size:18px; }
   .ops-page-head p { font-size:10px; }
@@ -1821,7 +1839,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
       <h2 style="margin:0 0 4px;font-size:18px;font-weight:500;">Parameter Reference</h2>
       <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">XE7A-24/HC wired controller parameters from the official manual. These are accessed <strong>directly on the physical wired controller</strong>, not from HA.</p>
 
-      <h3 style="color:var(--yellow);font-size:14px;">⚙ How to Access Settings</h3>
+      <h3 style="color:var(--yellow);font-size:14px;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>How to Access Settings</h3>
       <p style="color:var(--text-secondary);font-size:12px;margin-bottom:8px;">
       Per accedere alle impostazioni sul controller XE7A-24/HC:
       </p>
@@ -2838,7 +2856,7 @@ function renderDevice(d) {
 
     ${enabledPresets.length ? `<section class="control-section"><div class="section-title">Profili ambiente</div><div class="preset-quick">
       ${enabledPresets.map(([name]) => `<button class="btn ${activePreset === name ? 'active' : ''}" onclick="setPreset('${safeMac}','${name}')">${{day:'Giorno',night:'Notte',away:'Assente'}[name] || name}</button>`).join('')}
-    </div><div class="state-line">I profili applicano target, soglie e I-Demand configurati con ⚙.</div></section>` : `<section class="control-section"><div class="section-title">Profili ambiente</div><div class="state-line">Nessun profilo abilitato. Configurali dal pulsante ⚙ in alto.</div></section>`}
+    </div><div class="state-line">I profili applicano target, soglie e I-Demand configurati con <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>.</div></section>` : `<section class="control-section"><div class="section-title">Profili ambiente</div><div class="state-line">Nessun profilo abilitato. Configurali dal pulsante <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg> in alto.</div></section>`}
 
     <section class="control-section"><div class="section-title">Sonde native Gree</div>
     <div class="control-row">
@@ -2958,7 +2976,13 @@ function renderOperationsDevice(d) {
       ? _kwhTracker[d.mac].kwh.toFixed(2) : '0.00');
   const modeNames = ['Automatico', 'Raffrescamento', 'Riscaldamento', 'Ventilazione', 'Deumidificazione'];
   const modeShort = ['AUTO', 'FREDDO', 'CALDO', 'VENTOLA', 'DRY'];
-  const modeIcons = ['◎', '❄', '☀', '≋', '◇'];
+  const modeIcons = [
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>',
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h20M12 2v20"/><path d="m20 16-4-4 4-4"/><path d="M4 8l4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg>',
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>',
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.8 19.6A2 2 0 1 0 14 16H2"/><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"/><path d="M9.8 4.4A2 2 0 1 1 11 8H2"/></svg>',
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>',
+  ];
   const modeClasses = ['auto', 'cool', 'heat', 'fan', 'dry'];
   const modeName = modeNames[mod] || 'Sconosciuta';
   const activePreset = s.ActivePreset || null;
@@ -3035,12 +3059,12 @@ function renderOperationsDevice(d) {
         </div>
         <div class="ops-section-label" style="margin-bottom:7px">Modalità</div>
         <div class="ops-modes">
-          ${[0,1,2,3,4].map(value => `<button class="btn mode-${modeClasses[value]} ${mod === value && pow ? 'active' : ''}" onclick="setMode('${safeMac}',${value})" title="${modeNames[value]}"><span style="display:block;font-size:15px">${modeIcons[value]}</span>${modeShort[value]}</button>`).join('')}
+          ${[0,1,2,3,4].map(value => `<button class="btn mode-${modeClasses[value]} ${mod === value && pow ? 'active' : ''}" onclick="setMode('${safeMac}',${value})" title="${modeNames[value]}"><span style="display:block;line-height:0;margin-bottom:3px">${modeIcons[value]}</span>${modeShort[value]}</button>`).join('')}
         </div>
         <div class="ops-section-label" style="margin-top:12px">Ventilazione e potenza</div>
         <div class="btn-group">
           ${[0,1,2,3,4,5].map(value => `<button class="btn ${Number(s.WdSpd) === value ? 'active' : ''}" onclick="setFan('${safeMac}',${value})">${fanLabels[value]}</button>`).join('')}
-          ${s.Tur !== undefined ? `<button class="btn ${Number(s.Tur) === 1 || Number(s.WdSpd) === 6 ? 'active' : ''}" onclick="setTurbo('${safeMac}',${Number(s.Tur) === 1 || Number(s.WdSpd) === 6 ? 0 : 1})">🚀 TURBO</button>` : ''}
+          ${s.Tur !== undefined ? `<button class="btn ${Number(s.Tur) === 1 || Number(s.WdSpd) === 6 ? 'active' : ''}" onclick="setTurbo('${safeMac}',${Number(s.Tur) === 1 || Number(s.WdSpd) === 6 ? 0 : 1})"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>TURBO</button>` : ''}
         </div>
         ${s.smart_manual_fan_override ? `<div class="state-line">Override manuale ventola: ${escHtml(s.smart_manual_fan_override)} · resta attivo finché non selezioni un altro profilo</div>` : ''}
         <div class="ops-section-label" style="margin-top:12px">Profili ambiente</div>

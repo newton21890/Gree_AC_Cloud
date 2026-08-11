@@ -81,12 +81,21 @@ function queueApexChart(id, history, config) {
       try { previous.destroy(); } catch (error) {}
       _apexCharts.delete(id);
     }
-    const lineSeries = config.series.map(item => ({
+    // Una serie con tutti i valori null non produce alcuna linea: ApexCharts la
+    // ometterebbe dal disegno ma lascerebbe la voce in legenda, generando un
+    // grafico "mancante". Le filtriamo prima di costruire il grafico (la nota
+    // nel pannello è aggiunta da renderTimeSeriesPanel) e ricalcoliamo indici
+    // e stili (dropShadow, spessori, tratteggi) sulla lista filtrata.
+    const activeSeries = config.series.filter(item =>
+      history.some(point => finiteNumber(point[item.key]) !== null)
+    );
+    if (!activeSeries.length) return;
+    const lineSeries = activeSeries.map(item => ({
       name: item.label,
       type: item.area ? 'area' : 'line',
       data: history.map(point => [Number(point.t), finiteNumber(point[item.key])]),
     }));
-    const values = history.flatMap(point => config.series.map(item => finiteNumber(point[item.key]))).filter(Number.isFinite);
+    const values = history.flatMap(point => activeSeries.map(item => finiteNumber(point[item.key]))).filter(Number.isFinite);
     let minimum = config.fixedMin;
     let maximum = config.fixedMax;
     if (minimum === undefined || maximum === undefined) {
@@ -96,9 +105,9 @@ function queueApexChart(id, history, config) {
       minimum = minimum ?? Math.floor((low-pad)*10)/10;
       maximum = maximum ?? Math.ceil((high+pad)*10)/10;
     }
-    const outdoorSeries = config.series.map((item,index) => item.css === 'outdoor' ? index : -1).filter(index => index >= 0);
-    const dashArray = config.series.map(item => item.css === 'target' ? 7 : 0);
-    const widths = config.series.map(item => item.css === 'outdoor' ? 4 : item.css === 'target' ? 2 : 2.4);
+    const outdoorSeries = activeSeries.map((item,index) => item.css === 'outdoor' ? index : -1).filter(index => index >= 0);
+    const dashArray = activeSeries.map(item => item.css === 'target' ? 7 : 0);
+    const widths = activeSeries.map(item => item.css === 'outdoor' ? 4 : item.css === 'target' ? 2 : 2.4);
     const chart = new ApexCharts(element, {
       chart: {
         id,
@@ -108,17 +117,17 @@ function queueApexChart(id, history, config) {
         foreColor: '#8290a5',
         fontFamily: 'Inter,system-ui,-apple-system,sans-serif',
         animations: {enabled:false},
-        dropShadow:{enabled:outdoorSeries.length > 0,enabledOnSeries:outdoorSeries,top:0,left:0,blur:4,color:config.series[outdoorSeries[0]]?.color,opacity:.5},
+        dropShadow:{enabled:outdoorSeries.length > 0,enabledOnSeries:outdoorSeries,top:0,left:0,blur:4,color:activeSeries[outdoorSeries[0]]?.color,opacity:.5},
         toolbar: {show:false},
         zoom: {enabled:!config.compact,type:'x',autoScaleYaxis:false},
         selection: {enabled:false},
       },
       series: lineSeries,
-      colors: config.series.map(item => item.color),
+      colors: activeSeries.map(item => item.color),
       stroke: {curve:'smooth',width:widths,dashArray,lineCap:'round'},
       fill: {
         type:'gradient',
-        opacity:config.series.map(item => item.area ? .24 : 0),
+        opacity:activeSeries.map(item => item.area ? .24 : 0),
         gradient:{shade:'dark',type:'vertical',shadeIntensity:.2,opacityFrom:.32,opacityTo:.02,stops:[0,90,100]},
       },
       dataLabels: {enabled:false},
@@ -158,9 +167,10 @@ function queueApexChart(id, history, config) {
 function renderTimeSeriesPanel(mac, history, config) {
   const values = history.flatMap(point => config.series.map(item => finiteNumber(point[item.key]))).filter(Number.isFinite);
   if (!values.length) return `<section class="chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div></div><div class="chart-empty">Nessun dato disponibile nello storico di Home Assistant</div></section>`;
+  const missing = config.series.filter(item => !history.some(point => finiteNumber(point[item.key]) !== null));
   const id = `apex-chart-${mac}-${config.id}`.replace(/[^a-zA-Z0-9_-]/g,'_');
   queueApexChart(id,history,config);
-  return `<section class="chart-panel apex-chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div></div><div id="${id}" class="apex-chart-host" role="img" aria-label="${config.title}"></div></section>`;
+  return `<section class="chart-panel apex-chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div></div><div id="${id}" class="apex-chart-host" role="img" aria-label="${config.title}"></div>${missing.length ? `<div class="chart-missing-note">Serie senza dati in questo periodo: ${missing.map(item => escHtml(item.label)).join(', ')}</div>` : ''}</section>`;
 }
 function renderEnvironmentChart(mac, state, detailed = false) {
   const liveHistory = updateEnvironmentHistory(mac, state);
@@ -323,4 +333,8 @@ function renderChartsPage(data, requestHistory = true) {
 }
 function toggleChartExpand(mac) {
   document.getElementById(`detail-chart-${mac}`)?.classList.toggle('expanded');
+  // ApexCharts si riallinea alla larghezza della card (che cambia con
+  // l'espansione) ascoltando il resize della finestra: lo segnaliamo dopo
+  // il cambio di layout.
+  window.dispatchEvent(new Event('resize'));
 }
