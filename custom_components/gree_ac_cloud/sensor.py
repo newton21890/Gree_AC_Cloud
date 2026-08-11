@@ -78,8 +78,10 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
             return False
         raw = self.coordinator.data.get(self._key)
         if self._key == "InTem":
-            enabled = self.coordinator.data.get("InTemEn")
-            return enabled == 1 and isinstance(raw, (int, float)) and raw != 0
+            # InTem is a readable measurement even when the controller reports
+            # InTemEn=0.  The flag controls a device-side feature, not whether
+            # Home Assistant may expose the cloud value.
+            return isinstance(raw, (int, float)) and raw != 0
         if self._key == "TemSen":
             return isinstance(raw, (int, float)) and raw != 0
         if self._key == "InHumi":
@@ -96,8 +98,8 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
             # The indoor-air protocol value uses a +40 offset.
             return raw - 40 if raw != 0 else None
         if self._key == "OutTem" and isinstance(raw, (int, float)):
-            # The supplied manuals do not identify this physical probe.
-            return raw / 2 if raw > 50 else raw
+            # IDU/ODU temperature properties share the Gree +40 offset.
+            return raw - 40 if raw != 0 else None
         if self._key == "TemSen" and isinstance(raw, (int, float)):
             # Gree measured-air temperatures use a +40 protocol offset; zero
             # is the protocol sentinel for an unsupported/disabled sensor.
@@ -135,10 +137,11 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
             }
         if self._key == "OutTem":
             return {
-                "protocol_property": self._key,
-                "raw_value": self.coordinator.data.get(self._key),
-                "source": "physical probe not identified by the supplied manuals",
-                "warning": "Do not interpret this as room or outdoor ambient temperature.",
+                "protocol_property": "OutTem",
+                "raw_value": self.coordinator.data.get("OutTem"),
+                "source": "outdoor-unit (ODU) probe",
+                "encoding": "raw value minus 40 °C",
+                "warning": "This is an ODU probe, not necessarily outdoor ambient temperature.",
             }
         return None
 

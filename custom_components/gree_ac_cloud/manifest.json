@@ -10,7 +10,7 @@
   "issue_tracker": "https://github.com/newton21890/Gree_AC_Cloud/issues",
   "iot_class": "cloud_polling",
   "integration_type": "hub",
-  "version": "0.13.5",
+  "version": "0.13.6",
   "requirements": [
     "pycryptodome>=3.10",
     "aiomqtt>=2.0.0"

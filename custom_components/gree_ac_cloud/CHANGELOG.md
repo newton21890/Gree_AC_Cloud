@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.6
+
+### InTem sempre disponibile e correzione sonde IDU/ODU
+
+- `InTem` viene esposto come sensore temperatura dell'unità Gree ogni volta che il cloud restituisce un valore numerico valido, indipendentemente da `InTemEn`.
+- Il sensore `InTem` può quindi essere selezionato, da solo o insieme ad altri sensori temperatura, come sorgente per il calcolo della temperatura del relativo climate.
+- Corretta la decodifica visualizzata in **Sonde IDU / ODU**: sia `InTem` sia `OutTem` usano `raw − 40 °C`, non la precedente divisione per due.
+- `OutTem` resta una sonda fisica ODU e non viene presentata come temperatura meteo esterna.
+
 ## 0.13.5
 
 ### Comando e visualizzazione delle sonde native

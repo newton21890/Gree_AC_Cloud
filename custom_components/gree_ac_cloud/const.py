@@ -225,8 +225,8 @@ DEVICE_SENSORS = {
         "enabled_default": True,
     },
     "OutTem": {
-        "name": "Outdoor Unit Sensor (Raw/Unverified)",
-        "icon": "mdi:thermometer-alert",
+        "name": "Outdoor Unit Probe Temperature",
+        "icon": "mdi:thermometer",
         "diagnostic": True,
     },
     "TemSen": {

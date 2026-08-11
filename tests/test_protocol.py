@@ -170,14 +170,13 @@ def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
     panel_source = (COMPONENT / "panel.py").read_text()
     const_source = (COMPONENT / "const.py").read_text()
     assert 'self._key == "InTem"' in sensor_source
-    assert 'enabled = self.coordinator.data.get("InTemEn")' in sensor_source
-    assert "enabled == 1" in sensor_source
+    assert "Home Assistant may expose the cloud value" in sensor_source
     assert "return raw - 40" in sensor_source
     assert "raw != 0" in sensor_source
     assert 'self._key == "InHumi"' in sensor_source
     assert 'enabled = self.coordinator.data.get("InHumiEn")' in sensor_source
     assert "0 < raw <= 100" in sensor_source
-    assert 'self.coordinator.data.get("InTemEn") != 1' in climate_source
+    assert 'raw = self.coordinator.data.get("InTem")' in climate_source
     assert '"gree_indoor_temperature_sensor_enabled"' in climate_source
     assert '"gree_indoor_humidity_sensor_enabled"' in climate_source
     assert 'state["InTemEnableRaw"]' in panel_source
@@ -187,10 +186,11 @@ def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
     assert 'state["InHumiEnabled"]' in panel_source
     assert '"InTemEn"' in const_source
     assert '"InHumiEn"' in const_source
-    assert "Number(s.InTemEn) === 1" in panel_source
     assert "Number(s.InHumiEn) === 1" in panel_source
     assert "const measuredAir = s.InTem" in panel_source
-    assert "Number(measuredAir) - 40" in panel_source
+    assert "return Number.isFinite(raw) && raw !== 0 ? raw - 40 : null" in panel_source
+    assert "parseProbeTemp(s.InTem)" in panel_source
+    assert "parseProbeTemp(s.OutTem)" in panel_source
     assert "toggleNativeSensor" in panel_source
 
 

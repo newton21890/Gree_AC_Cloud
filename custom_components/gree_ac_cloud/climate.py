@@ -265,12 +265,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if value is not None:
             return value
         raw = self.coordinator.data.get("InTem")
-        if (
-            self.coordinator.data.get("InTemEn") != 1
-            or raw is None
-            or not isinstance(raw, (int, float))
-            or raw == 0
-        ):
+        if raw is None or not isinstance(raw, (int, float)) or raw == 0:
             return None
         return float(raw - 40)
 

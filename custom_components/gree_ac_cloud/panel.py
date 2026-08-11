@@ -331,11 +331,7 @@ class GreePanelDataView(HomeAssistantView):
                 raw_in_humi = state.get("InHumi")
                 state["InTemEnableRaw"] = state.get("InTemEn")
                 state["InHumiEnableRaw"] = state.get("InHumiEn")
-                state["InTemEnabled"] = (
-                    state.get("InTemEn") == 1
-                    and isinstance(raw_in_tem, (int, float))
-                    and raw_in_tem != 0
-                )
+                state["InTemEnabled"] = isinstance(raw_in_tem, (int, float)) and raw_in_tem != 0
                 state["TemSenEnabled"] = isinstance(raw_tem_sen, (int, float)) and raw_tem_sen != 0
                 state["InHumiEnabled"] = (
                     state.get("InHumiEn") == 1
@@ -2580,11 +2576,10 @@ async function sendCommand(mac, options, values) {
   }
 }
 
-function parseTemp(val) {
-  if (val == null || val === undefined) return '--';
-  val = Number(val);
-  if (val > 50) return (val / 2).toFixed(1);
-  return String(val);
+function parseProbeTemp(val) {
+  if (val == null || val === undefined) return null;
+  const raw = Number(val);
+  return Number.isFinite(raw) && raw !== 0 ? raw - 40 : null;
 }
 
 const MODELS = {
@@ -2693,14 +2688,13 @@ function renderDevice(d) {
   const inTem = s.InTem;
   const outTem = s.OutTem;
   const measuredAir = s.InTem;
-  const nativeRoomTemp = Number(s.InTemEn) === 1 && measuredAir != null
-    ? Number(measuredAir) - 40 : null;
+  const nativeRoomTemp = parseProbeTemp(measuredAir);
   const externalRoomTemp = s.RoomTemperature;
   const roomTemp = externalRoomTemp != null
     ? Number(externalRoomTemp)
     : nativeRoomTemp;
-  const probeIn = inTem != null ? Number(parseTemp(inTem)) : null;
-  const probeOut = outTem != null ? Number(parseTemp(outTem)) : null;
+  const probeIn = parseProbeTemp(inTem);
+  const probeOut = parseProbeTemp(outTem);
   const nativeHumidity = Number(s.InHumiEn) === 1 && Number(s.InHumi) > 0
     ? Number(s.InHumi) : null;
   const inHumi = s.RoomHumidity != null ? Number(s.RoomHumidity) : nativeHumidity;
@@ -2917,7 +2911,7 @@ function renderDevice(d) {
     </div></section>` : ''}
 
     <details class="compact-details"><summary>Dettagli tecnici e sonde diagnostiche</summary>
-      <div class="state-line">Sonde grezze IDU/ODU: ${probeIn != null ? probeIn.toFixed(1) : '--'}° / ${probeOut != null ? probeOut.toFixed(1) : '--'}° · Sensori HA temperatura: ${s.RoomTemperatureSensors?.length || 0} · umidità: ${s.RoomHumiditySensors?.length || 0}</div>
+      <div class="state-line">Sonde IDU/ODU (raw − 40): ${probeIn != null ? probeIn.toFixed(1) : '--'}° / ${probeOut != null ? probeOut.toFixed(1) : '--'}° · Sensori HA temperatura: ${s.RoomTemperatureSensors?.length || 0} · umidità: ${s.RoomHumiditySensors?.length || 0}</div>
     ${['Errcode','ErrType','RefLeak','MSysStatus','CleanState','CleanTime','FClTime','CleanDataFlag']
       .some(k => s[k] !== undefined && s[k] !== null) ? `<div class="control-row">
       <label>Stati</label>
@@ -2945,12 +2939,12 @@ function renderOperationsDevice(d) {
   const measuredAir = s.InTem;
   const roomTemp = s.RoomTemperature != null
     ? Number(s.RoomTemperature)
-    : (Number(s.InTemEn) === 1 && measuredAir != null ? Number(measuredAir) - 40 : null);
+    : parseProbeTemp(measuredAir);
   const humidity = s.RoomHumidity != null
     ? Number(s.RoomHumidity)
     : (Number(s.InHumiEn) === 1 && Number(s.InHumi) > 0 ? Number(s.InHumi) : null);
-  const probeIn = s.InTem != null ? Number(parseTemp(s.InTem)) : null;
-  const probeOut = s.OutTem != null ? Number(parseTemp(s.OutTem)) : null;
+  const probeIn = parseProbeTemp(s.InTem);
+  const probeOut = parseProbeTemp(s.OutTem);
   const safeMac = escHtml(String(d.mac || ''));
   const modelKey = getModelKey(d.mac);
   const model = MODELS[modelKey] || null;
@@ -3055,7 +3049,7 @@ function renderOperationsDevice(d) {
         <div class="ops-data-row"><span>Profilo</span><b>${activePreset ? (presetLabels[activePreset] || escHtml(activePreset).toUpperCase()) : 'MANUALE'}</b></div>
         <div class="ops-data-row"><span>Decisione Smart</span><b>${escHtml(s.smart_last_action || '--')}</b></div>
         <div class="ops-data-row"><span>I-Demand</span><b>${s.DREDEn === 1 ? (effectiveDred === 0 ? 'OFF' : (effectiveDred === 1 ? 'D1 · compressore escluso' : effectiveDred === 2 ? 'D2 · limite 50%' : 'D3 · limite 75%')) : 'N/D'}</b></div>
-        <div class="ops-data-row"><span>Sonde IDU / ODU</span><b>${probeIn != null ? probeIn.toFixed(1) + '°' : '--'} / ${probeOut != null ? probeOut.toFixed(1) + '°' : '--'}</b></div>
+        <div class="ops-data-row"><span>Sonde IDU / ODU (raw − 40)</span><b>${probeIn != null ? probeIn.toFixed(1) + '°' : '--'} / ${probeOut != null ? probeOut.toFixed(1) + '°' : '--'}</b></div>
         <details class="ops-details"><summary>APRI CONTROLLI AVANZATI ↓</summary>
           <div class="control-row"><label>Ventilatore</label><div class="btn-group">${[0,1,2,3,4,5].map(value => `<button class="btn ${Number(s.WdSpd) === value ? 'active' : ''}" onclick="setFan('${safeMac}',${value})">${fanLabels[value]}</button>`).join('')}</div></div>
           <div class="control-row"><label>Oscillazione</label><div class="btn-group"><button class="btn ${!s.SwUpDn && !s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','off')">Off</button><button class="btn ${s.SwUpDn && !s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','v')">Verticale</button><button class="btn ${!s.SwUpDn && s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','h')">Orizzontale</button><button class="btn ${s.SwUpDn && s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','both')">Entrambi</button></div></div>
@@ -3074,7 +3068,7 @@ function renderOperationsOverview(data) {
   const states = data.map(device => device.state || {});
   const valid = values => values.filter(value => Number.isFinite(value));
   const average = values => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
-  const roomTemps = valid(states.map(state => state.RoomTemperature != null ? Number(state.RoomTemperature) : (Number(state.InTemEn) === 1 && state.InTem != null ? Number(state.InTem) - 40 : NaN)));
+  const roomTemps = valid(states.map(state => state.RoomTemperature != null ? Number(state.RoomTemperature) : (parseProbeTemp(state.InTem) ?? NaN)));
   const humidity = valid(states.map(state => state.RoomHumidity != null ? Number(state.RoomHumidity) : (state.InHumi != null ? Number(state.InHumi) : NaN)));
   const outdoor = valid(states.map(state => state.OutdoorTemperature != null ? Number(state.OutdoorTemperature) : NaN));
   const power = states.reduce((sum, state, index) => {
