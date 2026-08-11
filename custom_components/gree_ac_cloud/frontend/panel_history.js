@@ -96,8 +96,9 @@ function queueApexChart(id, history, config) {
       minimum = minimum ?? Math.floor((low-pad)*10)/10;
       maximum = maximum ?? Math.ceil((high+pad)*10)/10;
     }
-    const dashArray = config.series.map(item => item.css === 'target' ? 7 : item.css === 'outdoor' ? 3 : 0);
-    const widths = config.series.map(item => item.css === 'target' ? 2 : 2.4);
+    const outdoorSeries = config.series.map((item,index) => item.css === 'outdoor' ? index : -1).filter(index => index >= 0);
+    const dashArray = config.series.map(item => item.css === 'target' ? 7 : 0);
+    const widths = config.series.map(item => item.css === 'outdoor' ? 4 : item.css === 'target' ? 2 : 2.4);
     const chart = new ApexCharts(element, {
       chart: {
         id,
@@ -107,7 +108,8 @@ function queueApexChart(id, history, config) {
         foreColor: '#8290a5',
         fontFamily: 'Inter,system-ui,-apple-system,sans-serif',
         animations: {enabled:false},
-        toolbar: {show:!config.compact,tools:{download:false,selection:true,zoom:true,zoomin:true,zoomout:true,pan:true,reset:true}},
+        dropShadow:{enabled:outdoorSeries.length > 0,enabledOnSeries:outdoorSeries,top:0,left:0,blur:4,color:config.series[outdoorSeries[0]]?.color,opacity:.5},
+        toolbar: {show:false},
         zoom: {enabled:!config.compact,type:'x',autoScaleYaxis:false},
         selection: {enabled:false},
       },
@@ -168,7 +170,7 @@ function renderEnvironmentChart(mac, state, detailed = false) {
     if (history.length < 2) return `<div class="ops-chart control-chart-loading"><div class="ops-chart-legend"><span><i style="background:#22d3ee"></i>Interna</span><span><i style="background:#facc15"></i>Target</span><span><i style="background:#fb7185"></i>Esterna</span></div><div class="chart-empty">${_historyView.loading ? 'Caricamento dati reali da HA Recorder…' : 'Raccolta dati in corso…'}</div></div>`;
     return renderTimeSeriesPanel(mac,history,{id:'control-temperature',compact:true,className:'control-chart',title:'Temperature reali',subtitle:recorderHistory.length > 1 ? `HA Recorder · periodo ${_historyView.period}` : 'Dati live in attesa dello storico Recorder',unit:'°',padding:1,minimumRange:6,decimals:0,series:[{key:'room',label:'Interna',color:'#22d3ee',area:true},{key:'target',label:'Target',color:'#facc15',css:'target'},{key:'outdoor',label:'Esterna',color:'#fb7185',css:'outdoor'}]});
   }
-  return `<div class="chart-panels">${renderTimeSeriesPanel(mac,history,{id:'temperature',title:'Temperature',subtitle:'Storico persistente HA Recorder',unit:'°',padding:1,minimumRange:6,decimals:0,series:[{key:'room',label:'Interna',color:'#22d3ee',area:true},{key:'target',label:'Target',color:'#facc15',css:'target'},{key:'outdoor',label:'Esterna',color:'#fb7185',css:'outdoor'}]})}${renderTimeSeriesPanel(mac,history,{id:'humidity',className:'humidity',title:'Umidità relativa',subtitle:'Sensori interni ed esterni',unit:'%',padding:5,minimumRange:20,fixedMin:0,fixedMax:100,decimals:0,series:[{key:'humidity',label:'Interna',color:'#38bdf8',area:true},{key:'outdoorHumidity',label:'Esterna',color:'#a78bfa',css:'outdoor'}]})}</div>`;
+  return `<div class="chart-panels">${renderTimeSeriesPanel(mac,history,{id:'temperature',title:'Temperature',subtitle:'Storico persistente HA Recorder · linea esterna evidenziata',unit:'°',padding:1,minimumRange:6,decimals:0,series:[{key:'room',label:'Interna',color:'#22d3ee',area:true},{key:'target',label:'Target',color:'#facc15',css:'target'},{key:'outdoor',label:'Esterna',color:'#ff5c8a',css:'outdoor'}]})}${renderTimeSeriesPanel(mac,history,{id:'humidity',className:'humidity',title:'Umidità relativa',subtitle:'Sensori interni ed esterni · scala adattiva',unit:'%',padding:5,minimumRange:20,decimals:0,series:[{key:'humidity',label:'Interna',color:'#38bdf8',area:true},{key:'outdoorHumidity',label:'Esterna',color:'#d8b4fe',css:'outdoor'}]})}</div>`;
 }
 function historyWindowLabel() {
   const end = _historyView.end || Date.now();

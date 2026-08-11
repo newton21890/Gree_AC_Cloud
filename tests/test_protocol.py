@@ -346,6 +346,10 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "new ApexCharts" in history_source
     assert "shared:true" in history_source
     assert "zoom: {enabled:!config.compact" in history_source
+    assert "toolbar: {show:false}" in history_source
+    assert "item.css === 'outdoor' ? 4" in history_source
+    assert "enabledOnSeries:outdoorSeries" in history_source
+    assert "fixedMin:0,fixedMax:100" not in history_source
     assert "destroyApexCharts" in history_source
     assert "renderControlCharts" in history_source
     assert "HA Recorder · periodo" in history_source

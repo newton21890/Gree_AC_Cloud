@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.1
+
+### Leggibilità dei valori esterni
+
+- Evidenziate le serie di temperatura e umidità esterne con linee continue più spesse, colori più luminosi e una lieve ombra dedicata.
+- Resa adattiva la scala verticale dell'umidità, così le variazioni dei sensori esterni non vengono compresse inutilmente nell'intervallo fisso 0–100%.
+- Rimossa la toolbar ApexCharts con i pulsanti zoom `+`, zoom `−`, selezione, pan e ripristino; restano disponibili tooltip e lettura condivisa delle serie.
+
 ## 0.12.0
 
 ### Grafici ApexCharts
