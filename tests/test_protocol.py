@@ -308,6 +308,8 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "function getAccessToken()" in panel_source
     assert "window.localStorage" in panel_source
     assert "window.parent.localStorage" in panel_source
+    assert "let _rejectedAccessToken = null" in panel_source
+    assert "Prefer the live Home Assistant auth object" in panel_source
     assert "opts.credentials = 'same-origin'" in panel_source
     assert "showPanelAuthFailure" in panel_source
     assert "schedulePanelAuthRetry" in panel_source

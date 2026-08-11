@@ -2271,9 +2271,25 @@ const __README_CONTENT__ = __README_JSON__;
 const __CHANGELOG_CONTENT__ = __CHANGELOG_JSON__;
 const __DEVICE_NAMES__ = __DEVICE_NAMES_JSON__;
 
+let _rejectedAccessToken = null;
+function usableAccessToken(token) {
+  return token && token !== _rejectedAccessToken ? token : null;
+}
 function getAccessToken() {
-  // Desktop browsers normally expose the parent HA storage. In the Companion
-  // app the iframe may instead get its own same-origin storage partition.
+  // Prefer the live Home Assistant auth object. A token cached in localStorage
+  // can remain present after it has expired, especially in long-lived desktop
+  // tabs and Android WebView partitions.
+  for (const frame of [window.parent, window.top]) {
+    try {
+      const app = frame.document.querySelector('home-assistant');
+      const auth = app && app.hass && app.hass.auth;
+      const token = usableAccessToken(auth && (auth.accessToken || (auth.data && auth.data.access_token)));
+      if (token) return token;
+    } catch (e) {}
+  }
+
+  // Storage remains a fallback when the Companion app isolates the iframe
+  // from the root frontend object.
   const stores = [];
   try { stores.push(window.localStorage); } catch (e) {}
   try { if (window.parent !== window) stores.push(window.parent.localStorage); } catch (e) {}
@@ -2282,17 +2298,7 @@ function getAccessToken() {
     try {
       const raw = store.getItem('hassTokens');
       const parsed = raw ? JSON.parse(raw) : null;
-      if (parsed && parsed.access_token) return parsed.access_token;
-    } catch (e) {}
-  }
-
-  // Fallback for HA frontends where auth is kept on the root application
-  // object rather than being readable from iframe localStorage.
-  for (const frame of [window.parent, window.top]) {
-    try {
-      const app = frame.document.querySelector('home-assistant');
-      const auth = app && app.hass && app.hass.auth;
-      const token = auth && (auth.accessToken || (auth.data && auth.data.access_token));
+      const token = usableAccessToken(parsed && parsed.access_token);
       if (token) return token;
     } catch (e) {}
   }
@@ -2327,6 +2333,7 @@ function schedulePanelAuthRetry() {
   _panelAuthRetryTimer = setTimeout(() => {
     _panelAuthRetryTimer = null;
     _panelAuthFailureShown = false;
+    _rejectedAccessToken = null;
     loadModels();
     loadNames().then(loadData);
   },60000);
@@ -2345,6 +2352,9 @@ async function apiFetch(url, opts = {}) {
   const resp = await fetch(url, opts);
   if (!resp.ok) {
     if (resp.status === 401) {
+      const authorization = opts.headers.Authorization || '';
+      _rejectedAccessToken = authorization.startsWith('Bearer ')
+        ? authorization.slice(7) : null;
       showPanelAuthFailure();
       schedulePanelAuthRetry();
     }
@@ -2353,6 +2363,7 @@ async function apiFetch(url, opts = {}) {
     throw error;
   }
   _panelAuthFailureShown = false;
+  _rejectedAccessToken = null;
   return resp.json();
 }
 

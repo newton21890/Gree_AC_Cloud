@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.3
+
+### Recupero delle sessioni frontend scadute
+
+- Il pannello preferisce ora il token corrente esposto dall'oggetto auth di Home Assistant rispetto alle copie presenti nel localStorage dell'iframe.
+- Dopo una risposta 401 il token rifiutato viene escluso dai tentativi successivi, impedendo che una vecchia sessione memorizzata continui a generare richieste non autenticate.
+- Il token escluso viene rivalutato solamente al tentativo controllato successivo, così un eventuale rinnovo della sessione Home Assistant può essere acquisito senza polling aggressivo.
+
 ## 0.11.2
 
 ### Inizializzazione TLS non bloccante
