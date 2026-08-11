@@ -135,7 +135,9 @@ POLL_COLS = [
     "InTem",
     "OutTem",
     "TemSen",
+    "InTemEn",
     "InHumi",
+    "InHumiEn",
     "SetDeciTem",
     "Err",
     "Errcode",
@@ -176,6 +178,8 @@ COMMAND_OPTIONS = frozenset(
         "SvSt",
         "SlpMod",
         "DRED",
+        "InTemEn",
+        "InHumiEn",
     }
 )
 

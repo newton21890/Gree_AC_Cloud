@@ -627,6 +627,17 @@ class GreePanelCommandView(HomeAssistantView):
                             for opt, val in zip(options, values):
                                 coord.device.properties[opt] = val
                             coord.async_set_updated_data(dict(coord.device.properties))
+                            if any(opt in ("InTemEn", "InHumiEn") for opt in options):
+                                await mqtt.refresh_device(
+                                    mac,
+                                    [
+                                        "InTemEn",
+                                        "TemSen",
+                                        "InTem",
+                                        "InHumiEn",
+                                        "InHumi",
+                                    ],
+                                )
                             if any(opt == "Pow" and val == 1 for opt, val in zip(options, values)):
                                 await coord.async_apply_startup_settings()
                         return self.json({"ok": ok})
@@ -2680,13 +2691,17 @@ function renderDevice(d) {
   const inTem = s.InTem;
   const outTem = s.OutTem;
   const measuredAir = s.TemSen;
+  const nativeRoomTemp = Number(s.InTemEn) === 1 && measuredAir != null
+    ? Number(measuredAir) - 40 : null;
   const externalRoomTemp = s.RoomTemperature;
   const roomTemp = externalRoomTemp != null
     ? Number(externalRoomTemp)
-    : (measuredAir != null ? Number(measuredAir) - 40 : null);
+    : nativeRoomTemp;
   const probeIn = inTem != null ? Number(parseTemp(inTem)) : null;
   const probeOut = outTem != null ? Number(parseTemp(outTem)) : null;
-  const inHumi = s.RoomHumidity != null ? Number(s.RoomHumidity) : s.InHumi;
+  const nativeHumidity = Number(s.InHumiEn) === 1 && Number(s.InHumi) > 0
+    ? Number(s.InHumi) : null;
+  const inHumi = s.RoomHumidity != null ? Number(s.RoomHumidity) : nativeHumidity;
   const fan = s.WdSpd;
   const swingV = s.SwUpDn;
   const swingH = s.SwingLfRig;
@@ -2781,9 +2796,9 @@ function renderDevice(d) {
       <div class="summary-value">${roomTemp != null ? roomTemp.toFixed(1) : '--'}°</div>
       <div class="summary-label">Temperatura ambiente${externalRoomTemp != null ? ' · media HA' : ''}</div>
     </div>
-    <div class="summary-tile" title="Media dei sensori umidità HA selezionati">
+    <div class="summary-tile" title="${s.RoomHumidity != null ? 'Media dei sensori umidità HA selezionati' : 'Sensore nativo Gree'}">
       <div class="summary-value">${inHumi != null ? Number(inHumi).toFixed(1) + '%' : '--'}</div>
-      <div class="summary-label">Umidità ambiente</div>
+      <div class="summary-label">Umidità ambiente${s.RoomHumidity != null ? ' · media HA' : ''}</div>
     </div>
     <div class="summary-tile">
       <div class="summary-value">${tem}°</div><div class="summary-label">Temperatura obiettivo</div>
@@ -2827,6 +2842,19 @@ function renderDevice(d) {
     ${enabledPresets.length ? `<section class="control-section"><div class="section-title">Profili ambiente</div><div class="preset-quick">
       ${enabledPresets.map(([name]) => `<button class="btn ${activePreset === name ? 'active' : ''}" onclick="setPreset('${safeMac}','${name}')">${{day:'Giorno',night:'Notte',away:'Assente'}[name] || name}</button>`).join('')}
     </div><div class="state-line">I profili applicano target, soglie e I-Demand configurati con ⚙.</div></section>` : `<section class="control-section"><div class="section-title">Profili ambiente</div><div class="state-line">Nessun profilo abilitato. Configurali dal pulsante ⚙ in alto.</div></section>`}
+
+    <section class="control-section"><div class="section-title">Sonde native Gree</div>
+    <div class="control-row">
+      <label>Temperatura interna</label>
+      <div class="btn-group"><button class="btn ${Number(s.InTemEn) === 1 ? 'active' : ''}" onclick="toggleNativeSensor('${safeMac}','InTemEn')">${Number(s.InTemEn) === 1 ? 'Abilitata' : 'Disabilitata'}</button></div>
+      <span class="state-line">${nativeRoomTemp != null ? nativeRoomTemp.toFixed(1) + ' °C (TemSen ' + escHtml(String(measuredAir)) + ' − 40)' : 'Nessun valore valido'}</span>
+    </div>
+    <div class="control-row">
+      <label>Umidità interna</label>
+      <div class="btn-group"><button class="btn ${Number(s.InHumiEn) === 1 ? 'active' : ''}" onclick="toggleNativeSensor('${safeMac}','InHumiEn')">${Number(s.InHumiEn) === 1 ? 'Abilitata' : 'Disabilitata'}</button></div>
+      <span class="state-line">${nativeHumidity != null ? nativeHumidity.toFixed(1) + '%' : 'Nessun valore valido'}</span>
+    </div>
+    </section>
 
     <section class="control-section"><div class="section-title">Comfort</div>
     <div class="control-row">
@@ -2915,8 +2943,10 @@ function renderOperationsDevice(d) {
   const measuredAir = s.TemSen;
   const roomTemp = s.RoomTemperature != null
     ? Number(s.RoomTemperature)
-    : (measuredAir != null ? Number(measuredAir) - 40 : null);
-  const humidity = s.RoomHumidity != null ? Number(s.RoomHumidity) : (s.InHumi != null ? Number(s.InHumi) : null);
+    : (Number(s.InTemEn) === 1 && measuredAir != null ? Number(measuredAir) - 40 : null);
+  const humidity = s.RoomHumidity != null
+    ? Number(s.RoomHumidity)
+    : (Number(s.InHumiEn) === 1 && Number(s.InHumi) > 0 ? Number(s.InHumi) : null);
   const probeIn = s.InTem != null ? Number(parseTemp(s.InTem)) : null;
   const probeOut = s.OutTem != null ? Number(parseTemp(s.OutTem)) : null;
   const safeMac = escHtml(String(d.mac || ''));
@@ -3220,6 +3250,16 @@ async function setSwing(mac, mode) {
   const h = (mode === 'h' || mode === 'both') ? 1 : 0;
   await sendCommand(mac, ['SwUpDn', 'SwingLfRig'], [v, h]);
   setTimeout(loadData, 1000);
+}
+
+async function toggleNativeSensor(mac, key) {
+  const data = await apiFetch(PANEL_DATA_URL);
+  const dev = data.find(d => d.mac === mac);
+  if (!dev) return;
+  const nextValue = Number(dev.state && dev.state[key]) === 1 ? 0 : 1;
+  const ok = await sendCommand(mac, [key], [nextValue]);
+  if (!ok) alert(`Il dispositivo ha rifiutato il comando ${key}=${nextValue}.`);
+  setTimeout(loadData, 1800);
 }
 
 async function toggleSwitch(mac, key) {
