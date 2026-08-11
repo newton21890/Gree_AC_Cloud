@@ -88,8 +88,11 @@ def test_panel_keeps_log_capture_and_d1_normalization() -> None:
 
 def test_insecure_tls_is_not_used_by_component() -> None:
     sources = "\n".join(path.read_text() for path in COMPONENT.glob("*.py"))
+    mqtt_source = (COMPONENT / "gree_mqtt.py").read_text()
     assert "verify=False" not in sources
     assert "ssl.CERT_NONE" not in sources
+    assert "await asyncio.to_thread(ssl.create_default_context)" in mqtt_source
+    assert "tls_context=self._tls_context" in mqtt_source
 
 
 def test_panel_javascript_parses_when_node_is_available() -> None:

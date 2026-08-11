@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.2
+
+### Inizializzazione TLS non bloccante
+
+- Spostata la creazione del contesto TLS MQTT e il caricamento dei certificati di sistema su un thread executor, eliminando il warning `load_default_certs` rilevato da Home Assistant durante l'avvio e le riconnessioni.
+- Il medesimo contesto TLS verificato viene riutilizzato nelle riconnessioni MQTT, senza disabilitare alcun controllo dei certificati.
+
 ## 0.11.1
 
 ### Correzioni prioritarie dai log diagnostici

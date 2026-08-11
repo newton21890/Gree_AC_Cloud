@@ -15,8 +15,17 @@ from .gree_api import GreeDevice
 _LOGGER = logging.getLogger(__name__)
 
 EXTRA_KEYS = [
-    "Health", "Quiet", "Tur", "StHt", "Blo", "SvSt", "SlpMod", "Lig",
-    "Air", "SwingLfRig", "SwUpDn",
+    "Health",
+    "Quiet",
+    "Tur",
+    "StHt",
+    "Blo",
+    "SvSt",
+    "SlpMod",
+    "Lig",
+    "Air",
+    "SwingLfRig",
+    "SwUpDn",
 ]
 
 
@@ -39,19 +48,20 @@ class GreeMQTTClient:
         self.devices = {device.mac: device for device in devices}
         self._on_data = on_data
         self._client = None
+        self._tls_context: ssl.SSLContext | None = None
         self._listener_task: asyncio.Task | None = None
         self._running = False
         self._connected = False
         self._connected_event = asyncio.Event()
-        self._user_params: dict[str, set[str]] = {
-            device.mac: set() for device in devices
-        }
+        self._user_params: dict[str, set[str]] = {device.mac: set() for device in devices}
         self._last_seen: dict[str, float] = {}
         self._last_command: dict[str, float] = {}
 
     def _create_client(self):
         import aiomqtt
 
+        if self._tls_context is None:
+            raise RuntimeError("MQTT TLS context has not been initialized")
         return aiomqtt.Client(
             hostname=self.host,
             port=self.port,
@@ -60,7 +70,7 @@ class GreeMQTTClient:
             identifier=f"gree_ac_{int(time.time())}",
             protocol=aiomqtt.ProtocolVersion.V311,
             keepalive=60,
-            tls_context=ssl.create_default_context(),
+            tls_context=self._tls_context,
         )
 
     async def start(self) -> bool:
@@ -70,10 +80,11 @@ class GreeMQTTClient:
 
         self._running = True
         self._connected_event.clear()
+        if self._tls_context is None:
+            # Loading the operating-system CA bundle performs blocking file I/O.
+            self._tls_context = await asyncio.to_thread(ssl.create_default_context)
         loop = asyncio.get_running_loop()
-        self._listener_task = loop.create_task(
-            self._connection_loop(), name="gree_ac_cloud_mqtt"
-        )
+        self._listener_task = loop.create_task(self._connection_loop(), name="gree_ac_cloud_mqtt")
         try:
             await asyncio.wait_for(self._connected_event.wait(), timeout=15)
         except asyncio.TimeoutError:
@@ -130,9 +141,7 @@ class GreeMQTTClient:
                 raise
             except Exception as exc:
                 if self._running:
-                    _LOGGER.warning(
-                        "MQTT connection lost (%s); reconnecting in %ds", exc, delay
-                    )
+                    _LOGGER.warning("MQTT connection lost (%s); reconnecting in %ds", exc, delay)
                     await asyncio.sleep(delay)
                     delay = min(delay * 2, 60)
             finally:
@@ -174,9 +183,7 @@ class GreeMQTTClient:
         if device is None:
             for candidate_mac, candidate in self.devices.items():
                 try:
-                    raw = unpad(
-                        candidate.cipher.decrypt(base64.b64decode(pack)), 16
-                    ).decode()
+                    raw = unpad(candidate.cipher.decrypt(base64.b64decode(pack)), 16).decode()
                     result = json.loads(raw)
                     if "cols" in result and "dat" in result:
                         result = dict(zip(result["cols"], result["dat"]))
@@ -216,18 +223,14 @@ class GreeMQTTClient:
         _LOGGER.debug("MQTT: %s ⇐ %s", mac, dict(sorted(data.items())))
         if needs_reenable:
             loop = asyncio.get_running_loop()
-            loop.create_task(
-                self.send_command(mac, needs_reenable, [1] * len(needs_reenable))
-            )
+            loop.create_task(self.send_command(mac, needs_reenable, [1] * len(needs_reenable)))
 
     async def _publish_json(self, topic: str, obj: dict, qos: int = 0) -> bool:
         client = self._client
         if not self._connected or client is None:
             return False
         try:
-            await client.publish(
-                topic, json.dumps(obj, separators=(",", ":")), qos=qos
-            )
+            await client.publish(topic, json.dumps(obj, separators=(",", ":")), qos=qos)
             return True
         except Exception as exc:
             _LOGGER.warning("Publish failed: %s", exc)
@@ -242,8 +245,12 @@ class GreeMQTTClient:
         await self._publish_json(
             f"request/{device.parent_mac}",
             {
-                "t": "pack", "i": 0, "uid": self.uid, "cid": "ha_ac_cloud",
-                "tcid": mac, "pack": device.build_status_request(cols or POLL_COLS),
+                "t": "pack",
+                "i": 0,
+                "uid": self.uid,
+                "cid": "ha_ac_cloud",
+                "tcid": mac,
+                "pack": device.build_status_request(cols or POLL_COLS),
             },
             qos=1,
         )
@@ -258,16 +265,17 @@ class GreeMQTTClient:
         sent = self._last_command.get(mac)
         return time.monotonic() - sent if sent is not None else None
 
-    async def send_command(
-        self, mac: str, options: list[str], values: list[Any]
-    ) -> bool:
+    async def send_command(self, mac: str, options: list[str], values: list[Any]) -> bool:
         device = self.devices.get(mac)
         if not device or not options or len(options) != len(values):
             return False
         ok = await self._publish_json(
             f"request/{device.parent_mac}",
             {
-                "t": "pack", "i": 0, "uid": self.uid, "cid": "ha_ac_cloud",
+                "t": "pack",
+                "i": 0,
+                "uid": self.uid,
+                "cid": "ha_ac_cloud",
                 "tcid": mac,
                 "pack": device.build_command_pack(options, values),
             },
