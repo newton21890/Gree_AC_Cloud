@@ -169,9 +169,10 @@ def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
     climate_source = (COMPONENT / "climate.py").read_text()
     panel_source = (COMPONENT / "panel.py").read_text()
     const_source = (COMPONENT / "const.py").read_text()
-    assert 'self._key == "TemSen"' in sensor_source
+    assert 'self._key == "InTem"' in sensor_source
     assert 'enabled = self.coordinator.data.get("InTemEn")' in sensor_source
     assert "enabled == 1" in sensor_source
+    assert "return raw - 40" in sensor_source
     assert "raw != 0" in sensor_source
     assert 'self._key == "InHumi"' in sensor_source
     assert 'enabled = self.coordinator.data.get("InHumiEn")' in sensor_source
@@ -180,6 +181,7 @@ def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
     assert '"gree_indoor_temperature_sensor_enabled"' in climate_source
     assert '"gree_indoor_humidity_sensor_enabled"' in climate_source
     assert 'state["InTemEnableRaw"]' in panel_source
+    assert 'state["InTemEnabled"]' in panel_source
     assert 'state["InHumiEnableRaw"]' in panel_source
     assert 'state["TemSenEnabled"]' in panel_source
     assert 'state["InHumiEnabled"]' in panel_source
@@ -187,6 +189,7 @@ def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
     assert '"InHumiEn"' in const_source
     assert "Number(s.InTemEn) === 1" in panel_source
     assert "Number(s.InHumiEn) === 1" in panel_source
+    assert "const measuredAir = s.InTem" in panel_source
     assert "Number(measuredAir) - 40" in panel_source
     assert "toggleNativeSensor" in panel_source
 

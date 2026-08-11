@@ -260,11 +260,11 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
 
     @property
     def current_temperature(self) -> float | None:
-        """Use the configured HA room sensor, then documented TemSen."""
+        """Use configured HA room sensors, then enabled native InTem."""
         value = self._average_entities(self._external_temperature_entities)
         if value is not None:
             return value
-        raw = self.coordinator.data.get("TemSen")
+        raw = self.coordinator.data.get("InTem")
         if (
             self.coordinator.data.get("InTemEn") != 1
             or raw is None
@@ -276,7 +276,17 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
 
     @property
     def current_humidity(self) -> float | None:
-        return self._average_entities(self._external_humidity_entities)
+        value = self._average_entities(self._external_humidity_entities)
+        if value is not None:
+            return value
+        raw = self.coordinator.data.get("InHumi")
+        if (
+            self.coordinator.data.get("InHumiEn") != 1
+            or not isinstance(raw, (int, float))
+            or not 0 < raw <= 100
+        ):
+            return None
+        return float(raw)
 
     @property
     def extra_state_attributes(self):

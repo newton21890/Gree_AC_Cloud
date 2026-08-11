@@ -220,16 +220,20 @@ HVAC_MAP_REV = {v: k for k, v in HVAC_MAP.items()}
 
 DEVICE_SENSORS = {
     "InTem": {
-        "name": "Indoor Unit Air Sensor (Raw/Unverified)",
-        "icon": "mdi:thermometer-alert",
-        "diagnostic": True,
+        "name": "Indoor Air Temperature",
+        "icon": "mdi:home-thermometer",
+        "enabled_default": True,
     },
     "OutTem": {
         "name": "Outdoor Unit Sensor (Raw/Unverified)",
         "icon": "mdi:thermometer-alert",
         "diagnostic": True,
     },
-    "TemSen": {"name": "Indoor Air Temperature", "icon": "mdi:home-thermometer"},
+    "TemSen": {
+        "name": "Additional Temperature Sensor",
+        "icon": "mdi:thermometer-lines",
+        "diagnostic": True,
+    },
     "InHumi": {"name": "Indoor Humidity", "icon": "mdi:water-percent"},
     "SetDeciTem": {"name": "Target Temperature (Decimal)", "icon": "mdi:thermometer"},
     "Errcode": {"name": "Error Code", "icon": "mdi:alert-circle-outline", "diagnostic": True},

@@ -326,15 +326,17 @@ class GreePanelDataView(HomeAssistantView):
                 state["RoomHumidity"] = _average(humidity_ids)
                 state["RoomTemperatureSensors"] = temperature_ids
                 state["RoomHumiditySensors"] = humidity_ids
+                raw_in_tem = state.get("InTem")
                 raw_tem_sen = state.get("TemSen")
                 raw_in_humi = state.get("InHumi")
                 state["InTemEnableRaw"] = state.get("InTemEn")
                 state["InHumiEnableRaw"] = state.get("InHumiEn")
-                state["TemSenEnabled"] = (
+                state["InTemEnabled"] = (
                     state.get("InTemEn") == 1
-                    and isinstance(raw_tem_sen, (int, float))
-                    and raw_tem_sen != 0
+                    and isinstance(raw_in_tem, (int, float))
+                    and raw_in_tem != 0
                 )
+                state["TemSenEnabled"] = isinstance(raw_tem_sen, (int, float)) and raw_tem_sen != 0
                 state["InHumiEnabled"] = (
                     state.get("InHumiEn") == 1
                     and isinstance(raw_in_humi, (int, float))
@@ -1928,9 +1930,9 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
       <p style="color:var(--text-secondary);font-size:12px;">Ogni entità HA corrisponde a una funzione del controller XE7A-24/HC. La colonna <strong>ICONA Display</strong> mostra quale simbolo appare sul display fisico quando la funzione è attiva (riferimento Tabella 3.1 del manuale).</p>
       <table class="wt"><tr><th>Platform</th><th>Key</th><th>HA Icona</th><th>ICONA Display</th><th>Descrizione</th></tr>
       <tr><td>climate</td><td>—</td><td><span class="hmi">❄</span></td><td>N.27/31/32 ☀❄/ N.30 Ventola / N.29 Goccia</td><td>Acceso/spento, modo (Auto/Cool/Heat/Fan/Dry), ventola 6 vel, swing, setpoint temperatura</td></tr>
-      <tr><td>sensor</td><td>InTem</td><td><span class="hmi">🌡</span></td><td>N.33 — valore temperatura display</td><td>Temperatura ambiente interna (da cloud; se InTemEn=0 sul controller, il valore è fisso 68=20°C)</td></tr>
+      <tr><td>sensor</td><td>InTem</td><td><span class="hmi">🌡</span></td><td>N.33 — valore temperatura display</td><td>Temperatura ambiente interna: valore protocollo con offset +40, quindi temperatura = InTem − 40 °C; valida quando InTemEn=1</td></tr>
       <tr><td>sensor</td><td>OutTem</td><td><span class="hmi">🌡</span></td><td>N.33 — valore temperatura display</td><td>Temperatura esterna (componente elettronico, non temperatura ambiente esterna reale)</td></tr>
-      <tr><td>sensor</td><td>TemSen</td><td><span class="hmi">🌡</span></td><td>—</td><td>Temperatura sensore locale del controller (I-FEEL). Non disponibile via cloud API → mostra <code>None</code></td></tr>
+      <tr><td>sensor</td><td>TemSen</td><td><span class="hmi">🌡</span></td><td>—</td><td>Sensore temperatura aggiuntivo/opzionale, separato da InTem; sulle unità osservate il cloud restituisce <code>None</code></td></tr>
       <tr><td>sensor</td><td>InHumi</td><td><span class="hmi">💧</span></td><td>—</td><td>Umidità interna percentuale (0–100%). C17 sul menu service. Non sempre disponibile</td></tr>
       <tr><td>sensor</td><td>SetDeciTem</td><td><span class="hmi">🌡</span></td><td>N.33 — setpoint display</td><td>Setpoint temperatura in decimi di °C (es. 245 = 24.5°C). Solo lettura</td></tr>
       <tr><td>switch</td><td>Health</td><td><span class="hmi">🌿</span></td><td>N.14 🌿 Health function</td><td>Ionizzatore/Health — genera ioni per purificare l'aria. Icona foglia sul display. Confermato funzionante sui tuoi device</td></tr>
@@ -2690,7 +2692,7 @@ function renderDevice(d) {
   const tem = s.SetDeciTem != null ? (s.SetDeciTem / 10).toFixed(1) : (s.SetTem || '--');
   const inTem = s.InTem;
   const outTem = s.OutTem;
-  const measuredAir = s.TemSen;
+  const measuredAir = s.InTem;
   const nativeRoomTemp = Number(s.InTemEn) === 1 && measuredAir != null
     ? Number(measuredAir) - 40 : null;
   const externalRoomTemp = s.RoomTemperature;
@@ -2847,7 +2849,7 @@ function renderDevice(d) {
     <div class="control-row">
       <label>Temperatura interna</label>
       <div class="btn-group"><button class="btn ${Number(s.InTemEn) === 1 ? 'active' : ''}" onclick="toggleNativeSensor('${safeMac}','InTemEn')">${Number(s.InTemEn) === 1 ? 'Abilitata' : 'Disabilitata'}</button></div>
-      <span class="state-line">${nativeRoomTemp != null ? nativeRoomTemp.toFixed(1) + ' °C (TemSen ' + escHtml(String(measuredAir)) + ' − 40)' : 'Nessun valore valido'}</span>
+      <span class="state-line">${nativeRoomTemp != null ? nativeRoomTemp.toFixed(1) + ' °C (InTem ' + escHtml(String(measuredAir)) + ' − 40)' : 'Nessun valore valido'}</span>
     </div>
     <div class="control-row">
       <label>Umidità interna</label>
@@ -2940,7 +2942,7 @@ function renderOperationsDevice(d) {
   const pow = Number(s.Pow || 0) === 1;
   const mod = Number(s.Mod || 0);
   const target = s.SetDeciTem != null ? (Number(s.SetDeciTem) / 10).toFixed(1) : (s.SetTem || '--');
-  const measuredAir = s.TemSen;
+  const measuredAir = s.InTem;
   const roomTemp = s.RoomTemperature != null
     ? Number(s.RoomTemperature)
     : (Number(s.InTemEn) === 1 && measuredAir != null ? Number(measuredAir) - 40 : null);
@@ -3072,7 +3074,7 @@ function renderOperationsOverview(data) {
   const states = data.map(device => device.state || {});
   const valid = values => values.filter(value => Number.isFinite(value));
   const average = values => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
-  const roomTemps = valid(states.map(state => state.RoomTemperature != null ? Number(state.RoomTemperature) : (state.TemSen != null ? Number(state.TemSen) - 40 : NaN)));
+  const roomTemps = valid(states.map(state => state.RoomTemperature != null ? Number(state.RoomTemperature) : (Number(state.InTemEn) === 1 && state.InTem != null ? Number(state.InTem) - 40 : NaN)));
   const humidity = valid(states.map(state => state.RoomHumidity != null ? Number(state.RoomHumidity) : (state.InHumi != null ? Number(state.InHumi) : NaN)));
   const outdoor = valid(states.map(state => state.OutdoorTemperature != null ? Number(state.OutdoorTemperature) : NaN));
   const power = states.reduce((sum, state, index) => {

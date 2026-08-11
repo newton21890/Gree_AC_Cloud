@@ -60,7 +60,9 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
         # A column being returned by the cloud is not the same as the physical
         # sensor being enabled. U-Match units commonly return TemSen=None and
         # InHumi=0 when those optional probes are not available.
-        self._attr_entity_registry_enabled_default = cfg.get("diagnostic", False)
+        self._attr_entity_registry_enabled_default = cfg.get(
+            "enabled_default", cfg.get("diagnostic", False)
+        )
 
         if cfg.get("diagnostic"):
             from homeassistant.helpers.entity import EntityCategory
@@ -75,9 +77,11 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
         if not super().available or self._key not in self.coordinator.data:
             return False
         raw = self.coordinator.data.get(self._key)
-        if self._key == "TemSen":
+        if self._key == "InTem":
             enabled = self.coordinator.data.get("InTemEn")
             return enabled == 1 and isinstance(raw, (int, float)) and raw != 0
+        if self._key == "TemSen":
+            return isinstance(raw, (int, float)) and raw != 0
         if self._key == "InHumi":
             enabled = self.coordinator.data.get("InHumiEn")
             return enabled == 1 and isinstance(raw, (int, float)) and 0 < raw <= 100
@@ -88,9 +92,11 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
         raw = self.coordinator.data.get(self._key)
         if raw is None:
             return None
-        if self._key in ("InTem", "OutTem") and isinstance(raw, (int, float)):
-            # The cloud samples resemble half-degree values, but the supplied
-            # manuals do not identify their physical probes.
+        if self._key == "InTem" and isinstance(raw, (int, float)):
+            # The indoor-air protocol value uses a +40 offset.
+            return raw - 40 if raw != 0 else None
+        if self._key == "OutTem" and isinstance(raw, (int, float)):
+            # The supplied manuals do not identify this physical probe.
             return raw / 2 if raw > 50 else raw
         if self._key == "TemSen" and isinstance(raw, (int, float)):
             # Gree measured-air temperatures use a +40 protocol offset; zero
@@ -106,12 +112,19 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self):
-        if self._key == "TemSen":
+        if self._key == "InTem":
             return {
-                "protocol_property": "TemSen",
+                "protocol_property": "InTem",
+                "raw_value": self.coordinator.data.get("InTem"),
                 "enable_property": "InTemEn",
                 "enable_value": self.coordinator.data.get("InTemEn"),
                 "source": "indoor-unit air sensor",
+                "encoding": "raw value minus 40 °C",
+            }
+        if self._key == "TemSen":
+            return {
+                "protocol_property": "TemSen",
+                "source": "additional temperature sensor",
                 "encoding": "raw value minus 40 °C",
             }
         if self._key == "InHumi":
@@ -120,7 +133,7 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
                 "enable_property": "InHumiEn",
                 "enable_value": self.coordinator.data.get("InHumiEn"),
             }
-        if self._key in ("InTem", "OutTem"):
+        if self._key == "OutTem":
             return {
                 "protocol_property": self._key,
                 "raw_value": self.coordinator.data.get(self._key),

@@ -7,7 +7,7 @@
 - Aggiunti `InTemEn` e `InHumiEn` sia al polling esplicito sia alla lista controllata dei comandi MQTT.
 - Il pannello permette di abilitare/disabilitare separatamente le due sonde e mostra i valori nativi restituiti dal dispositivo.
 - Dopo il comando viene richiesto subito un nuovo stato di `InTemEn`, `TemSen`, `InTem`, `InHumiEn` e `InHumi`, così da verificare se il controller accetta il flag e fornisce la misura.
-- La temperatura `TemSen` viene convertita esplicitamente con la formula richiesta `raw − 40 °C`, soltanto quando `InTemEn=1`.
+- La temperatura nativa associata al flag `InTemEn`, cioè `InTem`, viene convertita esplicitamente con la formula richiesta `raw − 40 °C`, soltanto quando `InTemEn=1`; `TemSen` resta una colonna separata/opzionale.
 - L'umidità `InHumi` viene mostrata soltanto quando `InHumiEn=1` e il valore è nell'intervallo valido.
 
 ## 0.13.4
