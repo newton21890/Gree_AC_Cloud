@@ -230,7 +230,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                     self._smart_manual_power = power
                     self._smart_manual_override_explicit = True
                     self._smart_last_action = "manual_on" if power else "manual_off"
-                    _LOGGER.warning(
+                    _LOGGER.info(
                         "External power change for %s classified as %s; last integration command age=%s",
                         self._device.mac,
                         self._smart_last_action,
@@ -637,10 +637,16 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         # continue monitoring, but do not countermand that choice until the room
         # crosses the opposite hysteresis boundary or the profile is reselected.
         if self._smart_manual_power is False:
+            self._smart_fan_speed = None
+            self._smart_dred_level = None
             self._smart_last_action = "manual_off"
             self.async_write_ha_state()
             return
         elif self._smart_manual_power is True:
+            # Automatic commands are suspended, but diagnostics must describe
+            # the observed controller state rather than a stale Smart request.
+            self._smart_fan_speed = FAN_MAP.get(self.coordinator.data.get("WdSpd"))
+            self._smart_dred_level = self._effective_dred_label
             self._smart_last_action = "manual_on"
             self.async_write_ha_state()
             return

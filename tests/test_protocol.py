@@ -220,6 +220,8 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "active_mode == HVACMode.HEAT and current < target" in climate_source
     assert "current < target - deadband" in climate_source
     assert "smart_manual_power_override" in climate_source
+    assert "self._smart_dred_level = self._effective_dred_label" in climate_source
+    assert "External power change for %s classified as %s" in climate_source
     assert "smart_manual_override_explicit" in climate_source
     assert "command_age" in climate_source
     assert "Ignoring delayed power echo" in climate_source
@@ -304,6 +306,11 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "window.localStorage" in panel_source
     assert "window.parent.localStorage" in panel_source
     assert "opts.credentials = 'same-origin'" in panel_source
+    assert "showPanelAuthFailure" in panel_source
+    assert "schedulePanelAuthRetry" in panel_source
+    assert "if (!_panelAuthFailureShown) loadData()" in panel_source
+    assert "if (!opts.headers.Authorization" in panel_source
+    assert "await hass.async_add_executor_job(_load_panel_assets_sync)" in panel_source
     assert "Sessione non disponibile" in panel_source
     assert "Smart (profilo)" not in sensor_modal_source
     assert "Regolazione profili attiva" not in sensor_modal_source

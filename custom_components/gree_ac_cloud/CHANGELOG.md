@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.1
+
+### Correzioni prioritarie dai log diagnostici
+
+- Eliminati gli accessi sincroni ai file del pannello dall'event loop di Home Assistant: README, changelog, manifest e moduli frontend vengono ora caricati tramite executor durante la registrazione.
+- Le variazioni di accensione provenienti da comando a parete o da altri client restano tracciate come override manuali, ma non vengono più segnalate come warning perché costituiscono un evento operativo previsto.
+- Durante un override manuale i diagnostici Smart mostrano ora ventola e I-Demand effettivamente osservati, evitando falsi mismatch causati da una precedente decisione automatica rimasta in memoria.
+- Il pannello interrompe il polling ogni 10 secondi dopo una risposta 401, mostra un messaggio esplicito e tenta nuovamente la sessione dopo 60 secondi; questo riduce drasticamente i tentativi non autenticati ripetuti.
+
 ## 0.11.0
 
 ### Grafici energetici e indicatori di risparmio

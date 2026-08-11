@@ -123,43 +123,51 @@ import os as _os
 _README_CACHE = "# README\n(file not found)"
 _CHANGELOG_CACHE = "# Changelog\n(file not found)"
 _VERSION_CACHE = "0.0.0"
+_PANEL_HISTORY_JS = ""
+_PANEL_PROFILES_JS = ""
+_PANEL_ASSETS_LOADED = False
 _changelog_path = _os.path.join(_os.path.dirname(__file__), "CHANGELOG.md")
 _readme_path = _os.path.join(_os.path.dirname(__file__), "README.md")
 _manifest_path = _os.path.join(_os.path.dirname(__file__), "manifest.json")
 _panel_history_js_path = _os.path.join(_os.path.dirname(__file__), "frontend", "panel_history.js")
 _panel_profiles_js_path = _os.path.join(_os.path.dirname(__file__), "frontend", "panel_profiles.js")
-for _cache_var, _path in [("_README_CACHE", _readme_path), ("_CHANGELOG_CACHE", _changelog_path)]:
+
+
+def _load_panel_assets_sync() -> None:
+    """Load packaged panel assets outside Home Assistant's event loop."""
+    global _CHANGELOG_CACHE
+    global _PANEL_ASSETS_LOADED
+    global _PANEL_HISTORY_JS
+    global _PANEL_PROFILES_JS
+    global _README_CACHE
+    global _VERSION_CACHE
+
     try:
-        with open(_path, encoding="utf-8") as _f:
-            _c = _f.read()
-        if _cache_var == "_README_CACHE":
-            _README_CACHE = _c
-        else:
-            _CHANGELOG_CACHE = _c
-    except Exception:
-        pass
-
-_try_manifest_path = _manifest_path
-try:
-    with open(_try_manifest_path, encoding="utf-8") as _f:
-        _manifest_data = json.load(_f)
-    _VERSION_CACHE = _manifest_data.get("version", "0.0.0")
-except Exception:
-    pass
-
-try:
-    with open(_panel_history_js_path, encoding="utf-8") as _file:
-        _PANEL_HISTORY_JS = _file.read()
-except OSError:
-    _LOGGER.exception("Unable to load panel history frontend module")
-    _PANEL_HISTORY_JS = ""
-
-try:
-    with open(_panel_profiles_js_path, encoding="utf-8") as _file:
-        _PANEL_PROFILES_JS = _file.read()
-except OSError:
-    _LOGGER.exception("Unable to load panel profiles frontend module")
-    _PANEL_PROFILES_JS = ""
+        with open(_readme_path, encoding="utf-8") as file:
+            _README_CACHE = file.read()
+    except OSError:
+        _LOGGER.exception("Unable to load panel README")
+    try:
+        with open(_changelog_path, encoding="utf-8") as file:
+            _CHANGELOG_CACHE = file.read()
+    except OSError:
+        _LOGGER.exception("Unable to load panel changelog")
+    try:
+        with open(_manifest_path, encoding="utf-8") as file:
+            _VERSION_CACHE = json.load(file).get("version", "0.0.0")
+    except (OSError, ValueError):
+        _LOGGER.exception("Unable to load integration manifest")
+    try:
+        with open(_panel_history_js_path, encoding="utf-8") as file:
+            _PANEL_HISTORY_JS = file.read()
+    except OSError:
+        _LOGGER.exception("Unable to load panel history frontend module")
+    try:
+        with open(_panel_profiles_js_path, encoding="utf-8") as file:
+            _PANEL_PROFILES_JS = file.read()
+    except OSError:
+        _LOGGER.exception("Unable to load panel profiles frontend module")
+    _PANEL_ASSETS_LOADED = True
 
 
 async def async_register_panel(hass: HomeAssistant):
@@ -169,6 +177,8 @@ async def async_register_panel(hass: HomeAssistant):
     domain_data = hass.data.setdefault(DOMAIN, {})
     if domain_data.get("panel_registered"):
         return
+    if not _PANEL_ASSETS_LOADED:
+        await hass.async_add_executor_job(_load_panel_assets_sync)
 
     # HTTP routes cannot be unregistered. Keep them for the HA process lifetime
     # and only recreate the sidebar item after an integration reload.
@@ -2296,15 +2306,53 @@ function authHeaders(extra = {}) {
   return headers;
 }
 
+let _panelAuthFailureShown = false;
+let _panelAuthRetryTimer = null;
+function showPanelAuthFailure() {
+  if (_panelAuthFailureShown) return;
+  _panelAuthFailureShown = true;
+  const badge = document.getElementById('statusBadge');
+  if (badge) {
+    badge.textContent = 'SESSIONE NON DISPONIBILE';
+    badge.classList.add('off');
+  }
+  const targets = ['devices','chartsContent','profilesContent'];
+  for (const id of targets) {
+    const element = document.getElementById(id);
+    if (element) element.innerHTML = '<div class="setup-msg"><h2>Sessione Home Assistant non disponibile</h2><p>Ricarica la pagina o riapri Gree AC Cloud dalla barra laterale. Il pannello ha sospeso gli aggiornamenti automatici per evitare richieste senza autenticazione.</p></div>';
+  }
+}
+function schedulePanelAuthRetry() {
+  if (_panelAuthRetryTimer) return;
+  _panelAuthRetryTimer = setTimeout(() => {
+    _panelAuthRetryTimer = null;
+    _panelAuthFailureShown = false;
+    loadModels();
+    loadNames().then(loadData);
+  },60000);
+}
+
 async function apiFetch(url, opts = {}) {
   opts.headers = authHeaders(opts.headers || {});
   opts.credentials = 'same-origin';
+  if (!opts.headers.Authorization && url.startsWith(HA_BASE + '/api/gree_ac_cloud/')) {
+    showPanelAuthFailure();
+    schedulePanelAuthRetry();
+    const error = new Error('Autenticazione Home Assistant non disponibile nel pannello');
+    error.status = 401;
+    throw error;
+  }
   const resp = await fetch(url, opts);
   if (!resp.ok) {
+    if (resp.status === 401) {
+      showPanelAuthFailure();
+      schedulePanelAuthRetry();
+    }
     const error = new Error(resp.status === 401 ? 'Autenticazione Home Assistant non disponibile nel pannello' : (resp.statusText || `HTTP ${resp.status}`));
     error.status = resp.status;
     throw error;
   }
+  _panelAuthFailureShown = false;
   return resp.json();
 }
 
@@ -2966,6 +3014,11 @@ async function loadData() {
     const container = document.getElementById('devices');
     const setupMsg = document.getElementById('setupMsg');
     const badge = document.getElementById('statusBadge');
+    _panelAuthFailureShown = false;
+    if (_panelAuthRetryTimer) {
+      clearTimeout(_panelAuthRetryTimer);
+      _panelAuthRetryTimer = null;
+    }
 
     if (!data || data.length === 0) {
       setupMsg.style.display = 'block';
@@ -3386,7 +3439,7 @@ document.addEventListener('keydown', event => {
 
 loadModels();
 loadNames().then(loadData);
-setInterval(loadData, 10000);
+setInterval(() => { if (!_panelAuthFailureShown) loadData(); }, 10000);
 
 (async function initSettings() {
   try {
