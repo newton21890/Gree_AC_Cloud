@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.0
+
+### Grafici ApexCharts
+
+- Sostituito il renderer SVG proprietario dei grafici con ApexCharts 3.54.1, distribuito localmente con l'integrazione e senza dipendenze da CDN o dalla ApexCharts Card HACS.
+- Aggiunti tooltip condivisi, zoom, selezione temporale, pan e ripristino sui grafici storici dettagliati.
+- Mantenuta l'acquisizione dati tramite l'API storico dell'integrazione, alimentata dal Recorder di Home Assistant e dalle entità configurate nel pannello.
+- Conservati tema scuro, aree graduate, linee target tratteggiate e layout responsive per desktop, mobile e orientamento verticale.
+- Aggiunta gestione esplicita del ciclo di vita dei grafici per evitare istanze duplicate e memoria residua durante aggiornamenti e cambi pagina.
+
 ## 0.11.3
 
 ### Recupero delle sessioni frontend scadute

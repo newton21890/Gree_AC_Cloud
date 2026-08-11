@@ -33,62 +33,132 @@ function updateEnvironmentHistory(mac, state) {
   while (history.length > 180) history.shift();
   return history;
 }
-function showChartTooltip(event, id, label, value, unit, timestamp) {
-  const tip = document.getElementById(id);
-  if (!tip) return;
-  const plot = tip.parentElement.getBoundingClientRect();
-  const marker = event.currentTarget?.getBoundingClientRect();
-  const pointerX = Number.isFinite(event.clientX) && event.clientX > 0 ? event.clientX : marker.left + marker.width / 2;
-  const pointerY = Number.isFinite(event.clientY) && event.clientY > 0 ? event.clientY : marker.top;
-  tip.innerHTML = `<b>${escHtml(label)} · ${Number(value).toFixed(1)} ${unit}</b><small>${new Date(Number(timestamp)).toLocaleString('it-IT')}</small>`;
-  tip.style.left = `${Math.max(85,Math.min(plot.width-85,pointerX-plot.left))}px`;
-  tip.style.top = `${Math.max(70,pointerY-plot.top)}px`;
-  tip.classList.add('visible');
+const _apexCharts = new Map();
+const _apexRenderTickets = new Map();
+
+function isApexChartScope(id, scope) {
+  const control = id.endsWith('-control-temperature');
+  return scope === 'all' || (scope === 'control' ? control : !control);
 }
-function hideChartTooltip(id) {
-  document.getElementById(id)?.classList.remove('visible');
+function destroyApexCharts(scope = 'all') {
+  for (const [id,chart] of _apexCharts.entries()) {
+    if (!isApexChartScope(id,scope)) continue;
+    try { chart.destroy(); } catch (error) {}
+    _apexCharts.delete(id);
+  }
+  for (const id of _apexRenderTickets.keys()) {
+    if (isApexChartScope(id,scope)) _apexRenderTickets.delete(id);
+  }
+}
+function apexChartHeight(config) {
+  const mobile = window.matchMedia('(max-width:720px)').matches;
+  const portrait = !config.compact && window.matchMedia('(max-width:720px) and (orientation:portrait)').matches;
+  if (portrait) return 520;
+  if (config.compact) return mobile ? 265 : 230;
+  return mobile ? 330 : 370;
+}
+function apexValue(value, decimals, unit) {
+  const number = finiteNumber(value);
+  return number === null ? '—' : `${number.toFixed(decimals)}${unit}`;
+}
+function apexTimeLabel(timestamp) {
+  const date = new Date(Number(timestamp));
+  const options = _historyView.period === '6h' || _historyView.period === '24h'
+    ? {hour:'2-digit',minute:'2-digit'}
+    : {day:'2-digit',month:'2-digit',hour:'2-digit'};
+  return date.toLocaleString('it-IT', options);
+}
+function queueApexChart(id, history, config) {
+  const ticket = Symbol(id);
+  _apexRenderTickets.set(id,ticket);
+  const render = () => {
+    if (_apexRenderTickets.get(id) !== ticket) return;
+    const element = document.getElementById(id);
+    if (!element || !element.isConnected || typeof ApexCharts === 'undefined') return;
+    _apexRenderTickets.delete(id);
+    const previous = _apexCharts.get(id);
+    if (previous) {
+      try { previous.destroy(); } catch (error) {}
+      _apexCharts.delete(id);
+    }
+    const lineSeries = config.series.map(item => ({
+      name: item.label,
+      type: item.area ? 'area' : 'line',
+      data: history.map(point => [Number(point.t), finiteNumber(point[item.key])]),
+    }));
+    const values = history.flatMap(point => config.series.map(item => finiteNumber(point[item.key]))).filter(Number.isFinite);
+    let minimum = config.fixedMin;
+    let maximum = config.fixedMax;
+    if (minimum === undefined || maximum === undefined) {
+      const low = Math.min(...values), high = Math.max(...values);
+      const range = Math.max(high-low,config.minimumRange || 1);
+      const pad = Math.max(config.padding || 0,range*.05);
+      minimum = minimum ?? Math.floor((low-pad)*10)/10;
+      maximum = maximum ?? Math.ceil((high+pad)*10)/10;
+    }
+    const dashArray = config.series.map(item => item.css === 'target' ? 7 : item.css === 'outdoor' ? 3 : 0);
+    const widths = config.series.map(item => item.css === 'target' ? 2 : 2.4);
+    const chart = new ApexCharts(element, {
+      chart: {
+        id,
+        type: 'line',
+        height: apexChartHeight(config),
+        background: 'transparent',
+        foreColor: '#8290a5',
+        fontFamily: 'Inter,system-ui,-apple-system,sans-serif',
+        animations: {enabled:false},
+        toolbar: {show:!config.compact,tools:{download:false,selection:true,zoom:true,zoomin:true,zoomout:true,pan:true,reset:true}},
+        zoom: {enabled:!config.compact,type:'x',autoScaleYaxis:false},
+        selection: {enabled:false},
+      },
+      series: lineSeries,
+      colors: config.series.map(item => item.color),
+      stroke: {curve:'smooth',width:widths,dashArray,lineCap:'round'},
+      fill: {
+        type:'gradient',
+        opacity:config.series.map(item => item.area ? .24 : 0),
+        gradient:{shade:'dark',type:'vertical',shadeIntensity:.2,opacityFrom:.32,opacityTo:.02,stops:[0,90,100]},
+      },
+      dataLabels: {enabled:false},
+      markers: {size:0,hover:{size:5}},
+      grid: {borderColor:'#223047',strokeDashArray:2,padding:{left:4,right:12,top:0,bottom:0}},
+      legend: {show:true,position:'top',horizontalAlign:'right',fontSize:'11px',labels:{colors:'#a7b3c5'},markers:{width:16,height:3,radius:2}},
+      xaxis: {
+        type:'datetime',
+        min:Math.min(...history.map(point => Number(point.t))),
+        max:Math.max(...history.map(point => Number(point.t))),
+        axisBorder:{show:true,color:'#52627a'},
+        axisTicks:{show:false},
+        labels:{datetimeUTC:false,rotate:0,hideOverlappingLabels:true,formatter:value => apexTimeLabel(value),style:{fontSize:'10px'}},
+        tooltip:{enabled:false},
+      },
+      yaxis: {
+        min:minimum,
+        max:maximum,
+        tickAmount:4,
+        forceNiceScale:true,
+        labels:{formatter:value => apexValue(value,config.decimals,config.unit),style:{fontSize:'10px'}},
+      },
+      tooltip: {
+        shared:true,
+        intersect:false,
+        theme:'dark',
+        x:{formatter:value => new Date(Number(value)).toLocaleString('it-IT')},
+        y:{formatter:value => apexValue(value,config.decimals,config.unit)},
+      },
+      noData:{text:'Nessun dato disponibile'},
+    });
+    _apexCharts.set(id,chart);
+    chart.render().catch(error => console.error('ApexCharts render failed',error));
+  };
+  requestAnimationFrame(render);
 }
 function renderTimeSeriesPanel(mac, history, config) {
-  // A portrait-specific coordinate system is essential here: merely making
-  // the SVG element taller leaves the wide viewBox letterboxed and the actual
-  // plot remains tiny. In portrait the plot therefore gets a genuinely tall
-  // viewBox, while landscape and desktop retain the wide timeline.
-  const mobileChart = window.matchMedia('(max-width:720px)').matches;
-  const portraitChart = !config.compact && window.matchMedia('(max-width:720px) and (orientation:portrait)').matches;
-  const compactMobile = config.compact && mobileChart;
-  const width = portraitChart || compactMobile ? 460 : 1000;
-  const height = portraitChart ? 580 : compactMobile ? 300 : 380;
-  const left = portraitChart || compactMobile ? 52 : 64;
-  const right = portraitChart || compactMobile ? 16 : 26;
-  const top = 24, bottom = portraitChart || compactMobile ? 62 : 54;
-  const values = history.flatMap(point => config.series.map(item => point[item.key])).filter(Number.isFinite);
+  const values = history.flatMap(point => config.series.map(item => finiteNumber(point[item.key]))).filter(Number.isFinite);
   if (!values.length) return `<section class="chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div></div><div class="chart-empty">Nessun dato disponibile nello storico di Home Assistant</div></section>`;
-  let min = config.fixedMin ?? Math.floor(Math.min(...values) - config.padding);
-  let max = config.fixedMax ?? Math.ceil(Math.max(...values) + config.padding);
-  if (max - min < config.minimumRange) { const middle = (max + min) / 2; min = middle - config.minimumRange / 2; max = middle + config.minimumRange / 2; }
-  const times = history.map(point => point.t);
-  const tMin = Math.min(...times), tMax = Math.max(...times);
-  const x = t => left + (tMax === tMin ? .5 : (t - tMin) / (tMax - tMin)) * (width-left-right);
-  const y = value => top + (max-value)/(max-min)*(height-top-bottom);
-  const ticks = Array.from({length:5},(_,index) => ({value:max-index*(max-min)/4,y:top+index*(height-top-bottom)/4}));
-  const timeTickCount = portraitChart || compactMobile ? 3 : 5;
-  const timeTicks = Array.from({length:timeTickCount},(_,index) => ({t:tMin+index*(tMax-tMin)/(timeTickCount-1),x:left+index*(width-left-right)/(timeTickCount-1)}));
-  const tooltipId = `chart-tip-${mac}-${config.id}`.replace(/[^a-zA-Z0-9_-]/g,'_');
-  const drawSeries = item => {
-    const points = history.map(point => ({point,value:point[item.key]})).filter(entry => Number.isFinite(entry.value));
-    if (!points.length) return '';
-    const coords = points.map(entry => `${x(entry.point.t)},${y(entry.value)}`).join(' ');
-    const area = item.area && points.length > 1 ? `<polygon class="chart-area" fill="${item.color}" points="${x(points[0].point.t)},${height-bottom} ${coords} ${x(points[points.length-1].point.t)},${height-bottom}"/>` : '';
-    const line = points.length > 1 ? `<polyline class="chart-series ${item.css || ''}" stroke="${item.color}" points="${coords}"/>` : '';
-    // Keep long Recorder histories readable: show a limited number of visual
-    // markers while preserving every sample in the line. Transparent hit
-    // targets make the markers easy to select with a finger.
-    const markerLimit = config.compact ? 28 : 48;
-    const dotStep = Math.max(1, Math.ceil(points.length / markerLimit));
-    const dots = points.filter((_,index) => index % dotStep === 0 || index === points.length - 1).map(entry => `<g class="chart-point-group" tabindex="0" role="button" aria-label="${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit}" onpointerdown="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmouseenter="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmousemove="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onmouseleave="hideChartTooltip('${tooltipId}')" onfocus="showChartTooltip(event,'${tooltipId}','${item.label}',${entry.value},'${config.unit}',${entry.point.t})" onblur="hideChartTooltip('${tooltipId}')"><circle class="chart-point-hit" cx="${x(entry.point.t)}" cy="${y(entry.value)}" r="14"/><circle class="chart-point" cx="${x(entry.point.t)}" cy="${y(entry.value)}" r="4.5" fill="${item.color}"/><title>${item.label}: ${Number(entry.value).toFixed(1)} ${config.unit} · ${new Date(entry.point.t).toLocaleString('it-IT')}</title></g>`).join('');
-    return area + line + dots;
-  };
-  return `<section class="chart-panel ${config.className || ''} ${portraitChart ? 'portrait-chart' : ''} ${compactMobile ? 'compact-mobile-chart' : ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div><div class="ops-chart-legend">${config.series.map(item => `<span><i style="background:${item.color};${item.css === 'target' ? 'background:repeating-linear-gradient(90deg,'+item.color+' 0 7px,transparent 7px 11px)' : ''}"></i>${item.label}</span>`).join('')}</div></div><div class="ops-chart-plot"><div class="chart-tooltip" id="${tooltipId}"></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${config.title}">${ticks.map(tick => `<line class="chart-grid-line" x1="${left}" y1="${tick.y}" x2="${width-right}" y2="${tick.y}"/><text class="chart-axis-label" x="${left-10}" y="${tick.y+4}" text-anchor="end">${tick.value.toFixed(config.decimals)}${config.unit}</text>`).join('')}<line class="chart-axis-line" x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}"/><line class="chart-axis-line" x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}"/>${config.series.map(drawSeries).join('')}${timeTicks.map(tick => `<text class="chart-axis-label" x="${tick.x}" y="${height-13}" text-anchor="middle">${new Date(tick.t).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</text>`).join('')}</svg></div></section>`;
+  const id = `apex-chart-${mac}-${config.id}`.replace(/[^a-zA-Z0-9_-]/g,'_');
+  queueApexChart(id,history,config);
+  return `<section class="chart-panel apex-chart-panel ${config.className || ''}"><div class="chart-panel-header"><div><div class="chart-panel-title">${config.title}</div><span class="chart-panel-subtitle">${config.subtitle}</span></div></div><div id="${id}" class="apex-chart-host" role="img" aria-label="${config.title}"></div></section>`;
 }
 function renderEnvironmentChart(mac, state, detailed = false) {
   const liveHistory = updateEnvironmentHistory(mac, state);
@@ -201,10 +271,12 @@ async function loadPersistentHistory(force = false) {
   }));
   if (generation !== _historyView.generation) return;
   _historyView.loading = false;
-  renderChartsPage(data, false);
-  renderControlCharts(data);
+  const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
+  if (activeTab === 'charts') renderChartsPage(data, false);
+  if (activeTab === 'devices') renderControlCharts(data);
 }
 function renderControlCharts(data) {
+  destroyApexCharts('control');
   for (const device of data) {
     const container = document.getElementById(`control-chart-${device.mac}`);
     if (container) container.innerHTML = renderEnvironmentChart(device.mac,device.state || {},false);
@@ -235,6 +307,7 @@ function goToLatestHistory() {
 function renderChartsPage(data, requestHistory = true) {
   const content = document.getElementById('chartsContent');
   if (!content) return;
+  destroyApexCharts('detail');
   const cards = data.map(device => {
     const state = device.state || {};
     const value = (raw,unit) => finiteNumber(raw) == null ? '--' : `${Number(raw).toFixed(1)}${unit}`;

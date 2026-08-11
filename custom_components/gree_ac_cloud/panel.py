@@ -125,16 +125,19 @@ _CHANGELOG_CACHE = "# Changelog\n(file not found)"
 _VERSION_CACHE = "0.0.0"
 _PANEL_HISTORY_JS = ""
 _PANEL_PROFILES_JS = ""
+_APEXCHARTS_JS = ""
 _PANEL_ASSETS_LOADED = False
 _changelog_path = _os.path.join(_os.path.dirname(__file__), "CHANGELOG.md")
 _readme_path = _os.path.join(_os.path.dirname(__file__), "README.md")
 _manifest_path = _os.path.join(_os.path.dirname(__file__), "manifest.json")
 _panel_history_js_path = _os.path.join(_os.path.dirname(__file__), "frontend", "panel_history.js")
 _panel_profiles_js_path = _os.path.join(_os.path.dirname(__file__), "frontend", "panel_profiles.js")
+_apexcharts_js_path = _os.path.join(_os.path.dirname(__file__), "frontend", "apexcharts.min.js")
 
 
 def _load_panel_assets_sync() -> None:
     """Load packaged panel assets outside Home Assistant's event loop."""
+    global _APEXCHARTS_JS
     global _CHANGELOG_CACHE
     global _PANEL_ASSETS_LOADED
     global _PANEL_HISTORY_JS
@@ -167,6 +170,11 @@ def _load_panel_assets_sync() -> None:
             _PANEL_PROFILES_JS = file.read()
     except OSError:
         _LOGGER.exception("Unable to load panel profiles frontend module")
+    try:
+        with open(_apexcharts_js_path, encoding="utf-8") as file:
+            _APEXCHARTS_JS = file.read()
+    except OSError:
+        _LOGGER.exception("Unable to load packaged ApexCharts module")
     _PANEL_ASSETS_LOADED = True
 
 
@@ -244,6 +252,7 @@ class GreePanelView(HomeAssistantView):
         html = html.replace("__CHANGELOG_JSON__", _safe_json_for_script(_CHANGELOG_CACHE))
         html = html.replace("__VERSION__", _VERSION_CACHE)
         html = html.replace("__DEVICE_NAMES_JSON__", "{}")
+        html = html.replace("__APEXCHARTS_JS__", _APEXCHARTS_JS)
         html = html.replace("__PANEL_HISTORY_JS__", _PANEL_HISTORY_JS)
         html = html.replace("__PANEL_PROFILES_JS__", _PANEL_PROFILES_JS)
         return web.Response(
@@ -1428,6 +1437,15 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-chart-plot { position:relative; }
 .chart-panel svg { width:100%; height:clamp(280px,34vw,390px); display:block; touch-action:pan-y; }
 .chart-panel.humidity svg { height:clamp(280px,34vw,390px); }
+.apex-chart-panel { overflow:hidden; }
+.apex-chart-host { width:100%; min-height:230px; }
+.apexcharts-canvas,.apexcharts-svg { background:transparent !important; }
+.apexcharts-tooltip,.apexcharts-xaxistooltip { border-color:#42536c !important; background:rgba(13,20,31,.97) !important; color:#eef6ff !important; box-shadow:0 8px 30px rgba(0,0,0,.45) !important; }
+.apexcharts-tooltip-title { border-bottom-color:#34445a !important; background:#151e2b !important; }
+.apexcharts-menu { border-color:#34445a !important; background:#111925 !important; }
+.apexcharts-menu-item:hover { background:#18313a !important; }
+.apexcharts-toolbar svg { fill:#8290a5 !important; }
+.apexcharts-toolbar .apexcharts-selected svg { fill:#22d3ee !important; }
 .chart-grid-line { stroke:#223047; stroke-width:1; vector-effect:non-scaling-stroke; }
 .chart-axis-line { stroke:#52627a; stroke-width:1; vector-effect:non-scaling-stroke; }
 .chart-axis-label { fill:#8290a5; font-size:11px; font-weight:600; }
@@ -2256,6 +2274,9 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 </div>
 
 <script>
+__APEXCHARTS_JS__
+</script>
+<script>
 const HA_BASE = window.location.origin;
 const PANEL_DATA_URL = HA_BASE + '/api/gree_ac_cloud/panel/data';
 const PANEL_CMD_URL = HA_BASE + '/api/gree_ac_cloud/panel/command';
@@ -3052,7 +3073,9 @@ async function loadData() {
     document.getElementById('opsUpdateText').textContent = `${data.length} unità · ${data.filter(d => d.connected).length} online · aggiornato ${new Date().toLocaleTimeString('it-IT')}`;
     container.innerHTML = data.map(d => renderOperationsDevice(d)).join('');
     window._lastPanelData = data;
-    renderChartsPage(data);
+    const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
+    if (activeTab === 'charts') renderChartsPage(data);
+    else if (activeTab === 'devices') renderControlCharts(data);
     renderProfilesPage(data);
 
     const info = document.getElementById('serverInfo');
@@ -3317,6 +3340,9 @@ function switchTab(tab) {
   });
   const badge = document.getElementById('statusBadge');
   badge.style.display = ['devices','charts','profiles'].includes(tab) ? 'inline' : 'none';
+  if (tab === 'devices') destroyApexCharts('detail');
+  else if (tab === 'charts') destroyApexCharts('control');
+  else destroyApexCharts();
   if (tab === 'charts' && window._lastPanelData) renderChartsPage(window._lastPanelData);
   if (tab === 'profiles' && window._lastPanelData) renderProfilesPage(window._lastPanelData);
   if (tab === 'logs') {

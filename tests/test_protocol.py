@@ -51,6 +51,12 @@ def test_persistent_history_is_modular_and_recorder_backed() -> None:
     assert '"30d": timedelta(days=30)' in history_source
     assert "HISTORY_MAX_POINTS = 720" in history_source
     assert "__PANEL_HISTORY_JS__" in panel_source
+    assert "__APEXCHARTS_JS__" in panel_source
+    assert "new ApexCharts" in frontend_source
+    assert "type:'datetime'" in frontend_source
+    assert "shared:true" in frontend_source
+    assert (COMPONENT / "frontend" / "apexcharts.min.js").stat().st_size > 500_000
+    assert "MIT License" in (COMPONENT / "frontend" / "APEXCHARTS_LICENSE").read_text()
     assert "loadPersistentHistory" in frontend_source
     assert "shiftHistory" in frontend_source
     assert "goToLatestHistory" in frontend_source
@@ -114,21 +120,34 @@ def test_panel_javascript_parses_when_node_is_available() -> None:
             break
 
     assert panel_html is not None
-    panel_html = panel_html.replace(
-        "__PANEL_HISTORY_JS__",
-        (COMPONENT / "frontend" / "panel_history.js").read_text(),
-    ).replace(
-        "__PANEL_PROFILES_JS__",
-        (COMPONENT / "frontend" / "panel_profiles.js").read_text(),
+    panel_html = (
+        panel_html.replace(
+            "__APEXCHARTS_JS__",
+            (COMPONENT / "frontend" / "apexcharts.min.js").read_text(),
+        )
+        .replace(
+            "__PANEL_HISTORY_JS__",
+            (COMPONENT / "frontend" / "panel_history.js").read_text(),
+        )
+        .replace(
+            "__PANEL_PROFILES_JS__",
+            (COMPONENT / "frontend" / "panel_profiles.js").read_text(),
+        )
     )
-    script_start = panel_html.find("<script>")
-    script_end = panel_html.rfind("</script>")
-    assert script_start >= 0 and script_end > script_start
+    scripts = []
+    offset = 0
+    while (script_start := panel_html.find("<script>", offset)) >= 0:
+        script_end = panel_html.find("</script>", script_start)
+        assert script_end > script_start
+        scripts.append(panel_html[script_start + len("<script>") : script_end])
+        offset = script_end + len("</script>")
+    assert len(scripts) == 2
 
-    with tempfile.NamedTemporaryFile("w", suffix=".js") as script:
-        script.write(panel_html[script_start + len("<script>") : script_end])
-        script.flush()
-        subprocess.run([node, "--check", script.name], check=True, capture_output=True)
+    for source in scripts:
+        with tempfile.NamedTemporaryFile("w", suffix=".js") as script:
+            script.write(source)
+            script.flush()
+            subprocess.run([node, "--check", script.name], check=True, capture_output=True)
 
 
 def _load_protocol_module():
@@ -324,10 +343,10 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "ClimateTargetTemperature" in history_source
     assert "outdoorHumiditySensor" in panel_source
     assert "renderChartsPage" in history_source
-    assert "chart-point-hit" in history_source
-    assert "markerLimit = config.compact ? 28 : 48" in history_source
-    assert "Math.ceil(points.length / markerLimit)" in history_source
-    assert 'onpointerdown="showChartTooltip' in history_source
+    assert "new ApexCharts" in history_source
+    assert "shared:true" in history_source
+    assert "zoom: {enabled:!config.compact" in history_source
+    assert "destroyApexCharts" in history_source
     assert "renderControlCharts" in history_source
     assert "HA Recorder · periodo" in history_source
     assert "compact:true" in history_source
