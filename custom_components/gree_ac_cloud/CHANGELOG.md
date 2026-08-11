@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.3
+
+### Validazione delle sonde ambiente Gree
+
+- Verificato il significato di `TemSen`: la temperatura ambiente Gree usa l'offset `+40`, ma il valore `0` indica una sonda non supportata o disabilitata e non deve diventare `−40 °C`.
+- Verificato `InHumi`: il valore `0` restituito dalle unità U-Match viene ora trattato come sonda umidità non disponibile, non come umidità reale allo 0%.
+- Le entità native `TemSen` e `InHumi` risultano disponibili soltanto quando il dato cloud è valido; `InHumi` non viene più abilitato per impostazione predefinita sui dispositivi che espongono solo il valore sentinella.
+- Esposti nel pannello e nell'entità climate i flag di disponibilità delle sonde Gree interne, separati dai sensori ambiente Home Assistant configurati.
+- `InTem` e `OutTem` restano sonde diagnostiche grezze/non verificate: sulle unità osservate riportano valori di circuito (67–89), non la temperatura ambiente interna o meteo esterna, e non vengono usate per la regolazione dei profili.
+- Confermata la corretta acquisizione delle sonde HA configurate: temperatura e umidità ambiente per ciascuna zona e riferimenti esterni comuni.
+
 ## 0.13.2
 
 ### Allineamento della modalità al protocollo Gree

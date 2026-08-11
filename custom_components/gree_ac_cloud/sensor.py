@@ -57,9 +57,10 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
         self._attr_device_class = SENSOR_CLASSES.get(key)
         self._attr_native_unit_of_measurement = SENSOR_UNITS.get(key)
         self._attr_state_class = SENSOR_STATE_CLASS.get(key)
-        self._attr_entity_registry_enabled_default = key in ("InHumi",) or cfg.get(
-            "diagnostic", False
-        )
+        # A column being returned by the cloud is not the same as the physical
+        # sensor being enabled. U-Match units commonly return TemSen=None and
+        # InHumi=0 when those optional probes are not available.
+        self._attr_entity_registry_enabled_default = cfg.get("diagnostic", False)
 
         if cfg.get("diagnostic"):
             from homeassistant.helpers.entity import EntityCategory
@@ -71,7 +72,14 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        return super().available and self._key in self.coordinator.data
+        if not super().available or self._key not in self.coordinator.data:
+            return False
+        raw = self.coordinator.data.get(self._key)
+        if self._key == "TemSen":
+            return isinstance(raw, (int, float)) and raw != 0
+        if self._key == "InHumi":
+            return isinstance(raw, (int, float)) and 0 < raw <= 100
+        return raw is not None
 
     @property
     def native_value(self):
@@ -83,8 +91,11 @@ class GreeSensor(GreeDeviceEntity, SensorEntity):
             # manuals do not identify their physical probes.
             return raw / 2 if raw > 50 else raw
         if self._key == "TemSen" and isinstance(raw, (int, float)):
-            # Gree measured-air temperatures use a +40 protocol offset.
-            return raw - 40
+            # Gree measured-air temperatures use a +40 protocol offset; zero
+            # is the protocol sentinel for an unsupported/disabled sensor.
+            return raw - 40 if raw != 0 else None
+        if self._key == "InHumi" and isinstance(raw, (int, float)):
+            return raw if 0 < raw <= 100 else None
         if isinstance(raw, list):
             return ", ".join(str(item) for item in raw) if raw else "0"
         if isinstance(raw, dict):

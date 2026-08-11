@@ -164,6 +164,21 @@ def _load_protocol_module():
     return module
 
 
+def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
+    sensor_source = (COMPONENT / "sensor.py").read_text()
+    climate_source = (COMPONENT / "climate.py").read_text()
+    panel_source = (COMPONENT / "panel.py").read_text()
+    assert 'self._key == "TemSen"' in sensor_source
+    assert "raw != 0" in sensor_source
+    assert 'self._key == "InHumi"' in sensor_source
+    assert "0 < raw <= 100" in sensor_source
+    assert "or raw == 0" in climate_source
+    assert '"gree_indoor_temperature_sensor_enabled"' in climate_source
+    assert '"gree_indoor_humidity_sensor_enabled"' in climate_source
+    assert 'state["TemSenEnabled"]' in panel_source
+    assert 'state["InHumiEnabled"]' in panel_source
+
+
 def test_gree_mode_mapping_matches_wire_protocol() -> None:
     const_source = (COMPONENT / "const.py").read_text()
     coordinator_source = (COMPONENT / "coordinator.py").read_text()

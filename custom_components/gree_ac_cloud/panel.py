@@ -326,6 +326,14 @@ class GreePanelDataView(HomeAssistantView):
                 state["RoomHumidity"] = _average(humidity_ids)
                 state["RoomTemperatureSensors"] = temperature_ids
                 state["RoomHumiditySensors"] = humidity_ids
+                raw_tem_sen = state.get("TemSen")
+                raw_in_humi = state.get("InHumi")
+                state["TemSenEnabled"] = isinstance(raw_tem_sen, (int, float)) and raw_tem_sen != 0
+                state["InHumiEnabled"] = (
+                    isinstance(raw_in_humi, (int, float)) and 0 < raw_in_humi <= 100
+                )
+                state["RoomTemperatureEnabled"] = state["RoomTemperature"] is not None
+                state["RoomHumidityEnabled"] = state["RoomHumidity"] is not None
                 state["Presets"] = room.get(CONF_PRESETS, {})
                 outdoor_entity = entry.options.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
                 outdoor_state = hass.states.get(outdoor_entity) if outdoor_entity else None
