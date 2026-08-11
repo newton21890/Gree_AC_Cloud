@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.9
+
+### Cambio temperatura senza riavvio dell'integrazione
+
+- Corretto il cambio del target mentre è attivo un profilo: il nuovo valore continua a essere salvato nel profilo, ma l'aggiornamento non scarica più le entità e non riavvia la connessione MQTT.
+- Il comando della temperatura viene applicato immediatamente all'unità e il profilo in memoria usa subito il nuovo target.
+- Gli altri aggiornamenti strutturali delle opzioni continuano a ricaricare normalmente l'integrazione quando necessario.
+
 ## 0.13.8
 
 ### Correzione comando Turbo U-Match

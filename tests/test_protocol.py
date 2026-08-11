@@ -194,6 +194,14 @@ def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
     assert "toggleNativeSensor" in panel_source
 
 
+def test_profile_temperature_change_does_not_reload_integration() -> None:
+    climate_source = (COMPONENT / "climate.py").read_text()
+    init_source = (COMPONENT / "__init__.py").read_text()
+    assert 'runtime_data["skip_next_options_reload"] = True' in climate_source
+    assert 'runtime.pop("skip_next_options_reload", False)' in init_source
+    assert "Applied live options update" in init_source
+
+
 def test_manual_fan_override_and_turbo_are_exposed() -> None:
     climate_source = (COMPONENT / "climate.py").read_text()
     panel_source = (COMPONENT / "panel.py").read_text()

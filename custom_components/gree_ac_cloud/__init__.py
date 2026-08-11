@@ -31,6 +31,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         STORAGE_VERSION,
         UPDATE_INTERVAL,
     )
+
     STORAGE_KEY_NAMES = f"{DOMAIN}.names"
     from .coordinator import GreeDeviceCoordinator, async_discover_and_connect
     from .panel import async_register_panel
@@ -71,7 +72,8 @@ async def async_setup_entry(hass: HomeAssistant, entry):
             if attempt < 3:
                 _LOGGER.warning(
                     "Setup attempt %d/3 failed: %s — retrying in 5s",
-                    attempt, err,
+                    attempt,
+                    err,
                 )
                 await asyncio.sleep(5)
 
@@ -104,10 +106,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     poll_interval = (saved_settings or {}).get("update_interval", UPDATE_INTERVAL)
     hass.data[DOMAIN]["settings"] = saved_settings or {"update_interval": UPDATE_INTERVAL}
 
-    coordinators = [
-        GreeDeviceCoordinator(hass, entry, mqtt, dev)
-        for dev in devices
-    ]
+    coordinators = [GreeDeviceCoordinator(hass, entry, mqtt, dev) for dev in devices]
 
     def _forward(mac, data):
         for coord in coordinators:
@@ -118,6 +117,13 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     data_forwarder["cb"] = _forward
 
     async def _async_options_updated(hass, updated_entry):
+        runtime = getattr(updated_entry, "runtime_data", None) or {}
+        if runtime.pop("skip_next_options_reload", False):
+            _LOGGER.debug(
+                "Applied live options update for %s without reloading MQTT",
+                updated_entry.entry_id,
+            )
+            return
         await hass.config_entries.async_reload(updated_entry.entry_id)
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
@@ -149,16 +155,12 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         for coord in coordinators:
             await coord.async_save_energy()
 
-    entry.async_on_unload(
-        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _persist_all)
-    )
+    entry.async_on_unload(hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _persist_all))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await async_register_panel(hass)
 
-    _LOGGER.info(
-        "Gree AC Cloud setup complete: %d devices", len(devices)
-    )
+    _LOGGER.info("Gree AC Cloud setup complete: %d devices", len(devices))
     return True
 
 

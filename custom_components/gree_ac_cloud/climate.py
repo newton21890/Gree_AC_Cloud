@@ -927,8 +927,10 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                     preset[CONF_PRESET_TARGET],
                     temp,
                 )
-                # Persist only after the hardware command succeeds. The existing
-                # options listener reloads the entry and resumes this profile.
+                # Persist only after the hardware command succeeds. The climate
+                # entity already has the live preset and target, so this options
+                # update must not tear down MQTT and reload the whole integration.
+                self.coordinator.config_entry.runtime_data["skip_next_options_reload"] = True
                 self.hass.config_entries.async_update_entry(
                     self.coordinator.config_entry, options=profile_options
                 )
