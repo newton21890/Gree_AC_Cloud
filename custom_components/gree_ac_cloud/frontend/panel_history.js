@@ -126,8 +126,8 @@ function queueApexChart(id, history, config) {
       colors: activeSeries.map(item => item.color),
       stroke: {curve:'smooth',width:widths,dashArray,lineCap:'round'},
       fill: {
-        type:'gradient',
-        opacity:activeSeries.map(item => item.area ? .24 : 0),
+        type: activeSeries.map(item => item.area ? 'gradient' : 'solid'),
+        opacity:activeSeries.map(item => item.area ? .18 : 1),
         gradient:{shade:'dark',type:'vertical',shadeIntensity:.2,opacityFrom:.32,opacityTo:.02,stops:[0,90,100]},
       },
       dataLabels: {enabled:false},
@@ -177,10 +177,10 @@ function renderEnvironmentChart(mac, state, detailed = false) {
   const recorderHistory = _persistentHistory[mac]?.points || [];
   const history = detailed ? recorderHistory : (recorderHistory.length > 1 ? recorderHistory : liveHistory);
   if (!detailed) {
-    if (history.length < 2) return `<div class="ops-chart control-chart-loading"><div class="ops-chart-legend"><span><i style="background:#22d3ee"></i>Interna</span><span><i style="background:#facc15"></i>Target</span><span><i style="background:#fb7185"></i>Esterna</span></div><div class="chart-empty">${_historyView.loading ? 'Caricamento dati reali da HA Recorder…' : 'Raccolta dati in corso…'}</div></div>`;
-    return renderTimeSeriesPanel(mac,history,{id:'control-temperature',compact:true,className:'control-chart',title:'Temperature reali',subtitle:recorderHistory.length > 1 ? `HA Recorder · periodo ${_historyView.period}` : 'Dati live in attesa dello storico Recorder',unit:'°',padding:1,minimumRange:6,decimals:0,series:[{key:'room',label:'Interna',color:'#22d3ee',area:true},{key:'target',label:'Target',color:'#facc15',css:'target'},{key:'outdoor',label:'Esterna',color:'#fb7185',css:'outdoor'}]});
+    if (history.length < 2) return `<div class="ops-chart control-chart-loading"><div class="ops-chart-legend"><span><i style="background:#22d3ee"></i>Interna</span><span><i style="background:#ff5c8a"></i>Esterna</span><span><i style="background:#fde047"></i>Target</span></div><div class="chart-empty">${_historyView.loading ? 'Caricamento dati reali da HA Recorder…' : 'Raccolta dati in corso…'}</div></div>`;
+    return renderTimeSeriesPanel(mac,history,{id:'control-temperature',compact:true,className:'control-chart',title:'Temperature reali',subtitle:recorderHistory.length > 1 ? `HA Recorder · periodo ${_historyView.period}` : 'Dati live in attesa dello storico Recorder',unit:'°',padding:1,minimumRange:6,decimals:0,series:[{key:'room',label:'Interna',color:'#22d3ee',area:true},{key:'outdoor',label:'Esterna',color:'#ff5c8a',css:'outdoor'},{key:'target',label:'Target',color:'#fde047',css:'target'}]});
   }
-  return `<div class="chart-panels">${renderTimeSeriesPanel(mac,history,{id:'temperature',title:'Temperature',subtitle:'Storico persistente HA Recorder · linea esterna evidenziata',unit:'°',padding:1,minimumRange:6,decimals:0,series:[{key:'room',label:'Interna',color:'#22d3ee',area:true},{key:'target',label:'Target',color:'#facc15',css:'target'},{key:'outdoor',label:'Esterna',color:'#ff5c8a',css:'outdoor'}]})}${renderTimeSeriesPanel(mac,history,{id:'humidity',className:'humidity',title:'Umidità relativa',subtitle:'Sensori interni ed esterni · scala adattiva',unit:'%',padding:5,minimumRange:20,decimals:0,series:[{key:'humidity',label:'Interna',color:'#38bdf8',area:true},{key:'outdoorHumidity',label:'Esterna',color:'#d8b4fe',css:'outdoor'}]})}</div>`;
+  return `<div class="chart-panels">${renderTimeSeriesPanel(mac,history,{id:'temperature',title:'Temperature',subtitle:'Storico persistente HA Recorder · linea esterna evidenziata',unit:'°',padding:1,minimumRange:6,decimals:0,series:[{key:'room',label:'Interna',color:'#22d3ee',area:true},{key:'outdoor',label:'Esterna',color:'#ff5c8a',css:'outdoor'},{key:'target',label:'Target',color:'#fde047',css:'target'}]})}${renderTimeSeriesPanel(mac,history,{id:'humidity',className:'humidity',title:'Umidità relativa',subtitle:'Sensori interni ed esterni · scala adattiva',unit:'%',padding:5,minimumRange:20,decimals:0,series:[{key:'humidity',label:'Interna',color:'#38bdf8',area:true},{key:'outdoorHumidity',label:'Esterna',color:'#d8b4fe',css:'outdoor'}]})}</div>`;
 }
 function historyWindowLabel() {
   const end = _historyView.end || Date.now();
