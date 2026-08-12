@@ -200,22 +200,29 @@ function inferredBaselinePower(point, actualW) {
   return actualW;
 }
 function buildEnergyHistory(history) {
-  const source = history.filter(point => finiteNumber(point.power) !== null).sort((a,b) => a.t - b.t);
+  const source = history.filter(point => finiteNumber(point.power) !== null || finiteNumber(point.actualPower) !== null).sort((a,b) => a.t - b.t);
   if (source.length < 2) return [];
   let actualKwh = 0;
+  let measuredKwh = 0;
   let baselineKwh = 0;
   return source.map((point,index) => {
-    const actualW = Math.max(0,finiteNumber(point.power) || 0);
+    const estimatedW = finiteNumber(point.power);
+    const actualMeterW = finiteNumber(point.actualPower);
+    const actualW = Math.max(0,estimatedW || 0);
+    const measuredW = actualMeterW === null ? null : Math.max(0,actualMeterW);
     const baselineW = inferredBaselinePower(point,actualW);
     if (index) {
       const previous = source[index - 1];
       const elapsedHours = Math.max(0,(point.t - previous.t) / 3600000);
       const previousActual = Math.max(0,finiteNumber(previous.power) || 0);
+      const previousMeasuredRaw = finiteNumber(previous.actualPower);
+      const previousMeasured = previousMeasuredRaw === null ? null : Math.max(0,previousMeasuredRaw);
       const previousBaseline = inferredBaselinePower(previous,previousActual);
       actualKwh += ((previousActual + actualW) / 2) * elapsedHours / 1000;
+      if (previousMeasured !== null && measuredW !== null) measuredKwh += ((previousMeasured + measuredW) / 2) * elapsedHours / 1000;
       baselineKwh += ((previousBaseline + baselineW) / 2) * elapsedHours / 1000;
     }
-    return {...point,powerKw:actualW / 1000,baselineKw:baselineW / 1000,savingKw:Math.max(0,baselineW - actualW) / 1000,energyKwh:actualKwh,baselineEnergyKwh:baselineKwh,savingKwh:Math.max(0,baselineKwh - actualKwh)};
+    return {...point,powerKw:estimatedW === null ? null : actualW / 1000,measuredPowerKw:measuredW === null ? null : measuredW / 1000,baselineKw:estimatedW === null ? null : baselineW / 1000,savingKw:estimatedW === null ? null : Math.max(0,baselineW - actualW) / 1000,energyKwh:actualKwh,measuredEnergyKwh:measuredW === null ? null : measuredKwh,baselineEnergyKwh:baselineKwh,savingKwh:Math.max(0,baselineKwh - actualKwh)};
   });
 }
 function profileEnergyScenarios(state) {
@@ -241,7 +248,10 @@ function renderEnergyIndicators(mac,state,history) {
   const baseline = last.baselineEnergyKwh;
   const saved = last.savingKwh;
   const savingPct = baseline > 0 ? saved / baseline * 100 : 0;
-  const peak = Math.max(...energy.map(point => point.powerKw));
+  const estimatedPowers = energy.map(point => point.powerKw).filter(value => value !== null);
+  const measuredPowers = energy.map(point => point.measuredPowerKw).filter(value => value !== null);
+  const peak = estimatedPowers.length ? Math.max(...estimatedPowers) : 0;
+  const measuredPeak = measuredPowers.length ? Math.max(...measuredPowers) : null;
   const average = actual / Math.max((last.t - energy[0].t) / 3600000,.001);
   const profileSavings = {};
   for (let index=1; index<energy.length; index++) {
@@ -253,9 +263,9 @@ function renderEnergyIndicators(mac,state,history) {
   }
   const profileRows = Object.entries(profileSavings).filter(([,value]) => value > .0001).sort((a,b) => b[1] - a[1]);
   const scenarios = profileEnergyScenarios(state);
-  const powerChart = renderTimeSeriesPanel(mac,energy,{id:'energy-power',title:'Potenza elettrica stimata',subtitle:'Confronto con lo stesso modo operativo senza DRED e Quiet',unit:' kW',padding:.08,minimumRange:.3,decimals:2,series:[{key:'powerKw',label:'Consumo stimato',color:'#fbbf24',area:true},{key:'baselineKw',label:'Riferimento',color:'#94a3b8',css:'target'},{key:'savingKw',label:'Risparmio istantaneo',color:'#34d399'}]});
-  const cumulativeChart = renderTimeSeriesPanel(mac,energy,{id:'energy-cumulative',title:'Energia cumulata nel periodo',subtitle:'Integrale della potenza stimata sui campioni HA Recorder',unit:' kWh',padding:.03,minimumRange:.1,decimals:2,series:[{key:'energyKwh',label:'Consumo',color:'#fb923c',area:true},{key:'baselineEnergyKwh',label:'Riferimento',color:'#94a3b8',css:'target'},{key:'savingKwh',label:'Risparmio',color:'#22c55e'}]});
-  return `<section class="energy-section"><div class="energy-section-head"><div><span class="ops-eyebrow">ENERGIA STIMATA</span><h4>Consumi e opportunità di risparmio</h4><p>Periodo ${_historyView.period} · stima basata sul modello dell'unità, non su un contatore elettrico.</p></div><span class="energy-estimate-badge">STIMA · NON FATTURAZIONE</span></div><div class="energy-kpis"><article><span>Consumo periodo</span><b>${actual.toFixed(2)} kWh</b><small>Potenza media ${average.toFixed(2)} kW</small></article><article><span>Riferimento comparabile</span><b>${baseline.toFixed(2)} kWh</b><small>Stesso modo senza DRED/Quiet</small></article><article class="saving"><span>Risparmio stimato</span><b>${saved.toFixed(2)} kWh</b><small>${savingPct.toFixed(1)}% sul riferimento</small></article><article><span>Picco stimato</span><b>${peak.toFixed(2)} kW</b><small>Massimo nel periodo selezionato</small></article></div><div class="chart-panels energy-panels">${powerChart}${cumulativeChart}</div><div class="energy-insights"><article><h5>Risparmio attribuito ai profili</h5>${profileRows.length ? `<div class="energy-profile-rows">${profileRows.map(([preset,value]) => `<div><span>${escHtml(preset)}</span><b>${value.toFixed(2)} kWh</b></div>`).join('')}</div>` : '<p>Non sono ancora presenti riduzioni attribuibili nello storico selezionato.</p>'}<small>Attribuzione basata sul preset registrato da Home Assistant durante ogni intervallo.</small></article><article><h5>Potenziale delle impostazioni</h5>${scenarios.length ? `<div class="energy-scenarios">${scenarios.map(item => `<div><span><b>${escHtml(item.name)}</b><small>${escHtml(item.hold)} · I-Demand ${escHtml(item.dred)}${item.quiet ? ' · Quiet' : ''}</small></span><strong>${item.range ? 'fino a ' : ''}${item.reduction.toFixed(0)}%</strong></div>`).join('')}</div>` : '<p>Nessun profilo automatico abilitato.</p>'}<small>Riduzione teorica della potenza durante richieste equivalenti. Il risparmio a comfort dipende dal tempo reale senza domanda e non è una promessa di consumo.</small></article></div></section>`;
+  const powerChart = renderTimeSeriesPanel(mac,energy,{id:'energy-power',title:'Potenza elettrica: misura e stima',subtitle:measuredPowers.length ? 'Il contatore effettivo è affiancato alla stima del modello' : 'Nessun sensore di potenza effettiva associato',unit:' kW',padding:.08,minimumRange:.3,decimals:2,series:[{key:'measuredPowerKw',label:'Misura effettiva',color:'#38bdf8',area:true},{key:'powerKw',label:'Stima modello',color:'#fbbf24'},{key:'baselineKw',label:'Riferimento stimato',color:'#94a3b8',css:'target'}]});
+  const cumulativeChart = renderTimeSeriesPanel(mac,energy,{id:'energy-cumulative',title:'Energia cumulata nel periodo',subtitle:'Integrale separato di potenza misurata e stimata sui campioni HA Recorder',unit:' kWh',padding:.03,minimumRange:.1,decimals:2,series:[{key:'measuredEnergyKwh',label:'Energia misurata',color:'#38bdf8',area:true},{key:'energyKwh',label:'Energia stimata',color:'#fb923c'},{key:'baselineEnergyKwh',label:'Riferimento stimato',color:'#94a3b8',css:'target'}]});
+  return `<section class="energy-section"><div class="energy-section-head"><div><span class="ops-eyebrow">ENERGIA · MISURA + STIMA</span><h4>Consumi effettivi e opportunità di risparmio</h4><p>Periodo ${_historyView.period} · il contatore effettivo resta distinto dalla stima del modello.</p></div><span class="energy-estimate-badge">SERIE AFFIANCATE</span></div><div class="energy-kpis"><article><span>Consumo periodo</span><b>${actual.toFixed(2)} kWh</b><small>Potenza media ${average.toFixed(2)} kW</small></article><article><span>Riferimento comparabile</span><b>${baseline.toFixed(2)} kWh</b><small>Stesso modo senza DRED/Quiet</small></article><article class="saving"><span>Risparmio stimato</span><b>${saved.toFixed(2)} kWh</b><small>${savingPct.toFixed(1)}% sul riferimento</small></article><article><span>Picco potenza</span><b>${measuredPeak === null ? peak.toFixed(2) : measuredPeak.toFixed(2)} kW</b><small>${measuredPeak === null ? 'Stimato · nessun contatore associato' : 'Misurato dal contatore nel periodo'}</small></article></div><div class="chart-panels energy-panels">${powerChart}${cumulativeChart}</div><div class="energy-insights"><article><h5>Risparmio attribuito ai profili</h5>${profileRows.length ? `<div class="energy-profile-rows">${profileRows.map(([preset,value]) => `<div><span>${escHtml(preset)}</span><b>${value.toFixed(2)} kWh</b></div>`).join('')}</div>` : '<p>Non sono ancora presenti riduzioni attribuibili nello storico selezionato.</p>'}<small>Attribuzione basata sul preset registrato da Home Assistant durante ogni intervallo.</small></article><article><h5>Potenziale delle impostazioni</h5>${scenarios.length ? `<div class="energy-scenarios">${scenarios.map(item => `<div><span><b>${escHtml(item.name)}</b><small>${escHtml(item.hold)} · I-Demand ${escHtml(item.dred)}${item.quiet ? ' · Quiet' : ''}</small></span><strong>${item.range ? 'fino a ' : ''}${item.reduction.toFixed(0)}%</strong></div>`).join('')}</div>` : '<p>Nessun profilo automatico abilitato.</p>'}<small>Riduzione teorica della potenza durante richieste equivalenti. Il risparmio a comfort dipende dal tempo reale senza domanda e non è una promessa di consumo.</small></article></div></section>`;
 }
 function historyToolbar() {
   const atNow = !_historyView.end;

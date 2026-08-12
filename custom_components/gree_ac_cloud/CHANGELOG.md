@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.0
+
+### Consumi elettrici effettivi affiancati alle stime
+
+- Aggiunta la configurazione **Consumi** per associare a ciascuna unità un sensore HA di potenza effettiva e, facoltativamente, il relativo contatore energia.
+- Le misure del contatore non sostituiscono le stime energetiche esistenti: entrambe restano disponibili e vengono mostrate come serie distinte.
+- Lo storico Recorder e il grafico energetico confrontano la potenza misurata con la stima del modello.
+- Le associazioni vengono applicate senza ricaricare l'integrazione e senza interrompere MQTT.
+
 ## 0.14.0
 
 ### Scheda descrittiva dell'impianto aeraulico

@@ -20,6 +20,8 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     COMMAND_OPTIONS,
+    CONF_ACTUAL_ENERGY_SENSOR,
+    CONF_ACTUAL_POWER_SENSOR,
     CONF_DEVICES,
     CONF_HUMIDITY_SENSOR,
     CONF_HUMIDITY_SENSORS,
@@ -64,6 +66,7 @@ PANEL_LOG_URL = "/api/gree_ac_cloud/panel/log"
 PANEL_README_URL = "/api/gree_ac_cloud/panel/readme"
 PANEL_CHANGELOG_URL = "/api/gree_ac_cloud/panel/changelog"
 PANEL_ROOM_SENSORS_URL = "/api/gree_ac_cloud/panel/room-sensors"
+PANEL_ENERGY_SENSORS_URL = "/api/gree_ac_cloud/panel/energy-sensors"
 PANEL_INSTALLATION_URL = "/api/gree_ac_cloud/panel/installation"
 
 
@@ -210,6 +213,7 @@ async def async_register_panel(hass: HomeAssistant):
         hass.http.register_view(GreePanelRefreshView)
         hass.http.register_view(GreePanelDevicesInfoView)
         hass.http.register_view(GreePanelRoomSensorsView)
+        hass.http.register_view(GreePanelEnergySensorsView)
         domain_data["panel_views_registered"] = True
 
     domain_data["panel_registered"] = True
@@ -398,6 +402,25 @@ class GreePanelDataView(HomeAssistantView):
                 state["Installation"] = (
                     hass.data.get(DOMAIN, {}).get("installations", {}).get(device.mac, {})
                 )
+                for option, state_key, entity_key in (
+                    (CONF_ACTUAL_POWER_SENSOR, "ActualPowerW", "ActualPowerSensor"),
+                    (CONF_ACTUAL_ENERGY_SENSOR, "ActualEnergyKWh", "ActualEnergySensor"),
+                ):
+                    entity_id = room.get(option)
+                    state[entity_key] = entity_id
+                    sensor_state = hass.states.get(entity_id) if entity_id else None
+                    value = None
+                    if sensor_state and sensor_state.state not in ("unknown", "unavailable"):
+                        try:
+                            value = float(sensor_state.state)
+                            unit = sensor_state.attributes.get("unit_of_measurement")
+                            if option == CONF_ACTUAL_POWER_SENSOR and unit == "kW":
+                                value *= 1000
+                            elif option == CONF_ACTUAL_ENERGY_SENSOR and unit == "Wh":
+                                value /= 1000
+                        except (TypeError, ValueError):
+                            value = None
+                    state[state_key] = value
                 state["EstimatedBaselinePowerW"] = state.get("estimated_baseline_power_w")
                 state["EstimatedSavingPowerW"] = state.get("estimated_saving_power_w")
                 data.append(
@@ -417,6 +440,97 @@ class GreePanelDataView(HomeAssistantView):
                     }
                 )
         return self.json(data)
+
+
+class GreePanelEnergySensorsView(HomeAssistantView):
+    """Associate real HA power and energy meters with each Gree unit."""
+
+    url = PANEL_ENERGY_SENSORS_URL
+    name = "api:gree_ac_cloud:panel_energy_sensors"
+    requires_auth = True
+
+    async def get(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        sensors = []
+        for state in hass.states.async_all("sensor"):
+            device_class = state.attributes.get("device_class")
+            if device_class not in ("power", "energy"):
+                continue
+            sensors.append(
+                {
+                    "entity_id": state.entity_id,
+                    "name": state.attributes.get("friendly_name", state.entity_id),
+                    "device_class": device_class,
+                    "state": state.state,
+                    "unit": state.attributes.get("unit_of_measurement"),
+                }
+            )
+        devices = []
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            runtime = getattr(entry, "runtime_data", None) or {}
+            configured = entry.options.get(CONF_DEVICES, {})
+            for coordinator in runtime.get("coordinators", []):
+                device = coordinator.device
+                room = configured.get(device.mac, {})
+                devices.append(
+                    {
+                        "entry_id": entry.entry_id,
+                        "mac": device.mac,
+                        "name": device.name,
+                        "actual_power_sensor": room.get(CONF_ACTUAL_POWER_SENSOR),
+                        "actual_energy_sensor": room.get(CONF_ACTUAL_ENERGY_SENSOR),
+                    }
+                )
+        sensors.sort(key=lambda sensor: sensor["name"].lower())
+        return self.json({"devices": devices, "sensors": sensors})
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        if not _is_admin(request):
+            return self.json({"error": "admin required"}, status=403)
+        try:
+            body = await request.json()
+        except Exception:
+            return self.json({"error": "invalid JSON"}, status=400)
+        entry_id = body.get("entry_id")
+        mac = body.get("mac")
+        power_sensor = body.get("actual_power_sensor") or None
+        energy_sensor = body.get("actual_energy_sensor") or None
+        if not entry_id or not _valid_mac(mac):
+            return self.json({"error": "invalid device"}, status=400)
+        for entity_id, expected_class in (
+            (power_sensor, "power"),
+            (energy_sensor, "energy"),
+        ):
+            if not entity_id:
+                continue
+            state = hass.states.get(entity_id)
+            if state is None or state.attributes.get("device_class") != expected_class:
+                return self.json({"error": f"invalid {expected_class} sensor"}, status=400)
+        entry = hass.config_entries.async_get_entry(entry_id)
+        if entry is None or entry.domain != DOMAIN:
+            return self.json({"error": "entry not found"}, status=404)
+        runtime = getattr(entry, "runtime_data", None) or {}
+        if not any(coord.device.mac == mac for coord in runtime.get("coordinators", [])):
+            return self.json({"error": "device not found"}, status=404)
+        devices = dict(entry.options.get(CONF_DEVICES, {}))
+        room = dict(devices.get(mac, {}))
+        if power_sensor:
+            room[CONF_ACTUAL_POWER_SENSOR] = power_sensor
+        else:
+            room.pop(CONF_ACTUAL_POWER_SENSOR, None)
+        if energy_sensor:
+            room[CONF_ACTUAL_ENERGY_SENSOR] = energy_sensor
+        else:
+            room.pop(CONF_ACTUAL_ENERGY_SENSOR, None)
+        devices[mac] = room
+        entry.runtime_data["skip_next_options_reload"] = True
+        hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_DEVICES: devices}
+        )
+        for coordinator in runtime.get("coordinators", []):
+            coordinator.async_update_listeners()
+        return self.json({"ok": True})
 
 
 class GreePanelRoomSensorsView(HomeAssistantView):
@@ -1889,6 +2003,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
     </label>
     <button class="refresh-btn" onclick="openSensorSettings()" title="Configura sensori ambiente e profili"><span class="sidebar-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.95 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.58 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.95a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.05 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.13.61.6 1.08 1.2 1.04H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></span><span class="sidebar-action-label">Configura</span></button>
     <button class="refresh-btn" onclick="openInstallationSettings()" title="Scheda impianto e condotte"><span class="sidebar-action-icon" aria-hidden="true">▦</span><span class="sidebar-action-label">Impianto</span></button>
+    <button class="refresh-btn" onclick="openEnergySensorSettings()" title="Associa i sensori di consumo effettivo"><span class="sidebar-action-icon" aria-hidden="true">⚡</span><span class="sidebar-action-label">Consumi</span></button>
     <button class="refresh-btn refresh-action" onclick="refreshNow()" title="Aggiorna ora"><span class="sidebar-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 6v5h-5"/><path d="M19 11a7 7 0 1 0 1 4"/></svg></span><span class="sidebar-action-label">Aggiorna ora</span></button>
   </div>
   <nav class="tab-nav" id="primaryNavigation" aria-label="Navigazione principale">
@@ -1920,7 +2035,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
     <div class="devices" id="devices"></div>
   </div>
   <div id="tab-charts" style="display:none;">
-    <div class="ops-page-head"><div><h2>Clima ed energia</h2><p>Storico persistente di temperatura, umidità, consumi stimati e risparmi attribuibili ai profili.</p></div></div>
+    <div class="ops-page-head"><div><h2>Clima ed energia</h2><p>Storico persistente di temperatura, umidità, consumi stimati e misure effettive affiancate.</p></div><div class="config-actions"><button class="config-btn" onclick="openEnergySensorSettings()">Sensori consumi</button></div></div>
     <div id="chartsContent" class="charts-grid"></div>
   </div>
   <div id="tab-profiles" style="display:none;">
@@ -2398,6 +2513,14 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   </div>
 </div>
 
+<div id="energySensorSettings" class="config-modal" role="dialog" aria-modal="true" aria-labelledby="energySensorTitle" onclick="if(event.target===this)closeEnergySensorSettings()">
+  <div class="config-dialog">
+    <header class="config-header"><div class="config-heading"><span class="config-heading-icon">⚡</span><div><h2 id="energySensorTitle">Misure elettriche effettive</h2><p>Associa i canali del contatore alle singole unità</p></div></div><button class="config-close" onclick="closeEnergySensorSettings()" aria-label="Chiudi misure elettriche">×</button></header>
+    <div class="config-body"><p class="config-intro">La potenza e l’energia misurate vengono mostrate accanto alle stime del modello: non le sostituiscono. Per lo storico della potenza scegli il sensore W del canale; il contatore kWh è facoltativo.</p><div id="energySensorSettingsContent" class="config-loading">Caricamento sensori elettrici…</div></div>
+    <footer class="config-footer"><span class="config-status" id="energySensorSettingsStatus">Le associazioni si applicano senza ricaricare MQTT.</span><div class="config-actions"><button class="config-btn" onclick="closeEnergySensorSettings()">Annulla</button><button class="config-btn primary" id="saveEnergySensorSettings">Salva associazioni</button></div></footer>
+  </div>
+</div>
+
 <div id="sensorSettings" class="config-modal" role="dialog" aria-modal="true" aria-labelledby="configTitle" onclick="if(event.target===this)closeSensorSettings()">
   <div class="config-dialog">
     <header class="config-header">
@@ -2432,6 +2555,7 @@ const PANEL_SETTINGS_URL = HA_BASE + '/api/gree_ac_cloud/panel/settings';
 const PANEL_REFRESH_URL = HA_BASE + '/api/gree_ac_cloud/panel/refresh';
 const PANEL_DEVICES_INFO_URL = HA_BASE + '/api/gree_ac_cloud/panel/devices-info';
 const PANEL_ROOM_SENSORS_URL = HA_BASE + '/api/gree_ac_cloud/panel/room-sensors';
+const PANEL_ENERGY_SENSORS_URL = HA_BASE + '/api/gree_ac_cloud/panel/energy-sensors';
 const PANEL_INSTALLATION_URL = HA_BASE + '/api/gree_ac_cloud/panel/installation';
 const PANEL_HISTORY_URL = HA_BASE + '/api/gree_ac_cloud/panel/history';
 const PANEL_PROFILE_URL = HA_BASE + '/api/gree_ac_cloud/panel/profile';
@@ -2635,6 +2759,43 @@ async function saveInstallationSettings(devices) {
       await apiFetch(PANEL_INSTALLATION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     }
     status.textContent = 'Schede salvate senza ricaricare l’integrazione.'; setTimeout(() => { closeInstallationSettings(); loadData(); }, 700);
+  } catch (error) { status.textContent = `Errore: ${error.message}`; } finally { button.disabled = false; }
+}
+
+async function openEnergySensorSettings() {
+  const modal = document.getElementById('energySensorSettings');
+  const content = document.getElementById('energySensorSettingsContent');
+  modal.style.display = 'block';
+  content.className = 'config-loading';
+  content.textContent = 'Caricamento sensori elettrici…';
+  try {
+    const data = await apiFetch(PANEL_ENERGY_SENSORS_URL);
+    const powers = data.sensors.filter(sensor => sensor.device_class === 'power');
+    const energies = data.sensors.filter(sensor => sensor.device_class === 'energy');
+    content.className = 'room-sensor-settings';
+    content.innerHTML = data.devices.map(device => {
+      const mac = escHtml(device.mac);
+      const name = escHtml(__DEVICE_NAMES__[device.mac] || device.name || device.mac);
+      return `<section class="room-sensor-device" data-entry-id="${escHtml(device.entry_id)}" data-mac="${mac}"><div class="room-sensor-device-head"><div><h3>${name}</h3><code>${mac}</code></div><span class="config-device-status" id="energy-status-${mac}">Stima mantenuta</span></div><div class="room-sensor-grid"><section class="outdoor-sensor-card"><div class="outdoor-sensor-copy"><span class="config-section-title">POTENZA EFFETTIVA</span><h3>Canale del contatore</h3><p>Sensore istantaneo in W. Verrà tracciato insieme alla potenza stimata.</p></div><select class="config-select actual-power-sensor"><option value="">Nessun sensore di potenza</option>${sensorOptions(powers,[device.actual_power_sensor])}</select></section><section class="outdoor-sensor-card"><div class="outdoor-sensor-copy"><span class="config-section-title">ENERGIA EFFETTIVA</span><h3>Contatore cumulativo</h3><p>Sensore in kWh facoltativo. Resta separato dall’energia stimata.</p></div><select class="config-select actual-energy-sensor"><option value="">Nessun sensore energia</option>${sensorOptions(energies,[device.actual_energy_sensor])}</select></section></div></section>`;
+    }).join('');
+    document.getElementById('saveEnergySensorSettings').onclick = () => saveEnergySensorAssociations(data.devices);
+  } catch (error) {
+    content.className = 'config-loading';
+    content.textContent = `Impossibile caricare i sensori elettrici: ${error.message}`;
+  }
+}
+function closeEnergySensorSettings() { document.getElementById('energySensorSettings').style.display = 'none'; }
+async function saveEnergySensorAssociations(devices) {
+  const button = document.getElementById('saveEnergySensorSettings');
+  const status = document.getElementById('energySensorSettingsStatus');
+  button.disabled = true;
+  try {
+    for (const device of devices) {
+      const card = document.querySelector(`#energySensorSettingsContent [data-mac="${device.mac}"]`);
+      await apiFetch(PANEL_ENERGY_SENSORS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entry_id:device.entry_id,mac:device.mac,actual_power_sensor:card.querySelector('.actual-power-sensor').value,actual_energy_sensor:card.querySelector('.actual-energy-sensor').value})});
+    }
+    status.textContent = 'Associazioni salvate. Stime e misure reali resteranno entrambe visibili.';
+    setTimeout(() => { closeEnergySensorSettings(); clearPersistentHistory(); loadData(); },800);
   } catch (error) { status.textContent = `Errore: ${error.message}`; } finally { button.disabled = false; }
 }
 

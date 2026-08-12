@@ -36,7 +36,7 @@ def test_panel_data_apis_require_authentication() -> None:
     # The HTML shell must stay public for the iframe; every data view is protected.
     history_source = (COMPONENT / "panel_history.py").read_text()
     profile_source = (COMPONENT / "panel_profiles.py").read_text()
-    assert source.count("requires_auth = True") == 10
+    assert source.count("requires_auth = True") == 11
     assert history_source.count("requires_auth = True") == 1
     assert profile_source.count("requires_auth = True") == 1
     assert source.count("requires_auth = False") == 1
@@ -62,6 +62,10 @@ def test_persistent_history_is_modular_and_recorder_backed() -> None:
     assert "goToLatestHistory" in frontend_source
     assert '"power": [estimated_power]' in history_source
     assert '"baselinePower": [baseline_power]' in history_source
+    assert '"actualPower": [actual_power]' in history_source
+    assert '"actualEnergy": [actual_energy]' in history_source
+    assert "measuredPowerKw" in frontend_source
+    assert "Misura effettiva" in frontend_source
     assert '"preset": [climate_entity]' in history_source
     assert "buildEnergyHistory" in frontend_source
     assert "renderEnergyIndicators" in frontend_source
@@ -192,6 +196,21 @@ def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
     assert "parseProbeTemp(s.InTem)" in panel_source
     assert "parseProbeTemp(s.OutTem)" in panel_source
     assert "toggleNativeSensor" in panel_source
+
+
+def test_actual_energy_meters_are_optional_and_keep_estimates() -> None:
+    panel_source = (COMPONENT / "panel.py").read_text()
+    history_source = (COMPONENT / "panel_history.py").read_text()
+    frontend_source = (COMPONENT / "frontend" / "panel_history.js").read_text()
+    const_source = (COMPONENT / "const.py").read_text()
+    assert 'CONF_ACTUAL_POWER_SENSOR = "actual_power_sensor"' in const_source
+    assert 'CONF_ACTUAL_ENERGY_SENSOR = "actual_energy_sensor"' in const_source
+    assert "class GreePanelEnergySensorsView" in panel_source
+    assert "PANEL_ENERGY_SENSORS_URL" in panel_source
+    assert "Stime e misure reali resteranno entrambe visibili" in panel_source
+    assert '"actualPower": [actual_power]' in history_source
+    assert "Stima modello" in frontend_source
+    assert "Misura effettiva" in frontend_source
 
 
 def test_installation_profile_is_persisted_without_reload() -> None:

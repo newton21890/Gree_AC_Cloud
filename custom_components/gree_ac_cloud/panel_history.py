@@ -12,6 +12,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_ACTUAL_ENERGY_SENSOR,
+    CONF_ACTUAL_POWER_SENSOR,
     CONF_DEVICES,
     CONF_HUMIDITY_SENSOR,
     CONF_HUMIDITY_SENSORS,
@@ -68,6 +70,8 @@ def _history_sensor_ids(hass, entry, device) -> dict[str, list[str]]:
     baseline_power = platform_entity(f"{device.mac}_baseline_power", "sensor")
     saving_power = platform_entity(f"{device.mac}_saving_power", "sensor")
     estimated_energy = platform_entity(f"{device.mac}_energy", "sensor")
+    actual_power = room.get(CONF_ACTUAL_POWER_SENSOR)
+    actual_energy = room.get(CONF_ACTUAL_ENERGY_SENSOR)
     outdoor_temperature = entry.options.get(CONF_OUTDOOR_TEMPERATURE_SENSOR)
     outdoor_humidity = entry.options.get(CONF_OUTDOOR_HUMIDITY_SENSOR)
     return {
@@ -82,6 +86,8 @@ def _history_sensor_ids(hass, entry, device) -> dict[str, list[str]]:
         "baselinePower": [baseline_power] if baseline_power else [],
         "savingPower": [saving_power] if saving_power else [],
         "energy": [estimated_energy] if estimated_energy else [],
+        "actualPower": [actual_power] if actual_power else [],
+        "actualEnergy": [actual_energy] if actual_energy else [],
         "mode": [climate_entity] if climate_entity else [],
         "preset": [climate_entity] if climate_entity else [],
         "dred": [climate_entity] if climate_entity else [],
@@ -137,6 +143,17 @@ def _merge_histories(histories, sensor_ids, period) -> list[dict]:
                 else:
                     try:
                         value = float(raw_value)
+                        unit = state.attributes.get("unit_of_measurement")
+                        if key == "actualPower":
+                            if unit == "kW":
+                                value *= 1000
+                            elif unit == "MW":
+                                value *= 1_000_000
+                        elif key == "actualEnergy":
+                            if unit == "Wh":
+                                value /= 1000
+                            elif unit == "MWh":
+                                value *= 1000
                     except (TypeError, ValueError):
                         value = None
                 events.append((state.last_updated.timestamp() * 1000, key, entity_id, value))

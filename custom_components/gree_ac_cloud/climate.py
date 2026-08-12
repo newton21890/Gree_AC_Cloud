@@ -295,6 +295,8 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             "humidity_sensors": self._external_humidity_entities,
             "temperature_average_sources": len(self._external_temperature_entities),
             "humidity_average_sources": len(self._external_humidity_entities),
+            "actual_power_sensor": self._room_options.get("actual_power_sensor"),
+            "actual_energy_sensor": self._room_options.get("actual_energy_sensor"),
             "gree_indoor_temperature_sensor_enabled": self.coordinator.data.get("InTemEn") == 1,
             "gree_indoor_temperature_sensor_enable_raw": self.coordinator.data.get("InTemEn"),
             "gree_indoor_humidity_sensor_enabled": self.coordinator.data.get("InHumiEn") == 1,
