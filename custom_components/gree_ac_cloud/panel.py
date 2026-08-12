@@ -393,6 +393,7 @@ class GreePanelDataView(HomeAssistantView):
                         "smart_dred_level",
                         "smart_dred_applied",
                         "smart_dred_verified",
+                        "smart_dred_pending",
                         "profile_control_enabled",
                         "smart_effective_target",
                         "smart_temperature_trend_c_per_hour",

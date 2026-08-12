@@ -220,6 +220,7 @@ def test_action_log_is_persistent_and_identifies_command_source() -> None:
     assert "previous_operating_state.get(key) is not None" in coordinator_source
     assert '"smart_dred_pending"' in climate_source
     assert "in attesa del prossimo comando" in panel_source
+    assert '"smart_dred_pending"' in panel_source
 
 
 def test_runtime_counters_are_persistent_and_resettable() -> None:
