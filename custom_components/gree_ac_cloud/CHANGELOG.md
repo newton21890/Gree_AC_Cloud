@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.1
+
+### Ripristino automatico della sessione del pannello
+
+- Il pannello attende il token Home Assistant quando l'app Companion riattiva la WebView invece di mostrare subito un errore permanente.
+- In caso di HTTP 401 richiede il rinnovo del token HA e ripete automaticamente la richiesta una volta.
+- Il recupero viene ritentato dopo pochi secondi e quando il pannello torna visibile o in primo piano.
+- Durante un rinnovo temporaneo mantiene visibili gli ultimi dati validi, evitando di obbligare al refresh della pagina.
+
 ## 0.16.0
 
 ### Telemetria consumi e ore di funzionamento

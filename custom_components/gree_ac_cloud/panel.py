@@ -2605,67 +2605,116 @@ function getAccessToken() {
   return null;
 }
 
-function authHeaders(extra = {}) {
+function authHeaders(extra = {}, token = getAccessToken()) {
   const headers = Object.assign({}, extra);
-  const token = getAccessToken();
   if (token) headers.Authorization = 'Bearer ' + token;
   return headers;
 }
 
+function liveHomeAssistantAuth() {
+  for (const frame of [window.parent, window.top]) {
+    try {
+      const app = frame.document.querySelector('home-assistant');
+      const auth = app && app.hass && app.hass.auth;
+      if (auth) return auth;
+    } catch (e) {}
+  }
+  return null;
+}
+
+const authDelay = milliseconds => new Promise(resolve => setTimeout(resolve,milliseconds));
+async function waitForAccessToken(forceRefresh = false, timeout = 8000) {
+  const deadline = Date.now() + timeout;
+  let refreshAttempted = false;
+  while (Date.now() < deadline) {
+    const auth = liveHomeAssistantAuth();
+    if (forceRefresh && auth && !refreshAttempted && typeof auth.refreshAccessToken === 'function') {
+      refreshAttempted = true;
+      try { await auth.refreshAccessToken(); } catch (error) { console.warn('HA token refresh pending:',error); }
+    }
+    const token = getAccessToken();
+    if (token) return token;
+    await authDelay(250);
+  }
+  return null;
+}
+
 let _panelAuthFailureShown = false;
 let _panelAuthRetryTimer = null;
+let _panelAuthRecoveryRunning = false;
 function showPanelAuthFailure() {
   if (_panelAuthFailureShown) return;
   _panelAuthFailureShown = true;
   const badge = document.getElementById('statusBadge');
   if (badge) {
-    badge.textContent = 'SESSIONE NON DISPONIBILE';
+    badge.textContent = 'RINNOVO SESSIONE…';
     badge.classList.add('off');
   }
-  const targets = ['devices','chartsContent','profilesContent'];
-  for (const id of targets) {
-    const element = document.getElementById(id);
-    if (element) element.innerHTML = '<div class="setup-msg"><h2>Sessione Home Assistant non disponibile</h2><p>Ricarica la pagina o riapri Gree AC Cloud dalla barra laterale. Il pannello ha sospeso gli aggiornamenti automatici per evitare richieste senza autenticazione.</p></div>';
+  // Keep the last valid dashboard visible while HA renews its access token.
+  // Destroying the cards made a short-lived mobile WebView race look like a
+  // permanent logout and forced the user to reload the whole panel.
+}
+async function recoverPanelAuth() {
+  if (_panelAuthRecoveryRunning) return;
+  _panelAuthRecoveryRunning = true;
+  try {
+    const token = await waitForAccessToken(true,10000);
+    if (!token) throw new Error('token not available yet');
+    _panelAuthFailureShown = false;
+    await loadModels();
+    await loadNames();
+    await loadData();
+  } catch (error) {
+    schedulePanelAuthRetry();
+  } finally {
+    _panelAuthRecoveryRunning = false;
   }
 }
-function schedulePanelAuthRetry() {
+function schedulePanelAuthRetry(delay = 3000) {
   if (_panelAuthRetryTimer) return;
   _panelAuthRetryTimer = setTimeout(() => {
     _panelAuthRetryTimer = null;
-    _panelAuthFailureShown = false;
-    _rejectedAccessToken = null;
-    loadModels();
-    loadNames().then(loadData);
-  },60000);
+    recoverPanelAuth();
+  },delay);
 }
 
 async function apiFetch(url, opts = {}) {
-  opts.headers = authHeaders(opts.headers || {});
-  opts.credentials = 'same-origin';
-  if (!opts.headers.Authorization && url.startsWith(HA_BASE + '/api/gree_ac_cloud/')) {
+  const protectedPanelUrl = url.startsWith(HA_BASE + '/api/gree_ac_cloud/');
+  let token = getAccessToken();
+  if (!token && protectedPanelUrl) token = await waitForAccessToken(false);
+  const request = {...opts,headers:authHeaders(opts.headers || {},token),credentials:'same-origin'};
+  if (!request.headers.Authorization && protectedPanelUrl) {
     showPanelAuthFailure();
     schedulePanelAuthRetry();
-    const error = new Error('Autenticazione Home Assistant non disponibile nel pannello');
+    const error = new Error('Autenticazione Home Assistant temporaneamente non disponibile');
     error.status = 401;
     throw error;
   }
-  const resp = await fetch(url, opts);
-  if (!resp.ok) {
-    if (resp.status === 401) {
-      const authorization = opts.headers.Authorization || '';
-      _rejectedAccessToken = authorization.startsWith('Bearer ')
-        ? authorization.slice(7) : null;
-      showPanelAuthFailure();
-      schedulePanelAuthRetry();
+  let resp = await fetch(url,request);
+  if (resp.status === 401 && protectedPanelUrl) {
+    const authorization = request.headers.Authorization || '';
+    _rejectedAccessToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : null;
+    showPanelAuthFailure();
+    token = await waitForAccessToken(true,10000);
+    if (token) {
+      request.headers = authHeaders(opts.headers || {},token);
+      resp = await fetch(url,request);
     }
-    const error = new Error(resp.status === 401 ? 'Autenticazione Home Assistant non disponibile nel pannello' : (resp.statusText || `HTTP ${resp.status}`));
+  }
+  if (!resp.ok) {
+    if (resp.status === 401) schedulePanelAuthRetry();
+    const error = new Error(resp.status === 401 ? 'Autenticazione Home Assistant temporaneamente non disponibile' : (resp.statusText || `HTTP ${resp.status}`));
     error.status = resp.status;
     throw error;
   }
   _panelAuthFailureShown = false;
   _rejectedAccessToken = null;
+  if (_panelAuthRetryTimer) { clearTimeout(_panelAuthRetryTimer); _panelAuthRetryTimer = null; }
   return resp.json();
 }
+
+window.addEventListener('focus',() => { if (_panelAuthFailureShown) recoverPanelAuth(); });
+document.addEventListener('visibilitychange',() => { if (!document.hidden && _panelAuthFailureShown) recoverPanelAuth(); });
 
 function sensorOptions(sensors, selected) {
   const chosen = new Set(selected || []);

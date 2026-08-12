@@ -459,11 +459,16 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "window.parent.localStorage" in panel_source
     assert "let _rejectedAccessToken = null" in panel_source
     assert "Prefer the live Home Assistant auth object" in panel_source
-    assert "opts.credentials = 'same-origin'" in panel_source
+    assert "credentials:'same-origin'" in panel_source
     assert "showPanelAuthFailure" in panel_source
     assert "schedulePanelAuthRetry" in panel_source
+    assert "waitForAccessToken" in panel_source
+    assert "refreshAccessToken" in panel_source
+    assert "recoverPanelAuth" in panel_source
+    assert "visibilitychange" in panel_source
+    assert "let resp = await fetch(url,request)" in panel_source
     assert "if (!_panelAuthFailureShown) loadData()" in panel_source
-    assert "if (!opts.headers.Authorization" in panel_source
+    assert "if (!request.headers.Authorization" in panel_source
     assert "await hass.async_add_executor_job(_load_panel_assets_sync)" in panel_source
     assert "Sessione non disponibile" in panel_source
     assert "Smart (profilo)" not in sensor_modal_source
