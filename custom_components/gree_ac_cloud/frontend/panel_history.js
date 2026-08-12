@@ -107,7 +107,7 @@ function queueApexChart(id, history, config) {
     }
     const outdoorSeries = activeSeries.map((item,index) => item.css === 'outdoor' ? index : -1).filter(index => index >= 0);
     const dashArray = activeSeries.map(item => item.css === 'target' ? 7 : 0);
-    const widths = activeSeries.map(item => item.css === 'outdoor' ? 4 : item.css === 'target' ? 2 : 2.4);
+    const widths = activeSeries.map(item => item.css === 'outdoor' ? 3 : item.css === 'target' ? 2 : 2.4);
     const chart = new ApexCharts(element, {
       chart: {
         id,
@@ -117,7 +117,7 @@ function queueApexChart(id, history, config) {
         foreColor: '#8290a5',
         fontFamily: 'Inter,system-ui,-apple-system,sans-serif',
         animations: {enabled:false},
-        dropShadow:{enabled:outdoorSeries.length > 0,enabledOnSeries:outdoorSeries,top:0,left:0,blur:4,color:activeSeries[outdoorSeries[0]]?.color,opacity:.5},
+        dropShadow:{enabled:outdoorSeries.length > 0,enabledOnSeries:outdoorSeries,top:0,left:0,blur:2,color:activeSeries[outdoorSeries[0]]?.color,opacity:.35},
         toolbar: {show:false},
         zoom: {enabled:!config.compact,type:'x',autoScaleYaxis:false},
         selection: {enabled:false},
