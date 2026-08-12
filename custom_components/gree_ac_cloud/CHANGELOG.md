@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.17.1
+
+### Diagnostica I-Demand e registro azioni
+
+- Lo stato I-Demand Smart distingue ora un livello già applicato da quello calcolato ma in attesa del prossimo comando dopo il cooldown.
+- Eliminato il falso avviso `D3 · applicato Off` durante il normale intervallo tra due comandi Smart.
+- Il registro non classifica più come comando esterno la comparsa iniziale di proprietà protocollo, ad esempio `Tur: 0`, durante il refresh dello stato.
+
 ## 0.17.0
 
 ### Registro persistente delle azioni

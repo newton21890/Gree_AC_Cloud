@@ -3443,7 +3443,10 @@ function renderOperationsDevice(d) {
     !profileEnabled || activePreset === 'manual' ? '<span class="ops-alert manual">Controllo manuale</span>' : '',
     override === false ? '<span class="ops-alert">Override manuale: spento</span>' : '',
     override === true ? '<span class="ops-alert">Override manuale: acceso</span>' : '',
-    s.smart_dred_level ? `<span class="ops-alert ${s.smart_dred_verified === false ? '' : 'manual'}">I-Demand Smart: ${escHtml(s.smart_dred_level)} · applicato ${escHtml(s.smart_dred_applied || '?')}${s.smart_dred_verified === false ? ' ⚠' : ' ✓'}</span>` : '',
+    s.smart_dred_level ? (s.smart_dred_pending
+      ? `<span class="ops-alert manual">I-Demand Smart: ${escHtml(s.smart_dred_level)} · in attesa del prossimo comando (ora ${escHtml(s.smart_dred_applied || '?')})</span>`
+      : `<span class="ops-alert ${s.smart_dred_verified === false ? '' : 'manual'}">I-Demand Smart: ${escHtml(s.smart_dred_level)} · applicato ${escHtml(s.smart_dred_applied || '?')}${s.smart_dred_verified === false ? ' ⚠' : ' ✓'}</span>`
+    ) : '',
   ].filter(Boolean).join('');
   const fanLabels = ['Auto', 'Bassa', 'Medio-bassa', 'Media', 'Medio-alta', 'Alta', 'Turbo'];
 

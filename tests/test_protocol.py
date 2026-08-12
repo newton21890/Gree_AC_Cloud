@@ -216,6 +216,10 @@ def test_action_log_is_persistent_and_identifies_command_source() -> None:
     assert "self.action_log.async_record" in mqtt_source
     assert '"device_external"' in coordinator_source
     assert '"external_control_change"' in coordinator_source
+    assert "external_changes" in coordinator_source
+    assert "previous_operating_state.get(key) is not None" in coordinator_source
+    assert '"smart_dred_pending"' in climate_source
+    assert "in attesa del prossimo comando" in panel_source
 
 
 def test_runtime_counters_are_persistent_and_resettable() -> None:

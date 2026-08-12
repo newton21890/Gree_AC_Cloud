@@ -117,6 +117,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         self._smart_fan_speed: str | None = None
         self._smart_manual_fan: str | None = None
         self._smart_dred_level: str | None = None
+        self._smart_dred_pending = False
         self._smart_samples: deque[tuple[float, float]] = deque(maxlen=180)
         self._smart_temperature_trend: float | None = None
         self._smart_temperature_trend_samples = 0
@@ -334,8 +335,10 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             "smart_dred_applied": self._effective_dred_label,
             "smart_dred_verified": (
                 self._smart_dred_level is None
+                or self._smart_dred_pending
                 or self._smart_dred_level == self._effective_dred_label
             ),
+            "smart_dred_pending": self._smart_dred_pending,
             "smart_temperature_trend_c_per_hour": self._smart_temperature_trend,
             "smart_temperature_trend_samples": self._smart_temperature_trend_samples,
             "smart_unmet_minutes": round(self._smart_unmet_minutes, 1),
@@ -760,6 +763,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if not self._smart_profile_enabled:
             self._smart_fan_speed = None
             self._smart_dred_level = None
+            self._smart_dred_pending = False
             # Smart disabled means monitoring/configuration only: never power
             # the machine on just to apply a target.
             if self.coordinator.data.get("Pow") and self.target_temperature != target:
@@ -777,6 +781,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         if self._smart_manual_power is False:
             self._smart_fan_speed = None
             self._smart_dred_level = None
+            self._smart_dred_pending = False
             self._smart_last_action = "manual_off"
             self.async_write_ha_state()
             return
@@ -785,6 +790,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             # the observed controller state rather than a stale Smart request.
             self._smart_fan_speed = FAN_MAP.get(self.coordinator.data.get("WdSpd"))
             self._smart_dred_level = self._effective_dred_label
+            self._smart_dred_pending = False
             self._smart_last_action = "manual_on"
             self.async_write_ha_state()
             return
@@ -794,6 +800,9 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             preset, desired_mode, current, target, deadband, demand_boost
         )
         self._smart_dred_level = dred
+        self._smart_dred_pending = bool(
+            dred is not None and dred != self._effective_dred_label and not can_command
+        )
 
         if desired_mode is None:
             hold_action = preset.get(CONF_PRESET_HOLD_ACTION, PRESET_HOLD_OFF)
@@ -894,6 +903,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                         source="profile",
                         action="smart_profile_demand",
                     ):
+                        self._smart_dred_pending = False
                         for option, value in zip(options, values):
                             self._device.properties[option] = value
                         self._sync_data()

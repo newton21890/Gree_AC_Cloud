@@ -201,14 +201,22 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
             self._current_run_seconds = 0.0
         self._last_power = current_power
         current_operating_state = self._operating_state()
+        previous_operating_state = self._last_operating_state
         changes = {
             key: value
             for key, value in current_operating_state.items()
-            if self._last_operating_state and self._last_operating_state.get(key) != value
+            if previous_operating_state and previous_operating_state.get(key) != value
         }
         self._last_operating_state = current_operating_state
+        # A missing property becoming visible is a protocol refresh, not a user
+        # action. Record only keys that had a concrete previous value.
+        external_changes = {
+            key: value
+            for key, value in changes.items()
+            if previous_operating_state.get(key) is not None
+        }
         command_age = self._mqtt.command_age(self.device.mac)
-        if changes and (command_age is None or command_age > 30):
+        if external_changes and (command_age is None or command_age > 30):
             action_log = getattr(self._mqtt, "action_log", None)
             if action_log is not None:
                 self.hass.async_create_task(
@@ -216,7 +224,7 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
                         self.device.mac,
                         "device_external",
                         "external_control_change",
-                        changes,
+                        external_changes,
                         result="observed",
                     )
                 )
