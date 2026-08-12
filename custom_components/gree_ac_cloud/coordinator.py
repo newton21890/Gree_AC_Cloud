@@ -100,6 +100,7 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         self._startup_store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.startup.{device.mac}")
         self._startup_settings: dict[str, Any] = {"dred": None}
         self._last_power = device.properties.get("Pow")
+        self._last_operating_state: dict[str, Any] = {}
         self._startup_apply_lock = False
 
     async def async_init(self):
@@ -115,6 +116,7 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
             if dred in (0, 1, 2, 3):
                 self._startup_settings["dred"] = dred
         self._last_power = self.device.properties.get("Pow")
+        self._last_operating_state = self._operating_state()
         self._runtime_powered = bool(self._last_power)
         if not self._runtime_powered:
             self._current_run_seconds = 0.0
@@ -152,7 +154,13 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         # MQTT echo does not apply the same startup preference a second time.
         self._last_power = data.get("Pow")
         try:
-            ok = await self._mqtt.send_command(self.device.mac, ["DRED"], [dred])
+            ok = await self._mqtt.send_command(
+                self.device.mac,
+                ["DRED"],
+                [dred],
+                source="startup",
+                action="startup_dred",
+            )
             if ok:
                 data["DRED"] = dred
                 if dred:
@@ -168,6 +176,23 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         finally:
             self._startup_apply_lock = False
 
+    def _operating_state(self) -> dict[str, Any]:
+        """Return the user-visible properties worth recording as actions."""
+        keys = (
+            "Pow",
+            "Mod",
+            "SetTem",
+            "SetDeciTem",
+            "WdSpd",
+            "Quiet",
+            "Tur",
+            "DRED",
+            "Idemand",
+            "SwUpDn",
+            "SwingLfRig",
+        )
+        return {key: self.device.properties.get(key) for key in keys}
+
     def async_process_device_update(self) -> None:
         """Publish fresh data and detect starts originating outside HA."""
         current_power = self.device.properties.get("Pow")
@@ -175,6 +200,26 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         if power_on:
             self._current_run_seconds = 0.0
         self._last_power = current_power
+        current_operating_state = self._operating_state()
+        changes = {
+            key: value
+            for key, value in current_operating_state.items()
+            if self._last_operating_state and self._last_operating_state.get(key) != value
+        }
+        self._last_operating_state = current_operating_state
+        command_age = self._mqtt.command_age(self.device.mac)
+        if changes and (command_age is None or command_age > 30):
+            action_log = getattr(self._mqtt, "action_log", None)
+            if action_log is not None:
+                self.hass.async_create_task(
+                    action_log.async_record(
+                        self.device.mac,
+                        "device_external",
+                        "external_control_change",
+                        changes,
+                        result="observed",
+                    )
+                )
         self.async_set_updated_data(self._build_data())
         if power_on and self.startup_dred is not None:
             self.hass.async_create_task(self.async_apply_startup_settings())

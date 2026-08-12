@@ -36,7 +36,7 @@ def test_panel_data_apis_require_authentication() -> None:
     # The HTML shell must stay public for the iframe; every data view is protected.
     history_source = (COMPONENT / "panel_history.py").read_text()
     profile_source = (COMPONENT / "panel_profiles.py").read_text()
-    assert source.count("requires_auth = True") == 11
+    assert source.count("requires_auth = True") == 12
     assert history_source.count("requires_auth = True") == 1
     assert profile_source.count("requires_auth = True") == 1
     assert source.count("requires_auth = False") == 1
@@ -196,6 +196,26 @@ def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
     assert "parseProbeTemp(s.InTem)" in panel_source
     assert "parseProbeTemp(s.OutTem)" in panel_source
     assert "toggleNativeSensor" in panel_source
+
+
+def test_action_log_is_persistent_and_identifies_command_source() -> None:
+    action_source = (COMPONENT / "action_log.py").read_text()
+    mqtt_source = (COMPONENT / "gree_mqtt.py").read_text()
+    panel_source = (COMPONENT / "panel.py").read_text()
+    climate_source = (COMPONENT / "climate.py").read_text()
+    coordinator_source = (COMPONENT / "coordinator.py").read_text()
+    assert "class GreeActionLog" in action_source
+    assert "ACTION_LOG_MAX_ENTRIES = 5000" in action_source
+    assert "await self._store.async_save" in action_source
+    assert "class GreePanelActionLogView" in panel_source
+    assert "PANEL_ACTION_LOG_URL" in panel_source
+    assert "loadActionLog" in panel_source
+    assert 'source="panel_manual"' in panel_source
+    assert 'source="profile"' in climate_source
+    assert 'source="ha_manual"' in climate_source
+    assert "self.action_log.async_record" in mqtt_source
+    assert '"device_external"' in coordinator_source
+    assert '"external_control_change"' in coordinator_source
 
 
 def test_runtime_counters_are_persistent_and_resettable() -> None:
@@ -482,7 +502,7 @@ def test_external_sensor_and_preset_options_are_exposed() -> None:
     assert "shared:true" in history_source
     assert "zoom: {enabled:!config.compact" in history_source
     assert "toolbar: {show:false}" in history_source
-    assert "item.css === 'outdoor' ? 4" in history_source
+    assert "item.css === 'outdoor' ? 3" in history_source
     assert "enabledOnSeries:outdoorSeries" in history_source
     assert "fixedMin:0,fixedMax:100" not in history_source
     assert "destroyApexCharts" in history_source

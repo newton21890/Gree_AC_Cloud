@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.17.0
+
+### Registro persistente delle azioni
+
+- Aggiunto in Diagnostica un registro operativo persistente nello storage Home Assistant, separato dai log tecnici volatili.
+- Ogni comando registra data e ora, unità, origine, azione, parametri inviati e risultato.
+- Le origini distinguono pannello manuale, servizi/entità Home Assistant, profili Smart, impostazioni di avvio, attività interna e variazioni osservate dal comando a muro/app esterna.
+- Il registro conserva fino a 5000 eventi, può essere filtrato, copiato e azzerato dall'amministratore.
+- Confermato il ripristino automatico della sessione introdotto nella 0.16.1.
+
 ## 0.16.1
 
 ### Ripristino automatico della sessione del pannello

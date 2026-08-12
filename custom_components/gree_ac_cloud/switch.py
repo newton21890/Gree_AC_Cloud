@@ -47,7 +47,13 @@ class GreeSwitch(GreeDeviceEntity, SwitchEntity):
             if self.coordinator.data.get("DREDEn") == 1:
                 options.append("DRED")
                 values.append(0)
-        if await mqtt.send_command(self.coordinator.device.mac, options, values):
+        if await mqtt.send_command(
+            self.coordinator.device.mac,
+            options,
+            values,
+            source="ha_manual",
+            action=f"turn_on_{self._key}",
+        ):
             for option, value in zip(options, values):
                 self.coordinator.device.properties[option] = value
             self.coordinator.async_set_updated_data(dict(self.coordinator.device.properties))
@@ -59,7 +65,13 @@ class GreeSwitch(GreeDeviceEntity, SwitchEntity):
         if self._key == "Tur":
             options = ["Tur", "WdSpd"]
             values = [0, 5]
-        if await mqtt.send_command(self.coordinator.device.mac, options, values):
+        if await mqtt.send_command(
+            self.coordinator.device.mac,
+            options,
+            values,
+            source="ha_manual",
+            action=f"turn_off_{self._key}",
+        ):
             for option, value in zip(options, values):
                 self.coordinator.device.properties[option] = value
             self.coordinator.async_set_updated_data(dict(self.coordinator.device.properties))

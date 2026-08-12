@@ -56,6 +56,7 @@ class GreeMQTTClient:
         self._user_params: dict[str, set[str]] = {device.mac: set() for device in devices}
         self._last_seen: dict[str, float] = {}
         self._last_command: dict[str, float] = {}
+        self.action_log = None
 
     def _create_client(self):
         import aiomqtt
@@ -265,7 +266,15 @@ class GreeMQTTClient:
         sent = self._last_command.get(mac)
         return time.monotonic() - sent if sent is not None else None
 
-    async def send_command(self, mac: str, options: list[str], values: list[Any]) -> bool:
+    async def send_command(
+        self,
+        mac: str,
+        options: list[str],
+        values: list[Any],
+        *,
+        source: str = "integration",
+        action: str = "device_command",
+    ) -> bool:
         device = self.devices.get(mac)
         if not device or not options or len(options) != len(values):
             return False
@@ -284,6 +293,15 @@ class GreeMQTTClient:
         _LOGGER.info("send_command: %s options=%s values=%s", mac, options, values)
         if ok:
             self._last_command[mac] = time.monotonic()
+        if self.action_log is not None:
+            changes = dict(zip(options, values))
+            await self.action_log.async_record(
+                mac,
+                source,
+                action,
+                changes,
+                result="sent" if ok else "failed",
+            )
 
         user_params = self._user_params.setdefault(mac, set())
         for option, value in zip(options, values):

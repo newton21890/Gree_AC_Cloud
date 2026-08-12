@@ -379,6 +379,7 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         if preset_mode not in self.preset_modes:
             raise ValueError(f"Unsupported or disabled preset: {preset_mode}")
+        previous_preset = self._preset_mode
         self._preset_mode = preset_mode
         self._smart_manual_power = None
         self._smart_manual_override_explicit = False
@@ -392,6 +393,15 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         else:
             await self._async_apply_preset()
         self.async_write_ha_state()
+        action_log = getattr(self.coordinator._mqtt, "action_log", None)
+        if action_log is not None and previous_preset != preset_mode:
+            await action_log.async_record(
+                self._device.mac,
+                "ha_manual",
+                "select_preset",
+                {"from": previous_preset, "to": preset_mode},
+                result="applied",
+            )
 
     def _active_preset(self) -> dict:
         if not self._preset_mode or self._preset_mode == PRESET_MANUAL:
@@ -822,7 +832,13 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                 self._preset_action_lock = True
                 self._expect_power_echo(True)
                 try:
-                    if await self.coordinator._mqtt.send_command(self._device.mac, options, values):
+                    if await self.coordinator._mqtt.send_command(
+                        self._device.mac,
+                        options,
+                        values,
+                        source="profile",
+                        action="smart_profile_hold",
+                    ):
                         for option, value in zip(options, values):
                             self._device.properties[option] = value
                         self._sync_data()
@@ -871,7 +887,13 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
                 self._preset_action_lock = True
                 self._expect_power_echo(True)
                 try:
-                    if await self.coordinator._mqtt.send_command(self._device.mac, options, values):
+                    if await self.coordinator._mqtt.send_command(
+                        self._device.mac,
+                        options,
+                        values,
+                        source="profile",
+                        action="smart_profile_demand",
+                    ):
                         for option, value in zip(options, values):
                             self._device.properties[option] = value
                         self._sync_data()
@@ -931,7 +953,13 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         else:
             options, values = ["Pow", "SetDeciTem"], [1, deci]
             self._expect_power_echo(True)
-        if await mqtt.send_command(self._device.mac, options, values):
+        if await mqtt.send_command(
+            self._device.mac,
+            options,
+            values,
+            source="ha_manual",
+            action="set_temperature",
+        ):
             for option, value in zip(options, values):
                 self._device.properties[option] = value
             self._sync_data()
@@ -971,7 +999,13 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             options = ["Pow", "Mod"]
             values = [1, HVAC_MAP_REV.get(hvac_mode, 0)]
         self._expect_power_echo(hvac_mode != HVACMode.OFF)
-        if await mqtt.send_command(self._device.mac, options, values):
+        if await mqtt.send_command(
+            self._device.mac,
+            options,
+            values,
+            source="ha_manual",
+            action="set_hvac_mode",
+        ):
             for option, value in zip(options, values):
                 self._device.properties[option] = value
             self._sync_data()
@@ -986,7 +1020,13 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
     async def async_turn_on(self):
         mqtt = self.coordinator._mqtt
         self._expect_power_echo(True)
-        if await mqtt.send_command(self._device.mac, ["Pow"], [1]):
+        if await mqtt.send_command(
+            self._device.mac,
+            ["Pow"],
+            [1],
+            source="ha_manual",
+            action="turn_on",
+        ):
             self._device.properties["Pow"] = 1
             self._sync_data()
             await self.coordinator.async_apply_startup_settings()
@@ -999,7 +1039,13 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
     async def async_turn_off(self):
         mqtt = self.coordinator._mqtt
         self._expect_power_echo(False)
-        if await mqtt.send_command(self._device.mac, ["Pow"], [0]):
+        if await mqtt.send_command(
+            self._device.mac,
+            ["Pow"],
+            [0],
+            source="ha_manual",
+            action="turn_off",
+        ):
             self._device.properties["Pow"] = 0
             self._sync_data()
             if not self._preset_action_lock and self._smart_profile_enabled:
@@ -1034,7 +1080,13 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             options = ["Tur", "WdSpd"]
             values = [0, speed]
         mqtt = self.coordinator._mqtt
-        if await mqtt.send_command(self._device.mac, options, values):
+        if await mqtt.send_command(
+            self._device.mac,
+            options,
+            values,
+            source="ha_manual",
+            action="set_fan_mode",
+        ):
             for option, value in zip(options, values):
                 self._device.properties[option] = value
             self._smart_manual_fan = fan_mode if self._smart_profile_enabled else None
@@ -1060,7 +1112,13 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
         v = 1 if swing_mode in (SWING_VERTICAL, SWING_BOTH) else 0
         h = 1 if swing_mode in (SWING_HORIZONTAL, SWING_BOTH) else 0
         mqtt = self.coordinator._mqtt
-        if await mqtt.send_command(self._device.mac, ["SwUpDn", "SwingLfRig"], [v, h]):
+        if await mqtt.send_command(
+            self._device.mac,
+            ["SwUpDn", "SwingLfRig"],
+            [v, h],
+            source="ha_manual",
+            action="set_swing_mode",
+        ):
             self._device.properties["SwUpDn"] = v
             self._device.properties["SwingLfRig"] = h
             self._sync_data()

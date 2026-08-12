@@ -28,10 +28,7 @@ async def async_setup_entry(hass, entry, async_add_entities: AddEntitiesCallback
         if entity_id is None:
             continue
         registry_entry = registry.async_get(entity_id)
-        if (
-            registry_entry
-            and registry_entry.disabled_by == er.RegistryEntryDisabler.INTEGRATION
-        ):
+        if registry_entry and registry_entry.disabled_by == er.RegistryEntryDisabler.INTEGRATION:
             registry.async_update_entity(entity_id, disabled_by=None)
 
     async_add_entities(
@@ -113,15 +110,17 @@ class GreeDemandResponseSelect(GreeDeviceEntity, SelectEntity):
 
         value = DRED_OPTIONS_REV[option]
         if await self.coordinator._mqtt.send_command(
-            self.coordinator.device.mac, ["DRED"], [value]
+            self.coordinator.device.mac,
+            ["DRED"],
+            [value],
+            source="ha_manual",
+            action="set_dred",
         ):
             self.coordinator.device.properties["DRED"] = value
             # The device proved that entering a DRED level cancels Quiet.
             if value:
                 self.coordinator.device.properties["Quiet"] = 0
-            self.coordinator.async_set_updated_data(
-                dict(self.coordinator.device.properties)
-            )
+            self.coordinator.async_set_updated_data(dict(self.coordinator.device.properties))
 
 
 class GreeStartupDemandResponseSelect(GreeDeviceEntity, SelectEntity):

@@ -34,6 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     )
 
     STORAGE_KEY_NAMES = f"{DOMAIN}.names"
+    from .action_log import GreeActionLog
     from .coordinator import GreeDeviceCoordinator, async_discover_and_connect
     from .panel import async_register_panel
 
@@ -90,6 +91,10 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     hass.data[DOMAIN].setdefault("models", {})
     hass.data[DOMAIN].setdefault("installations", {})
     hass.data[DOMAIN].setdefault("device_names", {})
+    if "action_log" not in hass.data[DOMAIN]:
+        action_log = GreeActionLog(hass)
+        await action_log.async_load()
+        hass.data[DOMAIN]["action_log"] = action_log
 
     models_store = Store(hass, STORAGE_VERSION, STORAGE_KEY_MODELS)
     saved_models = await models_store.async_load()
@@ -146,6 +151,8 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         raise
 
     hass.data[DOMAIN]["entries"][entry.entry_id] = coordinators
+
+    mqtt.action_log = hass.data[DOMAIN]["action_log"]
 
     entry.runtime_data = {
         "mqtt": mqtt,

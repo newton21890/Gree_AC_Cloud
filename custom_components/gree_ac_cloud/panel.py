@@ -63,6 +63,7 @@ PANEL_URL = "/api/gree_ac_cloud/panel"
 PANEL_DATA_URL = "/api/gree_ac_cloud/panel/data"
 PANEL_CMD_URL = "/api/gree_ac_cloud/panel/command"
 PANEL_LOG_URL = "/api/gree_ac_cloud/panel/log"
+PANEL_ACTION_LOG_URL = "/api/gree_ac_cloud/panel/action-log"
 PANEL_README_URL = "/api/gree_ac_cloud/panel/readme"
 PANEL_CHANGELOG_URL = "/api/gree_ac_cloud/panel/changelog"
 PANEL_ROOM_SENSORS_URL = "/api/gree_ac_cloud/panel/room-sensors"
@@ -206,6 +207,7 @@ async def async_register_panel(hass: HomeAssistant):
         hass.http.register_view(GreePanelProfileView)
         hass.http.register_view(GreePanelCommandView)
         hass.http.register_view(GreePanelLogView)
+        hass.http.register_view(GreePanelActionLogView)
         hass.http.register_view(GreePanelModelsView)
         hass.http.register_view(GreePanelInstallationView)
         hass.http.register_view(GreePanelNamesView)
@@ -745,7 +747,13 @@ class GreePanelCommandView(HomeAssistantView):
                             )
                         ):
                             return self.json({"error": "invalid command"}, status=400)
-                        ok = await mqtt.send_command(mac, options, values)
+                        ok = await mqtt.send_command(
+                            mac,
+                            options,
+                            values,
+                            source="panel_manual",
+                            action="panel_command",
+                        )
                         if ok:
                             for opt, val in zip(options, values):
                                 coord.device.properties[opt] = val
@@ -766,6 +774,40 @@ class GreePanelCommandView(HomeAssistantView):
                         return self.json({"ok": ok})
 
         return self.json({"error": "device not found"}, status=404)
+
+
+class GreePanelActionLogView(HomeAssistantView):
+    """Return and manage the persistent operating-action audit trail."""
+
+    url = PANEL_ACTION_LOG_URL
+    name = "api:gree_ac_cloud:panel_action_log"
+    requires_auth = True
+
+    async def get(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        action_log = hass.data.get(DOMAIN, {}).get("action_log")
+        if action_log is None:
+            return self.json([])
+        mac = request.query.get("mac") or None
+        source = request.query.get("source") or None
+        try:
+            limit = int(request.query.get("limit", 500))
+        except (TypeError, ValueError):
+            limit = 500
+        return self.json(action_log.entries(mac=mac, source=source, limit=limit))
+
+    async def delete(self, request: web.Request) -> web.Response:
+        if not _is_admin(request):
+            return self.json({"error": "admin required"}, status=403)
+        hass = request.app["hass"]
+        action_log = hass.data.get(DOMAIN, {}).get("action_log")
+        if action_log is None:
+            return self.json({"ok": True, "removed": 0})
+        mac = request.query.get("mac") or None
+        if mac and not _valid_mac(mac):
+            return self.json({"error": "invalid mac"}, status=400)
+        removed = await action_log.async_clear(mac)
+        return self.json({"ok": True, "removed": removed})
 
 
 class GreePanelLogView(HomeAssistantView):
@@ -1477,7 +1519,14 @@ body.desktop .header-row2 { padding-left: 0; }
 .log-toolbar { display:flex; gap:6px; margin-bottom:8px; align-items:center; flex-wrap:wrap; }
 .log-toggle { font-size:11px; color:var(--text2); display:flex; align-items:center; gap:4px; cursor:pointer; }
 #logCount { font-size:10px; color:var(--text2); margin-left:auto; white-space:nowrap; }
-#logContainer { font-size: 10px; font-family: monospace; line-height: 1.5; max-height:60vh; overflow-y:auto; }
+#logContainer,#actionLogContainer { font-size:10px; font-family:monospace; line-height:1.5; max-height:60vh; overflow-y:auto; }
+.action-log-entry { display:grid; grid-template-columns:145px 85px 120px minmax(180px,1fr) 70px; gap:9px; padding:7px 8px; border-bottom:1px solid #202b3a; align-items:center; }
+.action-log-entry:hover { background:#111a26; }
+.action-source { color:#67d7f0; font-weight:700; }
+.action-device { color:#9aa9bd; }
+.action-result-sent,.action-result-recorded { color:#52d68a; }
+.action-result-failed { color:#ff6b6b; }
+@media (max-width:720px) { .action-log-entry { grid-template-columns:1fr auto; } .action-device,.action-changes { grid-column:1/-1; } }
 .log-entry { padding: 3px 4px; border-bottom: 1px solid var(--border); white-space: pre-wrap; word-break: break-all; }
 .log-entry .log-time { color: var(--text2); margin-right: 4px; }
 .log-entry .log-debug { color: #666; }
@@ -1556,7 +1605,7 @@ body.desktop .control-row label { width: auto; min-width: 60px; padding-bottom: 
   .power-row .p-item .p-val { font-size: 15px; }
   .setup-msg { padding: 60px 20px; }
   .setup-msg .icon-ac { font-size: 64px; }
-  #logContainer { font-size: 11px; max-height:70vh; }
+  #logContainer,#actionLogContainer { font-size:11px; max-height:70vh; }
   .md-content { font-size: 13px; }
   .md-content h1 { font-size: 20px; }
 }
@@ -2462,6 +2511,16 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   </div>
 
   <div id="tab-logs" style="display:none;">
+    <div class="ops-page-head"><div><span class="ops-eyebrow">REGISTRO PERSISTENTE</span><h2>Azioni operative</h2><p>Comandi manuali, decisioni dei profili e risultati conservati nello storage Home Assistant.</p></div></div>
+    <div class="log-toolbar">
+      <button class="btn" onclick="loadActionLog()">↻ Aggiorna registro</button>
+      <button class="btn" onclick="copyActionLog()">📋 Copia registro</button>
+      <button class="btn" onclick="clearActionLog()">🗑 Azzera registro</button>
+      <select id="actionSourceFilter" class="config-select" style="width:auto" onchange="loadActionLog()"><option value="">Tutte le origini</option><option value="panel_manual">Pannello manuale</option><option value="ha_manual">Home Assistant/manuale</option><option value="profile">Profilo Smart</option><option value="startup">Avvio</option><option value="device_external">Comando a muro/app</option><option value="integration">Integrazione</option></select>
+      <span id="actionLogCount"></span>
+    </div>
+    <div id="actionLogContainer"><p style="color:var(--text2);font-size:12px;">Caricamento registro azioni…</p></div>
+    <div class="ops-page-head" style="margin-top:24px"><div><span class="ops-eyebrow">DIAGNOSTICA VOLATILE</span><h2>Log tecnici</h2><p>Ultimi messaggi in memoria; vengono persi al riavvio di Home Assistant.</p></div></div>
     <div class="log-toolbar">
       <button class="btn" onclick="copyAllLogs()">📋 Copy all</button>
       <label class="log-toggle">
@@ -2557,6 +2616,7 @@ __APEXCHARTS_JS__
 const HA_BASE = window.location.origin;
 const PANEL_DATA_URL = HA_BASE + '/api/gree_ac_cloud/panel/data';
 const PANEL_CMD_URL = HA_BASE + '/api/gree_ac_cloud/panel/command';
+const PANEL_ACTION_LOG_URL = HA_BASE + '/api/gree_ac_cloud/panel/action-log';
 const PANEL_NAMES_URL = HA_BASE + '/api/gree_ac_cloud/panel/names';
 const PANEL_SETTINGS_URL = HA_BASE + '/api/gree_ac_cloud/panel/settings';
 const PANEL_REFRESH_URL = HA_BASE + '/api/gree_ac_cloud/panel/refresh';
@@ -3772,6 +3832,37 @@ function loadChangelog() {
 
 let _logAutoRefreshTimer = null;
 let _lastLogCount = 0;
+let _lastActionLog = [];
+
+function actionLogText(entries) {
+  return entries.map(entry => `[${new Date(entry.timestamp).toLocaleString('it-IT')}] ${entry.mac} ${entry.source} ${entry.action} ${JSON.stringify(entry.changes || {})} ${entry.result}`).join('\n');
+}
+async function loadActionLog() {
+  const container = document.getElementById('actionLogContainer');
+  if (!container) return;
+  try {
+    const source = document.getElementById('actionSourceFilter')?.value || '';
+    const data = await apiFetch(PANEL_ACTION_LOG_URL + '?limit=1000' + (source ? '&source=' + encodeURIComponent(source) : ''));
+    _lastActionLog = data;
+    container.innerHTML = data.length ? data.map(entry => {
+      const name = __DEVICE_NAMES__[entry.mac] || entry.mac;
+      return `<div class="action-log-entry"><span>${escHtml(new Date(entry.timestamp).toLocaleString('it-IT'))}</span><span class="action-source">${escHtml(entry.source)}</span><span class="action-device">${escHtml(name)}</span><span class="action-changes"><b>${escHtml(entry.action)}</b> · ${escHtml(JSON.stringify(entry.changes || {}))}</span><span class="action-result-${escHtml(entry.result)}">${escHtml(entry.result)}</span></div>`;
+    }).join('') : '<p style="color:var(--text2)">Nessuna azione registrata.</p>';
+    const count = document.getElementById('actionLogCount');
+    if (count) count.textContent = data.length + ' azioni';
+    container.scrollTop = container.scrollHeight;
+  } catch (error) { container.innerHTML = `<p style="color:var(--red)">Registro non disponibile: ${escHtml(error.message)}</p>`; }
+}
+async function copyActionLog() {
+  if (!_lastActionLog.length) await loadActionLog();
+  const text = actionLogText(_lastActionLog);
+  try { await navigator.clipboard.writeText(text); } catch (error) { const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove(); }
+}
+async function clearActionLog() {
+  if (!window.confirm('Azzerare definitivamente tutto il registro persistente delle azioni?')) return;
+  await apiFetch(PANEL_ACTION_LOG_URL,{method:'DELETE'});
+  await loadActionLog();
+}
 
 async function loadLogs() {
   const container = document.getElementById('logContainer');
@@ -3851,6 +3942,7 @@ function switchTab(tab) {
   if (tab === 'charts' && window._lastPanelData) renderChartsPage(window._lastPanelData);
   if (tab === 'profiles' && window._lastPanelData) renderProfilesPage(window._lastPanelData);
   if (tab === 'logs') {
+    loadActionLog();
     loadLogs();
     onLogAutoRefreshChange();
   } else {
