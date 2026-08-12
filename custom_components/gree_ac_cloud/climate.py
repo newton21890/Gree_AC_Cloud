@@ -48,6 +48,7 @@ from .const import (
     CONF_PROFILE_CONTROL_ENABLED,
     CONF_TEMPERATURE_SENSOR,
     CONF_TEMPERATURE_SENSORS,
+    DOMAIN,
     DRED_OPTIONS_REV,
     FAN_MAP,
     FAN_MAP_REV,
@@ -286,6 +287,9 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
 
     @property
     def extra_state_attributes(self):
+        installation = (
+            self.hass.data.get(DOMAIN, {}).get("installations", {}).get(self._device.mac, {})
+        )
         return {
             "temperature_sensors": self._external_temperature_entities,
             "humidity_sensors": self._external_humidity_entities,
@@ -331,6 +335,10 @@ class GreeACClimateEntity(GreeDeviceEntity, ClimateEntity, RestoreEntity):
             "smart_manual_power_override": self._smart_manual_power,
             "smart_manual_override_explicit": self._smart_manual_override_explicit,
             "profile_control_enabled": self._profile_control_enabled,
+            "installation": installation,
+            "static_pressure_pa": installation.get("static_pressure_pa"),
+            "served_rooms": installation.get("served_rooms"),
+            "supply_outlets": installation.get("supply_outlets"),
         }
 
     @property

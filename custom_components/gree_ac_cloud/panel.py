@@ -50,6 +50,7 @@ from .const import (
     GREE_MQTT_PORTS,
     PRESET_DRED_ALIASES,
     PRESET_FAN_ALIASES,
+    STORAGE_KEY_INSTALLATIONS,
     STORAGE_KEY_MODELS,
     STORAGE_VERSION,
 )
@@ -63,6 +64,7 @@ PANEL_LOG_URL = "/api/gree_ac_cloud/panel/log"
 PANEL_README_URL = "/api/gree_ac_cloud/panel/readme"
 PANEL_CHANGELOG_URL = "/api/gree_ac_cloud/panel/changelog"
 PANEL_ROOM_SENSORS_URL = "/api/gree_ac_cloud/panel/room-sensors"
+PANEL_INSTALLATION_URL = "/api/gree_ac_cloud/panel/installation"
 
 
 def _safe_json_for_script(value) -> str:
@@ -202,6 +204,7 @@ async def async_register_panel(hass: HomeAssistant):
         hass.http.register_view(GreePanelCommandView)
         hass.http.register_view(GreePanelLogView)
         hass.http.register_view(GreePanelModelsView)
+        hass.http.register_view(GreePanelInstallationView)
         hass.http.register_view(GreePanelNamesView)
         hass.http.register_view(GreePanelSettingsView)
         hass.http.register_view(GreePanelRefreshView)
@@ -392,6 +395,9 @@ class GreePanelDataView(HomeAssistantView):
                         "smart_stall_boost",
                     ):
                         state[key] = climate_state.attributes.get(key)
+                state["Installation"] = (
+                    hass.data.get(DOMAIN, {}).get("installations", {}).get(device.mac, {})
+                )
                 state["EstimatedBaselinePowerW"] = state.get("estimated_baseline_power_w")
                 state["EstimatedSavingPowerW"] = state.get("estimated_saving_power_w")
                 data.append(
@@ -689,6 +695,83 @@ class GreePanelModelsView(HomeAssistantView):
         await store.async_save(hass.data[DOMAIN].get("models", {}))
         _LOGGER.info("Model set: %s → %s", mac, model or "(unset)")
         return self.json({"ok": True, "mac": mac, "model": model})
+
+
+class GreePanelInstallationView(HomeAssistantView):
+    """Persist descriptive ducted-installation data without reloading MQTT."""
+
+    url = PANEL_INSTALLATION_URL
+    name = "api:gree_ac_cloud:panel_installation"
+    requires_auth = True
+
+    FIELDS = {
+        "static_pressure_pa": (float, 0, 300),
+        "static_pressure_level": (int, 1, 9),
+        "main_duct_length_m": (float, 0, 500),
+        "total_duct_length_m": (float, 0, 2000),
+        "served_rooms": (int, 1, 100),
+        "supply_outlets": (int, 1, 200),
+        "return_grilles": (int, 1, 100),
+        "duct_diameter_mm": (float, 0, 2000),
+        "duct_section_cm2": (float, 0, 100000),
+    }
+    CHOICES = {
+        "duct_type": {"rigid", "flexible", "mixed", "other"},
+        "supply_outlet_type": {"grille", "diffuser", "slot", "mixed", "other"},
+        "return_grille_type": {"grille", "filter_grille", "mixed", "other"},
+        "filter_type": {"none", "standard", "high_efficiency", "other"},
+    }
+
+    async def get(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        return self.json(hass.data.get(DOMAIN, {}).get("installations", {}))
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        if not _is_admin(request):
+            return self.json({"error": "admin required"}, status=403)
+        try:
+            body = await request.json()
+        except Exception:
+            return self.json({"error": "invalid JSON"}, status=400)
+        mac = body.get("mac")
+        if not _valid_mac(mac):
+            return self.json({"error": "invalid mac"}, status=400)
+
+        clean = {}
+        for field, (cast, minimum, maximum) in self.FIELDS.items():
+            value = body.get(field)
+            if value in (None, ""):
+                continue
+            try:
+                number = cast(value)
+            except (TypeError, ValueError):
+                return self.json({"error": f"invalid {field}"}, status=400)
+            if isinstance(value, bool) or not minimum <= number <= maximum:
+                return self.json({"error": f"invalid {field}"}, status=400)
+            clean[field] = number
+        for field, choices in self.CHOICES.items():
+            value = body.get(field)
+            if value in (None, ""):
+                continue
+            if value not in choices:
+                return self.json({"error": f"invalid {field}"}, status=400)
+            clean[field] = value
+        notes = body.get("notes", "")
+        if not isinstance(notes, str) or len(notes) > 1000:
+            return self.json({"error": "invalid notes"}, status=400)
+        if notes.strip():
+            clean["notes"] = notes.strip()
+
+        hass.data.setdefault(DOMAIN, {}).setdefault("installations", {})
+        if clean:
+            hass.data[DOMAIN]["installations"][mac] = clean
+        else:
+            hass.data[DOMAIN]["installations"].pop(mac, None)
+        store = Store(hass, STORAGE_VERSION, STORAGE_KEY_INSTALLATIONS)
+        await store.async_save(hass.data[DOMAIN]["installations"])
+        _LOGGER.info("Installation profile updated for %s", mac)
+        return self.json({"ok": True, "mac": mac, "installation": clean})
 
 
 class GreePanelNamesView(HomeAssistantView):
@@ -1577,7 +1660,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .profile-docs ul,.profile-docs ol { padding-left:18px; }
 .profile-callout { margin:10px 0; padding:10px; border-left:3px solid var(--primary); border-radius:6px; background:#10202b; color:#b8dce4; font-size:10px; }
 @media (max-width:1100px) { .profiles-layout { grid-template-columns:1fr; } .profile-docs { position:static; } .profile-editor-grid { grid-template-columns:1fr; } }
-@media (max-width:720px) { .profile-cards { grid-template-columns:1fr; } .profile-editor-field { grid-template-columns:1fr; } .profile-toggle,.profile-mode-selector { justify-content:flex-start; } .chart-toolbar { align-items:stretch; flex-direction:column; } .chart-periods,.chart-navigation { justify-content:center; } }
+@media (max-width:720px) { .profile-cards { grid-template-columns:1fr; } .profile-editor-field { grid-template-columns:1fr; } .profile-toggle,.profile-mode-selector { justify-content:flex-start; } .chart-toolbar { align-items:stretch; flex-direction:column; } .chart-periods,.chart-navigation { justify-content:center; } .installation-grid { grid-template-columns:1fr; } .installation-field.wide,.installation-note { grid-column:1; } }
 .ops-empty { margin-top:10px; color:var(--text2); font-size:10px; }
 .ops-telemetry-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:11px; }
 .ops-health { color:var(--green); font-size:9px; }
@@ -1618,6 +1701,15 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .config-device-body { padding:15px; }
 .config-sensor-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .config-field { display:grid; gap:6px; min-width:0; }
+.installation-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.installation-device { margin-bottom:16px; padding:14px; border:1px solid #26354a; border-radius:12px; background:#111925; }
+.installation-device h3 { margin:0 0 12px; color:#e9f2ff; font-size:14px; }
+.installation-field { display:grid; gap:5px; }
+.installation-field label { color:var(--text2); font-size:9px; font-weight:700; text-transform:uppercase; }
+.installation-field input,.installation-field select,.installation-field textarea { width:100%; box-sizing:border-box; padding:9px; border:1px solid #34465f; border-radius:7px; color:var(--text); background:#0c131d; }
+.installation-field textarea { min-height:72px; resize:vertical; }
+.installation-field.wide { grid-column:1/-1; }
+.installation-note { grid-column:1/-1; margin:0; color:#7f8da2; font-size:9px; }
 .config-help { color:var(--text2); font-size:9px; }
 .config-section-title { margin:18px 0 9px; color:#b9c8da; font-size:9px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
 .outdoor-sensor-settings { display:grid; gap:14px; max-width:760px; margin:0 auto; }
@@ -1796,6 +1888,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
       </select>
     </label>
     <button class="refresh-btn" onclick="openSensorSettings()" title="Configura sensori ambiente e profili"><span class="sidebar-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.95 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.58 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.95a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.05 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.13.61.6 1.08 1.2 1.04H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></span><span class="sidebar-action-label">Configura</span></button>
+    <button class="refresh-btn" onclick="openInstallationSettings()" title="Scheda impianto e condotte"><span class="sidebar-action-icon" aria-hidden="true">▦</span><span class="sidebar-action-label">Impianto</span></button>
     <button class="refresh-btn refresh-action" onclick="refreshNow()" title="Aggiorna ora"><span class="sidebar-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 6v5h-5"/><path d="M19 11a7 7 0 1 0 1 4"/></svg></span><span class="sidebar-action-label">Aggiorna ora</span></button>
   </div>
   <nav class="tab-nav" id="primaryNavigation" aria-label="Navigazione principale">
@@ -2286,6 +2379,14 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
   </div>
 </div>
 
+<div id="installationSettings" class="config-modal" role="dialog" aria-modal="true" aria-labelledby="installationTitle" onclick="if(event.target===this)closeInstallationSettings()">
+  <div class="config-dialog">
+    <header class="config-header"><div class="config-heading"><span class="config-heading-icon">▦</span><div><h2 id="installationTitle">Scheda impianto aeraulico</h2><p>Dati descrittivi per contestualizzare portata, rumore e prestazioni</p></div></div><button class="config-close" onclick="closeInstallationSettings()" aria-label="Chiudi scheda impianto">×</button></header>
+    <div class="config-body" id="installationSettingsContent"><div class="config-loading">Caricamento configurazione…</div></div>
+    <footer class="config-footer"><span class="config-status" id="installationSettingsStatus">Questi dati non modificano P30 e non inviano comandi alla macchina.</span><div class="config-actions"><button class="config-btn" onclick="closeInstallationSettings()">Annulla</button><button class="config-btn primary" id="saveInstallationSettings">Salva scheda</button></div></footer>
+  </div>
+</div>
+
 <div id="roomSensorSettings" class="config-modal" role="dialog" aria-modal="true" aria-labelledby="roomSensorTitle" onclick="if(event.target===this)closeRoomSensorSettings()">
   <div class="config-dialog">
     <header class="config-header">
@@ -2331,6 +2432,7 @@ const PANEL_SETTINGS_URL = HA_BASE + '/api/gree_ac_cloud/panel/settings';
 const PANEL_REFRESH_URL = HA_BASE + '/api/gree_ac_cloud/panel/refresh';
 const PANEL_DEVICES_INFO_URL = HA_BASE + '/api/gree_ac_cloud/panel/devices-info';
 const PANEL_ROOM_SENSORS_URL = HA_BASE + '/api/gree_ac_cloud/panel/room-sensors';
+const PANEL_INSTALLATION_URL = HA_BASE + '/api/gree_ac_cloud/panel/installation';
 const PANEL_HISTORY_URL = HA_BASE + '/api/gree_ac_cloud/panel/history';
 const PANEL_PROFILE_URL = HA_BASE + '/api/gree_ac_cloud/panel/profile';
 
@@ -2485,6 +2587,55 @@ function roomSensorGroup(device, sensors, selected, kind) {
   const icon = isTemperature ? '°C' : '%';
   const help = isTemperature ? 'I valori disponibili vengono mediati per temperatura corrente, profili Smart e storico.' : 'I valori disponibili vengono mediati e confrontati con la soglia di umidità del profilo.';
   return `<section class="room-sensor-group ${isTemperature ? 'temperature' : 'humidity'}" id="room-${kind}-${mac}"><header class="room-sensor-group-head"><span class="room-sensor-kind-icon">${icon}</span><div class="room-sensor-kind-copy"><h4>${title}</h4><p>${subtitle}</p></div><div class="room-sensor-tools"><span class="room-sensor-count">0 selezionati</span><button class="room-sensor-clear" type="button">Deseleziona tutti</button></div></header><div class="room-sensor-list">${roomSensorOptions(sensors,selected,mac,kind)}</div><footer class="room-sensor-group-foot">${help}</footer></section>`;
+}
+
+function installationNumberField(mac, key, label, value, unit, step='1') {
+  return `<div class="installation-field"><label>${label}</label><input type="number" min="0" step="${step}" data-installation-mac="${mac}" data-installation-key="${key}" value="${value ?? ''}" placeholder="Non indicato"><small>${unit}</small></div>`;
+}
+function installationSelectField(mac, key, label, value, options) {
+  return `<div class="installation-field"><label>${label}</label><select data-installation-mac="${mac}" data-installation-key="${key}"><option value="">Non indicato</option>${options.map(([v,l]) => `<option value="${v}" ${value === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`;
+}
+async function openInstallationSettings() {
+  const modal = document.getElementById('installationSettings');
+  const content = document.getElementById('installationSettingsContent');
+  modal.style.display = 'block';
+  content.innerHTML = '<div class="config-loading">Caricamento schede impianto…</div>';
+  try {
+    const [devices, installations] = await Promise.all([apiFetch(PANEL_DATA_URL), apiFetch(PANEL_INSTALLATION_URL)]);
+    content.innerHTML = devices.map(device => {
+      const mac = escHtml(device.mac); const cfg = installations[device.mac] || {};
+      return `<section class="installation-device" data-installation-device="${mac}"><h3>${escHtml(__DEVICE_NAMES__[device.mac] || device.name)} · <code>${mac}</code></h3><div class="installation-grid">
+        ${installationNumberField(mac,'static_pressure_pa','Pressione statica impostata',cfg.static_pressure_pa,'Pa','1')}
+        ${installationNumberField(mac,'static_pressure_level','Livello P30',cfg.static_pressure_level,'P1–P9','1')}
+        ${installationNumberField(mac,'main_duct_length_m','Condotta principale',cfg.main_duct_length_m,'metri','0.1')}
+        ${installationNumberField(mac,'total_duct_length_m','Sviluppo totale condotte',cfg.total_duct_length_m,'metri','0.1')}
+        ${installationNumberField(mac,'served_rooms','Locali serviti',cfg.served_rooms,'numero','1')}
+        ${installationNumberField(mac,'supply_outlets','Bocchette di mandata',cfg.supply_outlets,'numero','1')}
+        ${installationNumberField(mac,'return_grilles','Griglie di ripresa',cfg.return_grilles,'numero','1')}
+        ${installationNumberField(mac,'duct_diameter_mm','Diametro equivalente',cfg.duct_diameter_mm,'mm','1')}
+        ${installationNumberField(mac,'duct_section_cm2','Sezione condotta',cfg.duct_section_cm2,'cm²','1')}
+        ${installationSelectField(mac,'duct_type','Tipo condotte',cfg.duct_type,[['rigid','Rigide'],['flexible','Flessibili'],['mixed','Miste'],['other','Altro']])}
+        ${installationSelectField(mac,'supply_outlet_type','Terminali di mandata',cfg.supply_outlet_type,[['grille','Griglie'],['diffuser','Diffusori'],['slot','Feritoie lineari'],['mixed','Misti'],['other','Altro']])}
+        ${installationSelectField(mac,'return_grille_type','Tipo ripresa',cfg.return_grille_type,[['grille','Griglia'],['filter_grille','Griglia portafiltro'],['mixed','Mista'],['other','Altro']])}
+        ${installationSelectField(mac,'filter_type','Filtrazione',cfg.filter_type,[['none','Nessuna'],['standard','Standard'],['high_efficiency','Alta efficienza'],['other','Altro']])}
+        <div class="installation-field wide"><label>Note installazione</label><textarea data-installation-mac="${mac}" data-installation-key="notes" maxlength="1000">${escHtml(cfg.notes || '')}</textarea></div>
+        <p class="installation-note">Dato descrittivo: non è una misura in tempo reale e non modifica automaticamente la pressione statica della macchina.</p>
+      </div></section>`;
+    }).join('');
+    document.getElementById('saveInstallationSettings').onclick = () => saveInstallationSettings(devices);
+  } catch (error) { content.innerHTML = `<div class="config-loading">Errore: ${escHtml(error.message)}</div>`; }
+}
+function closeInstallationSettings() { document.getElementById('installationSettings').style.display = 'none'; }
+async function saveInstallationSettings(devices) {
+  const button = document.getElementById('saveInstallationSettings'); const status = document.getElementById('installationSettingsStatus'); button.disabled = true;
+  try {
+    for (const device of devices) {
+      const body = {mac:device.mac};
+      document.querySelectorAll(`[data-installation-mac="${device.mac}"]`).forEach(input => { if (input.value !== '') body[input.dataset.installationKey] = input.value; });
+      await apiFetch(PANEL_INSTALLATION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    }
+    status.textContent = 'Schede salvate senza ricaricare l’integrazione.'; setTimeout(() => { closeInstallationSettings(); loadData(); }, 700);
+  } catch (error) { status.textContent = `Errore: ${error.message}`; } finally { button.disabled = false; }
 }
 
 async function openRoomSensorSettings() {
@@ -3081,6 +3232,7 @@ function renderOperationsDevice(d) {
         <div class="ops-data-row"><span>Decisione Smart</span><b>${escHtml(s.smart_last_action || '--')}</b></div>
         <div class="ops-data-row"><span>I-Demand</span><b>${s.DREDEn === 1 ? (effectiveDred === 0 ? 'OFF' : (effectiveDred === 1 ? 'D1 · compressore escluso' : effectiveDred === 2 ? 'D2 · limite 50%' : 'D3 · limite 75%')) : 'N/D'}</b></div>
         <div class="ops-data-row"><span>Sonde IDU / ODU (raw − 40)</span><b>${probeIn != null ? probeIn.toFixed(1) + '°' : '--'} / ${probeOut != null ? probeOut.toFixed(1) + '°' : '--'}</b></div>
+        <div class="ops-data-row"><span>Impianto aeraulico</span><b>${s.Installation?.static_pressure_pa != null ? s.Installation.static_pressure_pa + ' Pa' : '--'} · ${s.Installation?.served_rooms != null ? s.Installation.served_rooms + ' locali' : '--'} · ${s.Installation?.supply_outlets != null ? s.Installation.supply_outlets + ' mandate' : '--'}</b></div>
         <details class="ops-details"><summary>APRI CONTROLLI AVANZATI ↓</summary>
           <div class="control-row"><label>Ventilatore</label><div class="btn-group">${[0,1,2,3,4,5].map(value => `<button class="btn ${Number(s.WdSpd) === value ? 'active' : ''}" onclick="setFan('${safeMac}',${value})">${fanLabels[value]}</button>`).join('')}</div></div>
           <div class="control-row"><label>Oscillazione</label><div class="btn-group"><button class="btn ${!s.SwUpDn && !s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','off')">Off</button><button class="btn ${s.SwUpDn && !s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','v')">Verticale</button><button class="btn ${!s.SwUpDn && s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','h')">Orizzontale</button><button class="btn ${s.SwUpDn && s.SwingLfRig ? 'active' : ''}" onclick="setSwing('${safeMac}','both')">Entrambi</button></div></div>

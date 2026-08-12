@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.14.0
+
+### Scheda descrittiva dell'impianto aeraulico
+
+- Aggiunta nel pannello la sezione **Impianto**, con configurazione separata per ciascuna macchina.
+- È possibile registrare pressione statica impostata in Pa, livello P30, lunghezza principale e totale delle condotte, numero di locali, mandate e riprese, diametro/sezione, tipo di condotte, terminali, ripresa, filtro e note.
+- I dati sono descrittivi: non scrivono P30, non inviano comandi alla macchina e non vengono presentati come misure in tempo reale.
+- La scheda viene salvata nello storage Home Assistant senza ricaricare l'integrazione o interrompere MQTT.
+- Pressione statica, locali e mandate sono riepilogati nella telemetria del pannello; la scheda completa e i principali valori sono esposti anche negli attributi dell'entità climate.
+
 ## 0.13.9
 
 ### Cambio temperatura senza riavvio dell'integrazione

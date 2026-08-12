@@ -36,7 +36,7 @@ def test_panel_data_apis_require_authentication() -> None:
     # The HTML shell must stay public for the iframe; every data view is protected.
     history_source = (COMPONENT / "panel_history.py").read_text()
     profile_source = (COMPONENT / "panel_profiles.py").read_text()
-    assert source.count("requires_auth = True") == 9
+    assert source.count("requires_auth = True") == 10
     assert history_source.count("requires_auth = True") == 1
     assert profile_source.count("requires_auth = True") == 1
     assert source.count("requires_auth = False") == 1
@@ -192,6 +192,23 @@ def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
     assert "parseProbeTemp(s.InTem)" in panel_source
     assert "parseProbeTemp(s.OutTem)" in panel_source
     assert "toggleNativeSensor" in panel_source
+
+
+def test_installation_profile_is_persisted_without_reload() -> None:
+    panel_source = (COMPONENT / "panel.py").read_text()
+    init_source = (COMPONENT / "__init__.py").read_text()
+    climate_source = (COMPONENT / "climate.py").read_text()
+    const_source = (COMPONENT / "const.py").read_text()
+    assert "STORAGE_KEY_INSTALLATIONS" in const_source
+    assert 'setdefault("installations", {})' in init_source
+    assert "class GreePanelInstallationView" in panel_source
+    assert '"static_pressure_pa"' in panel_source
+    assert '"main_duct_length_m"' in panel_source
+    assert '"served_rooms"' in panel_source
+    assert '"supply_outlets"' in panel_source
+    assert "openInstallationSettings" in panel_source
+    assert "Schede salvate senza ricaricare" in panel_source
+    assert '"installation": installation' in climate_source
 
 
 def test_profile_temperature_change_does_not_reload_integration() -> None:

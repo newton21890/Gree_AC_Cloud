@@ -26,6 +26,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
         GREE_CLOUD_SERVERS,
         GREE_MQTT_HOSTS,
         GREE_MQTT_PORTS,
+        STORAGE_KEY_INSTALLATIONS,
         STORAGE_KEY_MODELS,
         STORAGE_KEY_SETTINGS,
         STORAGE_VERSION,
@@ -87,6 +88,7 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN].setdefault("entries", {})
     hass.data[DOMAIN].setdefault("models", {})
+    hass.data[DOMAIN].setdefault("installations", {})
     hass.data[DOMAIN].setdefault("device_names", {})
 
     models_store = Store(hass, STORAGE_VERSION, STORAGE_KEY_MODELS)
@@ -94,6 +96,12 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     if saved_models:
         hass.data[DOMAIN]["models"].update(saved_models)
         _LOGGER.info("Restored %d device model mappings", len(saved_models))
+
+    installations_store = Store(hass, STORAGE_VERSION, STORAGE_KEY_INSTALLATIONS)
+    saved_installations = await installations_store.async_load()
+    if saved_installations:
+        hass.data[DOMAIN]["installations"].update(saved_installations)
+        _LOGGER.info("Restored %d installation profiles", len(saved_installations))
 
     names_store = Store(hass, STORAGE_VERSION, STORAGE_KEY_NAMES)
     saved_names = await names_store.async_load()
@@ -148,6 +156,8 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     async def _persist_all(event=None):
         store = Store(hass, STORAGE_VERSION, STORAGE_KEY_MODELS)
         await store.async_save(hass.data[DOMAIN].get("models", {}))
+        installations = Store(hass, STORAGE_VERSION, STORAGE_KEY_INSTALLATIONS)
+        await installations.async_save(hass.data[DOMAIN].get("installations", {}))
         ns = Store(hass, STORAGE_VERSION, STORAGE_KEY_NAMES)
         await ns.async_save(hass.data[DOMAIN].get("device_names", {}))
         ss = Store(hass, STORAGE_VERSION, STORAGE_KEY_SETTINGS)
