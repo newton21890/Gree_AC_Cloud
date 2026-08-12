@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.0
+
+### Telemetria consumi e ore di funzionamento
+
+- La colonna Telemetria mostra ora potenza ed energia effettive accanto ai rispettivi valori stimati.
+- Aggiunti il contatore persistente delle ore totali di accensione e il tempo trascorso dall'ultima accensione.
+- Il contatore totale può essere azzerato dal pannello per ciascuna unità senza modificare i dati energetici.
+- Aggiunte entità sensore dedicate alle ore totali e alle ore della sessione corrente.
+
 ## 0.15.0
 
 ### Consumi elettrici effettivi affiancati alle stime

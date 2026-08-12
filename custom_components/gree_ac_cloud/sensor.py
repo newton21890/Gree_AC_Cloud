@@ -3,7 +3,7 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, UnitOfEnergy, UnitOfPower, UnitOfTemperature
+from homeassistant.const import PERCENTAGE, UnitOfEnergy, UnitOfPower, UnitOfTemperature, UnitOfTime
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DEVICE_SENSORS
@@ -20,6 +20,8 @@ async def async_setup_entry(hass, entry, async_add_entities: AddEntitiesCallback
         entities.append(GreeBaselinePowerSensor(coord))
         entities.append(GreeSavingPowerSensor(coord))
         entities.append(GreeEnergySensor(coord))
+        entities.append(GreeTotalRuntimeSensor(coord))
+        entities.append(GreeCurrentRuntimeSensor(coord))
     async_add_entities(entities)
 
 
@@ -222,6 +224,40 @@ class GreeSavingPowerSensor(GreeDeviceEntity, SensorEntity):
             "counterfactual": True,
             "not_a_meter": True,
         }
+
+
+class GreeTotalRuntimeSensor(GreeDeviceEntity, SensorEntity):
+    """Persistent cumulative powered-on hours since the last manual reset."""
+
+    _attr_name = "Total Runtime"
+    _attr_icon = "mdi:timer-outline"
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_state_class = SensorStateClass.TOTAL
+
+    def __init__(self, coordinator):
+        super().__init__(coordinator, coordinator.device, key_suffix="total_runtime")
+
+    @property
+    def native_value(self):
+        return round(float(self.coordinator.data.get("total_runtime_seconds", 0)) / 3600, 2)
+
+
+class GreeCurrentRuntimeSensor(GreeDeviceEntity, SensorEntity):
+    """Hours elapsed since the current power-on transition."""
+
+    _attr_name = "Current Runtime"
+    _attr_icon = "mdi:timer-play-outline"
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator):
+        super().__init__(coordinator, coordinator.device, key_suffix="current_runtime")
+
+    @property
+    def native_value(self):
+        return round(float(self.coordinator.data.get("current_run_seconds", 0)) / 3600, 2)
 
 
 class GreeEnergySensor(GreeDeviceEntity, SensorEntity):

@@ -701,8 +701,9 @@ class GreePanelCommandView(HomeAssistantView):
         options = body.get("options", [])
         values = body.get("values", [])
         has_startup_dred = "startup_dred" in body
+        reset_runtime = body.get("reset_runtime") is True
 
-        if not mac or (not has_startup_dred and (not options or not values)):
+        if not mac or (not has_startup_dred and not reset_runtime and (not options or not values)):
             return self.json({"error": "missing command data"}, status=400)
 
         for entry in hass.config_entries.async_entries(DOMAIN):
@@ -714,6 +715,10 @@ class GreePanelCommandView(HomeAssistantView):
                     if coord.device.mac == mac:
                         if not _valid_mac(mac):
                             return self.json({"error": "invalid mac"}, status=400)
+                        if reset_runtime:
+                            await coord.async_reset_runtime()
+                            _LOGGER.info("Runtime counter reset for %s", mac)
+                            return self.json({"ok": True})
                         if has_startup_dred:
                             startup_dred = body.get("startup_dred")
                             if isinstance(startup_dred, bool) or startup_dred not in (
@@ -1780,6 +1785,8 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline:2px 
 .ops-health { color:var(--green); font-size:9px; }
 .ops-data-row { display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid #222c3b; color:var(--text2); font-size:10px; }
 .ops-data-row b { color:var(--text); text-align:right; }
+.ops-inline-reset { margin-left:5px; padding:2px 6px; border:1px solid #435269; border-radius:5px; color:#aebdd0; background:#141d29; font-size:8px; cursor:pointer; }
+.ops-inline-reset:hover { border-color:#e29b43; color:#ffd08a; }
 .ops-details { margin-top:12px; padding-top:10px; border-top:0; }
 .ops-details summary { min-height:32px; padding:8px; border:1px solid var(--border); border-radius:7px; text-align:center; cursor:pointer; color:#98a7bc; font-size:9px; }
 .ops-details .control-row { display:grid; grid-template-columns:1fr; align-items:start; margin-top:10px; }
@@ -2906,6 +2913,20 @@ async function sendCommand(mac, options, values) {
   }
 }
 
+function formatRuntime(seconds) {
+  const value = Math.max(0, Number(seconds) || 0);
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  return `${hours.toLocaleString('it-IT')} h ${String(minutes).padStart(2,'0')} min`;
+}
+async function resetRuntime(mac) {
+  if (!window.confirm('Azzerare le ore totali di accensione di questa unità? Il consumo energetico non verrà azzerato.')) return;
+  try {
+    await apiFetch(PANEL_CMD_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mac,reset_runtime:true})});
+    await loadData();
+  } catch (error) { alert('Azzeramento ore non riuscito: ' + error.message); }
+}
+
 function parseProbeTemp(val) {
   if (val == null || val === undefined) return null;
   const raw = Number(val);
@@ -3386,8 +3407,10 @@ function renderOperationsDevice(d) {
       </section>
       <section class="ops-telemetry">
         <div class="ops-telemetry-head"><span class="ops-section-label">Telemetria</span><span class="ops-health">${errorCode === 0 ? '● NESSUN ERRORE' : '● ERRORE ' + errorCode}</span></div>
-        <div class="ops-data-row"><span>Potenza stimata</span><b>${modelKey || s.estimated_power_w != null ? estPower.toFixed(2) + ' kW' : '--'}</b></div>
-        <div class="ops-data-row"><span>Energia sessione</span><b>${modelKey || s.estimated_energy_kwh != null ? energy + ' kWh' : '--'}</b></div>
+        <div class="ops-data-row"><span>Potenza effettiva / stimata</span><b>${s.ActualPowerW != null ? (Number(s.ActualPowerW) / 1000).toFixed(2) + ' kW' : '--'} / ${modelKey || s.estimated_power_w != null ? estPower.toFixed(2) + ' kW' : '--'}</b></div>
+        <div class="ops-data-row"><span>Energia effettiva / stimata</span><b>${s.ActualEnergyKWh != null ? Number(s.ActualEnergyKWh).toFixed(2) + ' kWh' : '--'} / ${modelKey || s.estimated_energy_kwh != null ? energy + ' kWh' : '--'}</b></div>
+        <div class="ops-data-row"><span>Ore accensione totali</span><b>${formatRuntime(s.total_runtime_seconds)} <button class="ops-inline-reset" onclick="resetRuntime('${safeMac}')" title="Azzera solo il contatore delle ore">Azzera</button></b></div>
+        <div class="ops-data-row"><span>Dall’ultima accensione</span><b>${pow ? formatRuntime(s.current_run_seconds) : '--'}</b></div>
         <div class="ops-data-row"><span>Ventilatore</span><b>${fanLabels[Number(s.WdSpd)] || s.WdSpd || '--'}</b></div>
         <div class="ops-data-row"><span>Profilo</span><b>${activePreset ? (presetLabels[activePreset] || escHtml(activePreset).toUpperCase()) : 'MANUALE'}</b></div>
         <div class="ops-data-row"><span>Decisione Smart</span><b>${escHtml(s.smart_last_action || '--')}</b></div>

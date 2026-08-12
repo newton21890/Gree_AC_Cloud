@@ -90,6 +90,10 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         self.device = device
         self._mqtt = mqtt
         self._total_energy_kwh: float = 0.0
+        self._total_runtime_seconds: float = 0.0
+        self._current_run_seconds: float = 0.0
+        self._last_runtime_time: float = time.monotonic()
+        self._runtime_powered = bool(device.properties.get("Pow"))
         self._last_energy_time: float = time.monotonic()
         self._energy_save_counter = 0
         self._energy_store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.energy.{device.mac}")
@@ -102,12 +106,19 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         data = await self._energy_store.async_load()
         if data:
             self._total_energy_kwh = data.get("total_kwh", 0.0)
+            self._total_runtime_seconds = max(0.0, float(data.get("total_runtime_seconds", 0.0)))
+            if self.device.properties.get("Pow"):
+                self._current_run_seconds = max(0.0, float(data.get("current_run_seconds", 0.0)))
         startup_data = await self._startup_store.async_load()
         if startup_data:
             dred = startup_data.get("dred")
             if dred in (0, 1, 2, 3):
                 self._startup_settings["dred"] = dred
         self._last_power = self.device.properties.get("Pow")
+        self._runtime_powered = bool(self._last_power)
+        if not self._runtime_powered:
+            self._current_run_seconds = 0.0
+        self._last_runtime_time = time.monotonic()
         self._last_energy_time = time.monotonic()
 
     @property
@@ -161,6 +172,8 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         """Publish fresh data and detect starts originating outside HA."""
         current_power = self.device.properties.get("Pow")
         power_on = self._last_power == 0 and current_power == 1
+        if power_on:
+            self._current_run_seconds = 0.0
         self._last_power = current_power
         self.async_set_updated_data(self._build_data())
         if power_on and self.startup_dred is not None:
@@ -170,8 +183,17 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         await self._energy_store.async_save(
             {
                 "total_kwh": self._total_energy_kwh,
+                "total_runtime_seconds": self._total_runtime_seconds,
+                "current_run_seconds": self._current_run_seconds,
             }
         )
+
+    async def async_reset_runtime(self) -> None:
+        """Reset the persistent total runtime without affecting energy data."""
+        self._total_runtime_seconds = 0.0
+        self._last_runtime_time = time.monotonic()
+        await self.async_save_energy()
+        self.async_set_updated_data(self._build_data())
 
     @property
     def _model_key(self) -> str:
@@ -261,9 +283,22 @@ class GreeDeviceCoordinator(DataUpdateCoordinator):
         now = time.monotonic()
         elapsed_h = (now - self._last_energy_time) / 3600.0
         self._last_energy_time = now
+        runtime_elapsed = now - self._last_runtime_time
+        self._last_runtime_time = now
+        # Attribute elapsed time to the state observed during the preceding
+        # interval. This avoids adding off-time at startup and preserves the
+        # final interval when an MQTT update reports a power-off transition.
+        if self._runtime_powered and 0 < runtime_elapsed < 3600:
+            self._total_runtime_seconds += runtime_elapsed
+            self._current_run_seconds += runtime_elapsed
+        self._runtime_powered = bool(data.get("Pow"))
+        if not self._runtime_powered:
+            self._current_run_seconds = 0.0
         if data.get("Pow") and elapsed_h > 0 and elapsed_h < 1:
             self._total_energy_kwh += data["estimated_power_w"] * elapsed_h / 1000.0
         data["estimated_energy_kwh"] = round(self._total_energy_kwh, 3)
+        data["total_runtime_seconds"] = round(self._total_runtime_seconds)
+        data["current_run_seconds"] = round(self._current_run_seconds)
         return data
 
     async def _async_update_data(self) -> dict[str, Any]:

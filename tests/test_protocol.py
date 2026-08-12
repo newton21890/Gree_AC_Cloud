@@ -198,6 +198,22 @@ def test_optional_environment_sensors_honor_protocol_sentinels() -> None:
     assert "toggleNativeSensor" in panel_source
 
 
+def test_runtime_counters_are_persistent_and_resettable() -> None:
+    coordinator_source = (COMPONENT / "coordinator.py").read_text()
+    sensor_source = (COMPONENT / "sensor.py").read_text()
+    panel_source = (COMPONENT / "panel.py").read_text()
+    assert '"total_runtime_seconds"' in coordinator_source
+    assert '"current_run_seconds"' in coordinator_source
+    assert "async_reset_runtime" in coordinator_source
+    assert "class GreeTotalRuntimeSensor" in sensor_source
+    assert "class GreeCurrentRuntimeSensor" in sensor_source
+    assert "Ore accensione totali" in panel_source
+    assert "Dall’ultima accensione" in panel_source
+    assert "Potenza effettiva / stimata" in panel_source
+    assert "Energia effettiva / stimata" in panel_source
+    assert "reset_runtime" in panel_source
+
+
 def test_actual_energy_meters_are_optional_and_keep_estimates() -> None:
     panel_source = (COMPONENT / "panel.py").read_text()
     history_source = (COMPONENT / "panel_history.py").read_text()
