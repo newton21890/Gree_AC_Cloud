@@ -16,8 +16,16 @@ build/
 *.swp
 
 # Credentials & secrets
+.env
+.env.*
+!.env.example
 .bridge_credentials.json
 cloud_bridge_config.json
+secrets.yaml
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Binary / large files
 *.apk
