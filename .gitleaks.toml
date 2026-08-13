@@ -1,0 +1,12 @@
+title = "Gree AC Cloud secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Explicit dummy keys used by protocol tests and upstream configuration examples"
+regexTarget = "secret"
+regexes = [
+  '''^0123456789abcdef$''',
+  '''^A1B2C3D4E5F6$''',
+]
